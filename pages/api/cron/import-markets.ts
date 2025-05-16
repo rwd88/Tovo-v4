@@ -1,4 +1,5 @@
 /* eslint-disable */
+ /* eslint-disable @typescript-eslint/no-explicit-any */
 
 // File: pages/api/cron/import-markets.ts
 

@@ -6,6 +6,7 @@ import { PrismaClient } from '@prisma/client'
 declare global {
   // prevent multiple clients in dev
   // @ts-ignore
+  // @ts-expect-error
   var __prisma: PrismaClient | undefined
 }
 
