@@ -17,12 +17,12 @@ export default async function handler(
   console.log('⏳ import-markets cron start')
 
   try {
-    // 1) Wipe out yesterday's trades
+    // 1) Delete all previous trades
     console.log('→ Deleting all trades…')
     const tradesDel = await prisma.trade.deleteMany({})
     console.log(`✔ Trades deleted: ${tradesDel.count}`)
 
-    // 2) Wipe out yesterday's markets
+    // 2) Delete all previous markets
     console.log('→ Deleting all markets…')
     const marketsDel = await prisma.market.deleteMany({})
     console.log(`✔ Markets deleted: ${marketsDel.count}`)
@@ -41,13 +41,13 @@ export default async function handler(
     })
     console.log('✔ HTML fetched, loading into cheerio…')
 
-    // 4) Parse out all high-impact (red) rows
+    // 4) Scrape all high-impact (red) rows
     const $ = cheerio.load(html)
-    // ForexFactory now marks red events with <span class="impact-icon impact-icon--high">
+    // FF marks red events with <span class="impact-icon impact-icon--high">
     const rows = $('span.impact-icon--high').closest('tr')
     console.log(`→ Found ${rows.length} high-impact rows`)
 
-    // 5) Map every row to a Market record
+    // 5) Map each row into a Market record
     const toCreate = rows
       .map((_, el) => {
         const $row = $(el)
@@ -62,20 +62,18 @@ export default async function handler(
 
         return {
           question: $row.find('td.calendar__event').text().trim(),
-          status: 'open' as const,
+          status:   'open' as const,
           eventTime,
-          forecast: parseFloat(
-            $row.find('td.calendar__forecast').text().trim() || '0'
-          ),
-          outcome: null as string | null,
-          poolYes: 0,
-          poolNo: 0,
+          forecast: parseFloat($row.find('td.calendar__forecast').text().trim() || '0'),
+          outcome:  null as string | null,
+          poolYes:  0,
+          poolNo:   0,
         }
       })
       .get() // Cheerio → real array
     console.log(`→ Prepared ${toCreate.length} market records for insertion`)
 
-    // 6) Bulk-insert them all in chunks of 100, accumulating a total count
+    // 6) Bulk-insert them in chunks of 100
     let added = 0
     for (let i = 0; i < toCreate.length; i += 100) {
       const chunk = toCreate.slice(i, i + 100)
@@ -86,15 +84,14 @@ export default async function handler(
 
     // 7) Return summary
     return res.status(200).json({
-      success: true,
-      tradesDeleted: tradesDel.count,
+      success:        true,
+      tradesDeleted:  tradesDel.count,
       marketsDeleted: marketsDel.count,
       added,
     })
   } catch (err) {
     console.error('🔥 import-markets cron failed:', err)
-    return res
-      .status(500)
-      .json({ success: false, error: (err as Error).message || 'Unknown error' })
+    const message = err instanceof Error ? err.message : String(err)
+    return res.status(500).json({ success: false, error: message })
   }
 }

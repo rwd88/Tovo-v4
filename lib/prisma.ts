@@ -1,12 +1,10 @@
-/* eslint-disable */
-// File: lib/prisma.ts
-
+/* eslint-disable @typescript-eslint/ban-ts-comment */
 import { PrismaClient } from '@prisma/client'
 
 declare global {
   // prevent multiple clients in dev
   // @ts-expect-error
-  var __prisma: PrismaClient | undefined
+  let __prisma: PrismaClient | undefined
 }
 
 export const prisma =
@@ -14,5 +12,6 @@ export const prisma =
   new PrismaClient({ log: ['query'] })
 
 if (process.env.NODE_ENV !== 'production') {
+  // @ts-expect-error
   global.__prisma = prisma
 }
