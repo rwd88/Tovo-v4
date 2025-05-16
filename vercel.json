@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/import-markets",
+      "schedule": "0 0 * * *"
+    }
+  ]
+}
