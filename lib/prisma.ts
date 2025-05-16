@@ -1,6 +1,6 @@
-/* eslint-disable no-var, @typescript-eslint/ban-ts-comment */
+/* eslint-disable @typescript-eslint/ban-ts-comment */
+/* eslint-disable no-var */
 
-// lib/prisma.ts
 import { PrismaClient } from '@prisma/client'
 
 declare global {
