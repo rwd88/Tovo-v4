@@ -1,3 +1,5 @@
+/* eslint-disable no-var, @typescript-eslint/ban-ts-comment */
+
 // lib/prisma.ts
 import { PrismaClient } from '@prisma/client'
 

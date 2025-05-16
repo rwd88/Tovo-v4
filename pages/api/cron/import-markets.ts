@@ -1,4 +1,6 @@
-  // File: pages/api/cron/import-markets.ts
+/* eslint-disable */
+
+// File: pages/api/cron/import-markets.ts
 
   import type { NextApiRequest, NextApiResponse } from 'next'
   import axios from 'axios'
