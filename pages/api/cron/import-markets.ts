@@ -26,7 +26,7 @@ export default async function handler(
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(403).json({ success: false, error: 'Unauthorized' })
   }
-
+}
   // 1) only GET
   if (req.method !== 'GET') {
     return res
@@ -118,4 +118,3 @@ export default async function handler(
       .status(500)
       .json({ success: false, error: (err as Error).message })
   }
-}  // <-- real closing brace
