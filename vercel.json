@@ -6,3 +6,9 @@
     }
   ]
 }
+{
+  "version": 2,
+  "cache": {
+    "ignoreBuildCache": true
+  }
+}
