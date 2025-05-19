@@ -1,10 +1,24 @@
-/* eslint-disable */
-// File: pages/api/cron/import-markets.ts
-
+// pages/api/cron/import-markets.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
 import axios from 'axios'
 import * as cheerio from 'cheerio'
 import { prisma } from '../../../lib/prisma'
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  // 1) secret check:
+  const auth = req.headers['authorization']
+  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+    return res.status(403).json({ success: false, error: 'Unauthorized' })
+  }
+
+  // 2) only GET:
+  if (req.method !== 'GET') {
+    return res.status(405).json({ success: false, error: 'Only GET allowed' })
+  }
+  
 
 interface ApiResponse {
   success: boolean
