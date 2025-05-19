@@ -106,7 +106,7 @@ export default async function handler(
     }
     console.log(`✔ Markets created: ${added}`)
 
-    // 8) respond
+    // 8) send JSON response
     return res.status(200).json({
       success: true,
       tradesDeleted: tradesDel.count,
@@ -119,4 +119,4 @@ export default async function handler(
       .status(500)
       .json({ success: false, error: (err as Error).message })
   }
-}  // <-- end of handler, no extra code below
+}
