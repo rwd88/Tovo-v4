@@ -117,4 +117,4 @@ export default async function handler(
       .status(500)
       .json({ success: false, error: (err as Error).message })
   }
-}  // <-- this single closing brace ends your handler; no more code below it
+}  // <-- **REAL** closing brace for your handler
