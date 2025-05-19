@@ -4,7 +4,6 @@ import axios from 'axios'
 import * as cheerio from 'cheerio'
 import { prisma } from '../../../lib/prisma'
 
-// shape of our JSON response
 interface ApiResponse {
   success: boolean
   tradesDeleted?: number
@@ -62,7 +61,7 @@ export default async function handler(
     })
     console.log('✔ HTML fetched, loading into cheerio…')
 
-    // 4) find red(impact–high) rows
+    // 4) find high-impact rows
     const $ = cheerio.load(html)
     const rows = $('span.impact-icon--high').closest('tr')
     console.log(`→ Found ${rows.length} high-impact rows`)
@@ -118,4 +117,4 @@ export default async function handler(
       .status(500)
       .json({ success: false, error: (err as Error).message })
   }
-}
+}  // <-- this single closing brace ends your handler; no more code below it
