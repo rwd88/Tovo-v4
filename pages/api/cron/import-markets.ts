@@ -8,13 +8,14 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  // 1) secret check:
-  const auth = req.headers['authorization']
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
-    return res.status(403).json({ success: false, error: 'Unauthorized' })
+  // 0) Check cron secret
+  const auth = req.headers.authorization
+  if (process.env.CRON_SECRET) {
+    if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+      return res.status(403).json({ success: false, error: 'Unauthorized' })
+    }
   }
 
-  // 2) only GET:
   if (req.method !== 'GET') {
     return res.status(405).json({ success: false, error: 'Only GET allowed' })
   }
