@@ -1,5 +1,4 @@
 // File: pages/api/cron/import-markets.ts
-
 import type { NextApiRequest, NextApiResponse } from 'next'
 import axios from 'axios'
 import { prisma } from '../../../lib/prisma'
@@ -12,14 +11,12 @@ interface ApiResponse {
   error?: string
 }
 
-// shape of the Faireconomy JSON feed
 interface FFEvent {
   title: string
   impact: 0 | 1 | 2 | 3
-  date: string       // e.g. "2025-05-19T13:30:00Z"
-  forecast: string    // e.g. "3.5"
+  date: string
+  forecast: string
 }
-
 interface FFCalendar {
   events: FFEvent[]
 }
@@ -28,7 +25,7 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ApiResponse>
 ) {
-  // 0) secret
+  // 0) secret check
   const auth = req.headers.authorization
   if (!process.env.CRON_SECRET) {
     return res
@@ -39,7 +36,7 @@ export default async function handler(
     return res.status(403).json({ success: false, error: 'Unauthorized' })
   }
 
-  // 1) GET only
+  // 1) enforce GET
   if (req.method !== 'GET') {
     return res.status(405).json({ success: false, error: 'Only GET allowed' })
   }
@@ -49,16 +46,15 @@ export default async function handler(
     const tradesDel = await prisma.trade.deleteMany({})
     const marketsDel = await prisma.market.deleteMany({})
 
-    // 3) fetch the JSON calendar
-    const JSON_URL = 'https://cdn.faireconomy.media/ff_calendar_thisweek.json'
-    const { data: feed } = await axios.get<FFCalendar>(JSON_URL, {
-      responseType: 'json',
-    })
+    // 3) fetch JSON calendar from the NFS host
+    const JSON_URL =
+      'https://cdn-nfs.faireconomy.media/ff_calendar_thisweek.json'
+    const { data: feed } = await axios.get<FFCalendar>(JSON_URL)
 
-    // 4) filter only high-impact (impact===3)
+    // 4) filter high impact only
     const high = feed.events.filter((e) => e.impact === 3)
 
-    // 5) map to your prisma shape
+    // 5) map into your schema
     const toCreate = high.map((e) => ({
       question: e.title,
       status: 'open' as const,
@@ -69,7 +65,7 @@ export default async function handler(
       poolNo: 0,
     }))
 
-    // 6) bulk-insert in chunks of 100
+    // 6) bulk‐insert in batches of 100
     let added = 0
     for (let i = 0; i < toCreate.length; i += 100) {
       const chunk = toCreate.slice(i, i + 100)
@@ -77,7 +73,7 @@ export default async function handler(
       added += count
     }
 
-    // 7) respond
+    // 7) success response
     return res.status(200).json({
       success: true,
       tradesDeleted: tradesDel.count,
