@@ -16,7 +16,7 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ApiResponse>
 ) {
-  // 0) check cron secret
+  // 0) verify cron secret
   const auth = req.headers.authorization
   if (!process.env.CRON_SECRET) {
     return res
@@ -27,7 +27,7 @@ export default async function handler(
     return res.status(403).json({ success: false, error: 'Unauthorized' })
   }
 
-  // only GET allowed
+  // 1) only GET
   if (req.method !== 'GET') {
     return res
       .status(405)
@@ -35,18 +35,19 @@ export default async function handler(
   }
 
   console.log('⏳ import-markets cron start')
+
   try {
-    // 1) delete trades
+    // 2) delete yesterday’s trades
     console.log('→ Deleting all trades…')
     const tradesDel = await prisma.trade.deleteMany({})
     console.log(`✔ Trades deleted: ${tradesDel.count}`)
 
-    // 2) delete markets
+    // 3) delete yesterday’s markets
     console.log('→ Deleting all markets…')
     const marketsDel = await prisma.market.deleteMany({})
     console.log(`✔ Markets deleted: ${marketsDel.count}`)
 
-    // 3) fetch HTML
+    // 4) fetch this week’s calendar
     const CAL_URL = 'https://www.forexfactory.com/calendar.php?week=this'
     console.log(`→ Fetching calendar HTML from ${CAL_URL}`)
     const { data: html } = await axios.get<string>(CAL_URL, {
@@ -61,12 +62,12 @@ export default async function handler(
     })
     console.log('✔ HTML fetched, loading into cheerio…')
 
-    // 4) find high-impact rows
+    // 5) parse high-impact rows
     const $ = cheerio.load(html)
     const rows = $('span.impact-icon--high').closest('tr')
     console.log(`→ Found ${rows.length} high-impact rows`)
 
-    // 5) map to Market objects
+    // 6) build data array
     const toCreate = rows
       .map((_, el) => {
         const $row = $(el)
@@ -92,19 +93,19 @@ export default async function handler(
         }
       })
       .get()
-
     console.log(`→ Prepared ${toCreate.length} market records`)
 
-    // 6) bulk insert
+    // 7) bulk insert in chunks
     let added = 0
     for (let i = 0; i < toCreate.length; i += 100) {
-      const chunk = toCreate.slice(i, i + 100)
-      const result = await prisma.market.createMany({ data: chunk })
+      const result = await prisma.market.createMany({
+        data: toCreate.slice(i, i + 100),
+      })
       added += result.count
     }
     console.log(`✔ Markets created: ${added}`)
 
-    // 7) return
+    // 8) respond
     return res.status(200).json({
       success: true,
       tradesDeleted: tradesDel.count,
@@ -117,4 +118,4 @@ export default async function handler(
       .status(500)
       .json({ success: false, error: (err as Error).message })
   }
-}  // <-- **REAL** closing brace for your handler
+}  // <-- real closing brace
