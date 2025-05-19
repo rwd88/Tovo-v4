@@ -1,4 +1,5 @@
 // File: pages/api/cron/import-markets.ts
+
 import type { NextApiRequest, NextApiResponse } from 'next'
 import axios from 'axios'
 import * as cheerio from 'cheerio'
@@ -53,7 +54,8 @@ export default async function handler(
     const { data: html } = await axios.get<string>(CAL_URL, {
       responseType: 'text',
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
         Accept: 'text/html,application/xhtml+xml',
         'Accept-Language': 'en-US,en;q=0.9',
         Connection: 'keep-alive',
@@ -97,8 +99,9 @@ export default async function handler(
     // 7) bulk insert in chunks
     let added = 0
     for (let i = 0; i < toCreate.length; i += 100) {
-      const chunk = toCreate.slice(i, i + 100)
-      const { count } = await prisma.market.createMany({ data: chunk })
+      const { count } = await prisma.market.createMany({
+        data: toCreate.slice(i, i + 100),
+      })
       added += count
     }
     console.log(`✔ Markets created: ${added}`)
@@ -116,4 +119,4 @@ export default async function handler(
       .status(500)
       .json({ success: false, error: (err as Error).message })
   }
-}  // <-- this single brace closes your handler, no extra code below
+}  // <-- end of handler, no extra code below
