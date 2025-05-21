@@ -1,12 +1,21 @@
 // pages/api/cron/import-results.ts
+
 import type { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 import { parseStringPromise } from 'xml2js';
 import prisma from '../../../lib/prisma';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // 🔒 Guard: allow secret via query or via Authorization: Bearer
+  const providedSecret =
+    (req.query.secret as string) ||
+    req.headers.authorization?.split(' ')[1];
+  if (providedSecret !== process.env.CRON_SECRET) {
+    return res.status(404).end();
+  }
+
   try {
-    // 1. Fetch ForexFactory’s XML feed
+    // 1. Fetch ForexFactory XML feed
     const feedUrl = 'https://cdn-nfs.forexfactory.net/ff_calendar_thisweek.xml';
     const { data: xml } = await axios.get<string>(feedUrl, { responseType: 'text' });
 
@@ -16,8 +25,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       ? parsed.rss.channel.item
       : [parsed.rss.channel.item];
 
-    // 3. Upsert outcomes
-    let processed = 0, failures: string[] = [];
+    // 3. Update your Market.outcome for each event
+    let processed = 0;
+    const failures: string[] = [];
+
     for (const item of items) {
       const eventId = item['ff:calendar_id'];
       const actual  = item['ff:actual']?.trim();
@@ -30,15 +41,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
         processed++;
       } catch (err) {
-        console.error(`✖ Error updating ${eventId}`, err);
+        console.error(`✖ Error updating market ${eventId}`, err);
         failures.push(eventId);
       }
     }
 
-    // 4. Return summary
+    // 4. Return a summary
     return res.status(200).json({ importedResults: processed, failures });
   } catch (err) {
     console.error('❗ import-results error', err);
-    return res.status(500).json({ error: 'Import failed.' });
+    return res.status(500).json({ error: 'Import of event outcomes failed.' });
   }
 }

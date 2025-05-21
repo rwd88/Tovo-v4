@@ -24,7 +24,8 @@ model Market {
   status     String   // open, locked, settled
   eventTime  DateTime
   forecast   Float
-  outcome    String?  // yes / no
+outcome    String?  // yes / no
+  externalId String   @unique  // ← ForexFactory calendar_id
   poolYes    Float    @default(0)
   poolNo     Float    @default(0)
   trades     Trade[]
