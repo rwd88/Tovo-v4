@@ -3,15 +3,7 @@
   "crons": [
     {
       "path": "/api/cron/import-markets",
-      "schedule": "0 0 * * *"
-    },
-    {
-      "path": "/api/cron/import-results",
-      "schedule": "0 0 * * *"
-    },
-    {
-      "path": "/api/cron/settle",
-      "schedule": "0 0 * * *"
+      "schedule": "0 10 * * *"
     }
   ]
 }
