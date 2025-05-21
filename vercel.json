@@ -1,17 +1,4 @@
 {
-  "crons": [
-    {
-      "path": "/api/cron/import-markets",
-      "schedule": "0 0 * * *"
-    }
-  ]
-}
-{
-  "version": 3,
-  "cache": {
-    "ignoreBuildCache": true
-  }
-}{
   "version": 3,
   "cache": {
     "ignoreBuildCache": true
