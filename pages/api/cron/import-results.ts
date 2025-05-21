@@ -20,7 +20,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       ? parsed.rss.channel.item
       : [parsed.rss.channel.item];
 
-    let processed = 0, failures: string[] = [];
+    let processed = 0;
+ const failures: string[] = [];
     for (const item of items) {
       const eventId = item['ff:calendar_id'];
       const actual  = item['ff:actual']?.trim();
