@@ -7,8 +7,28 @@
   ]
 }
 {
-  "version": 2,
+  "version": 3,
   "cache": {
     "ignoreBuildCache": true
   }
+}{
+  "version": 3,
+  "cache": {
+    "ignoreBuildCache": true
+  },
+  "crons": [
+    {
+      "path": "/api/cron/import-markets",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/import-results",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/settle",
+      "schedule": "15 * * * *"
+    }
+  ]
 }
+
