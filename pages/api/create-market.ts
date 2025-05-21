@@ -21,6 +21,7 @@ export default async function handler(
       outcome,
       poolYes,
       poolNo,
+      externalId,    // ← make sure we pull this in
     } = req.body
 
     // Validate payload
@@ -30,7 +31,8 @@ export default async function handler(
       !eventTime ||
       forecast === undefined ||
       poolYes === undefined ||
-      poolNo === undefined
+      poolNo === undefined ||
+      !externalId    // ← require it as well
     ) {
       return res.status(400).json({ error: 'Missing required fields' })
     }
@@ -45,6 +47,7 @@ export default async function handler(
         outcome,
         poolYes,
         poolNo,
+        externalId,   // ← write it into the DB
       },
     })
 
