@@ -26,7 +26,7 @@ export default async function handler() {
       
       // Get corresponding pool and trades
       const winningPool = winningOutcome === 'YES' ? market.poolYes : market.poolNo;
-      const losingPool = winningOutcome === 'YES' ? market.poolNo : market.poolYes;
+      // const losingPool = winningOutcome === 'YES' ? market.poolNo : market.poolYes;  // <-- Removed
       const winningTrades = market.trades.filter(t => t.type === winningOutcome);
 
       // Economic calculations
