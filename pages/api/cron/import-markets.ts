@@ -25,6 +25,11 @@ interface ApiResponse {
   error?: string
 }
 
+// Type guard to remove nulls
+function notNull<T>(value: T | null): value is T {
+  return value !== null;
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ApiResponse>
@@ -110,7 +115,7 @@ export default async function handler(
           poolNo: 0,
         }
       })
-      .filter(Boolean)
+      .filter(notNull) // <--- Fix here!
 
     // 6) Insert in batches
     let added = 0
