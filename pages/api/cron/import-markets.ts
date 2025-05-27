@@ -2,7 +2,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next'
 import axios from 'axios'
-// @ts-ignore: missing xml2js types
+// @ts-expect-error: xml2js has no types
 import { parseStringPromise } from 'xml2js'
 import { prisma } from '../../../lib/prisma'   // ← named import
 
