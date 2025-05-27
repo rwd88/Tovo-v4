@@ -3,7 +3,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import axios from 'axios'
 import * as cheerio from 'cheerio'
-import prisma from '../../../lib/prisma'
+import { prisma } from '../../../lib/prisma'  // ← use named import
 
 interface ApiResponse {
   success: boolean
@@ -99,7 +99,7 @@ export default async function handler(
     for (let i = 0; i < toCreate.length; i += 100) {
       const { count } = await prisma.market.createMany({
         data: toCreate.slice(i, i + 100),
-        skipDuplicates: true
+        skipDuplicates: true,
       })
       added += count
     }
@@ -107,8 +107,8 @@ export default async function handler(
 
     // 7) Return summary
     return res.status(200).json({
-      success:       true,
-      tradesDeleted: tradesDel.count,
+      success:        true,
+      tradesDeleted:  tradesDel.count,
       marketsDeleted: marketsDel.count,
       added,
     })
