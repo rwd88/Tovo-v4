@@ -3,7 +3,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import axios from 'axios'
 import * as cheerio from 'cheerio'
-import { prisma } from '../../../lib/prisma'
+import prisma from '../../../lib/prisma'
 
 interface ApiResponse {
   success: boolean
@@ -54,8 +54,7 @@ export default async function handler(
     const { data: html } = await axios.get<string>(CAL_URL, {
       responseType: 'text',
       headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
         Accept: 'text/html,application/xhtml+xml',
         'Accept-Language': 'en-US,en;q=0.9',
         Connection: 'keep-alive',
@@ -63,12 +62,12 @@ export default async function handler(
     })
     console.log('✔ HTML fetched, loading into cheerio…')
 
-    // 5) Parse high‐impact rows
+    // 5) Parse high-impact rows
     const $ = cheerio.load(html)
     const rows = $('span.impact-icon--high').closest('tr')
     console.log(`→ Found ${rows.length} high-impact rows`)
 
-    // 6) Bulk‐insert in chunks of 100 to avoid payload limits
+    // 6) Build payload with required externalId, chunked insert
     const toCreate = rows
       .map((_, el) => {
         const $row = $(el)
@@ -82,10 +81,10 @@ export default async function handler(
         const eventTime = new Date(`${dateText} ${timeText}`).toISOString()
 
         return {
-          externalId: eventTime,  // ← satisfy the required field
+          externalId: eventTime,             // ← required by schema
           question:   $row.find('td.calendar__event').text().trim(),
           status:     'open' as const,
-          eventTime,
+          eventTime,                         // ISO string
           forecast:   parseFloat(
                         $row.find('td.calendar__forecast').text().trim() || '0'
                       ),
@@ -108,7 +107,7 @@ export default async function handler(
 
     // 7) Return summary
     return res.status(200).json({
-      success: true,
+      success:       true,
       tradesDeleted: tradesDel.count,
       marketsDeleted: marketsDel.count,
       added,
