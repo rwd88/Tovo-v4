@@ -21,14 +21,13 @@ export default async function handler() {
   for (const market of markets) {
     const totalPool = market.poolYes + market.poolNo;
     const winningSide = market.outcome === 'YES' ? 'poolYes' : 'poolNo';
-    const losingSide = winningSide === 'poolYes' ? 'poolNo' : 'poolYes';
     
     // Economic calculations
     const houseCut = totalPool * 0.1; // 10% house fee
     const tradingFee = totalPool * 0.01; // 1% per trade
     const netPool = totalPool - houseCut - (tradingFee * 2);
     
-    // 3. Update trader balances (pseudo-code)
+    // 3. Update trader balances
     const winningTrades = market.trades.filter(t => t.side === winningSide);
     const winningShare = market[winningSide] / netPool;
     
