@@ -1,7 +1,7 @@
 // pages/api/cron/import-markets.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
 import axios from 'axios'
-import * as cheerio from 'cheerio'
+import { parseStringPromise } from 'xml2js'
 import { prisma } from '../../../lib/prisma'
 
 interface ApiResponse {
@@ -20,86 +20,74 @@ export default async function handler(
   const auth = req.headers.authorization
   if (!process.env.CRON_SECRET) {
     console.error('CRON_SECRET not configured')
-    return res.status(500).json({ 
-      success: false, 
-      error: 'Server configuration error' 
+    return res.status(500).json({
+      success: false,
+      error: 'Server configuration error'
     })
   }
-  
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
     console.warn('Unauthorized cron attempt')
-    return res.status(403).json({ 
-      success: false, 
-      error: 'Unauthorized' 
+    return res.status(403).json({
+      success: false,
+      error: 'Unauthorized'
     })
   }
 
   // 1) Only GET
   if (req.method !== 'GET') {
-    return res.status(405).json({ 
-      success: false, 
-      error: 'Only GET requests are allowed' 
+    return res.status(405).json({
+      success: false,
+      error: 'Only GET requests are allowed'
     })
   }
 
   console.log('⏳ Starting market import cron job')
 
   try {
-    // 2) Delete existing trades
-    console.log('→ Clearing previous trades...')
+    // 2) Delete existing trades and markets
+    console.log('→ Clearing previous trades and markets...')
     const tradesDel = await prisma.trade.deleteMany({})
-    console.log(`✔ Deleted ${tradesDel.count} trades`)
-
-    // 3) Delete existing markets
-    console.log('→ Clearing previous markets...')
     const marketsDel = await prisma.market.deleteMany({})
-    console.log(`✔ Deleted ${marketsDel.count} markets`)
+    console.log(`✔ Deleted ${tradesDel.count} trades, ${marketsDel.count} markets`)
 
-    // 4) Fetch current week's calendar
-const CAL_URL = 'https://nfs.faireconomy.media/ff_calendar_thisweek.xml'
+    // 3) Fetch XML calendar
+    const CAL_URL = 'https://nfs.faireconomy.media/ff_calendar_thisweek.xml'
     console.log(`→ Fetching calendar from ${CAL_URL}`)
-    
-    const { data: html } = await axios.get<string>(CAL_URL, {
+
+    const { data: xml } = await axios.get<string>(CAL_URL, {
       responseType: 'text',
-      timeout: 10000, // 10 second timeout
+      timeout: 10000,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        Accept: 'text/html,application/xhtml+xml',
-        'Accept-Language': 'en-US,en;q=0.9',
+        'User-Agent': 'Mozilla/5.0 (compatible; ForexFactoryBot/1.0)',
       },
     })
 
-    console.log('✔ HTML fetched successfully')
-    const $ = cheerio.load(html)
+    // 4) Parse XML
+    const parsed = await parseStringPromise(xml, {
+      explicitArray: false,
+      trim: true,
+    })
+    const events = parsed?.weeklyevents?.event
+      ? Array.isArray(parsed.weeklyevents.event)
+        ? parsed.weeklyevents.event
+        : [parsed.weeklyevents.event]
+      : []
 
-    // 5) Parse high-impact events
-    const rows = $('span.impact-icon--high').closest('tr')
-    console.log(`→ Found ${rows.length} high-impact events`)
+    console.log(`→ Found ${events.length} events`)
 
-    // 6) Prepare market data
-    const toCreate = rows
-      .map((_, el) => {
-        const $row = $(el)
-        
-        const timeText = $row.find('td.calendar__time').text().trim()
-        const dateText = $row
-          .prevAll('tr.calendar__row--date')
-          .first()
-          .find('th')
-          .text()
-          .trim()
-          
-        const eventTime = new Date(`${dateText} ${timeText}`)
-        if (isNaN(eventTime.getTime())) {
-          console.warn('Invalid date for event:', $row.find('td.calendar__event').text().trim())
-          return null
-        }
+    // 5) Prepare market data (example: only "High" impact)
+    const toCreate = events
+      .filter((ev: any) => ev.impact === 'High')
+      .map((ev: any) => {
+        const date = ev.date?.trim() || ''
+        const time = ev.time?.trim() || ''
+        const eventName = ev.title?.trim() || ''
+        const forecastText = ev.forecast?.trim() || ''
+        const eventTime = new Date(`${date} ${time}`)
+        if (isNaN(eventTime.getTime())) return null
 
-        const eventName = $row.find('td.calendar__event').text().trim()
-        const forecastText = $row.find('td.calendar__forecast').text().trim()
-        
         return {
-          externalId: `${eventTime.toISOString()}-${eventName}`,
+          externalId: ev.id || ev.url || (eventName + date + time),
           question: eventName,
           status: 'open' as const,
           eventTime: eventTime.toISOString(),
@@ -109,10 +97,9 @@ const CAL_URL = 'https://nfs.faireconomy.media/ff_calendar_thisweek.xml'
           poolNo: 0,
         }
       })
-      .get()
-      .filter(Boolean) // Filter out any null entries from failed date parsing
+      .filter(Boolean)
 
-    // 7) Insert in batches
+    // 6) Insert in batches
     let added = 0
     const batchSize = 100
     for (let i = 0; i < toCreate.length; i += batchSize) {
@@ -124,7 +111,7 @@ const CAL_URL = 'https://nfs.faireconomy.media/ff_calendar_thisweek.xml'
         })
         added += count
       } catch (batchError) {
-        console.error(`Error processing batch ${i/batchSize + 1}:`, batchError)
+        console.error(`Error processing batch ${i / batchSize + 1}:`, batchError)
       }
     }
     console.log(`✔ Created ${added} new markets`)
@@ -138,9 +125,9 @@ const CAL_URL = 'https://nfs.faireconomy.media/ff_calendar_thisweek.xml'
 
   } catch (err) {
     console.error('❌ Market import failed:', err)
-    return res.status(500).json({ 
-      success: false, 
-      error: err instanceof Error ? err.message : 'Unknown error occurred' 
+    return res.status(500).json({
+      success: false,
+      error: err instanceof Error ? err.message : 'Unknown error occurred'
     })
   }
 }

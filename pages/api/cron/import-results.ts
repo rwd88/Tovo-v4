@@ -12,46 +12,28 @@ interface ApiResponse {
   warning?: string;
 }
 
-interface ForexItem {
-  'ff:calendar_id': string;
-  'ff:actual'?: string;
-  'ff:title'?: string;
-  'ff:previous'?: string;
-  'ff:forecast'?: string;
-}
-
-interface RssChannel {
-  item: ForexItem | ForexItem[];
-}
-
-interface RssFeed {
-  rss: {
-    channel: RssChannel;
-  };
-}
-
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ApiResponse>
 ) {
   // 1. Authentication
-  const providedSecret = 
-    (req.query.secret as string) || 
+  const providedSecret =
+    (req.query.secret as string) ||
     req.headers.authorization?.split(' ')[1];
-  
+
   if (!process.env.CRON_SECRET) {
     console.error('CRON_SECRET not configured');
-    return res.status(500).json({ 
-      success: false, 
-      error: 'Server configuration error' 
+    return res.status(500).json({
+      success: false,
+      error: 'Server configuration error'
     });
   }
 
   if (providedSecret !== process.env.CRON_SECRET) {
     console.warn('Unauthorized access attempt to import-results');
-    return res.status(403).json({ 
-      success: false, 
-      error: 'Unauthorized' 
+    return res.status(403).json({
+      success: false,
+      error: 'Unauthorized'
     });
   }
 
@@ -59,9 +41,9 @@ export default async function handler(
 
   try {
     // 2. Fetch and parse XML feed
-    const feedUrl = 'https://cdn-nfs.forexfactory.net/ff_calendar_thisweek.xml';
+    const feedUrl = 'https://nfs.faireconomy.media/ff_calendar_thisweek.xml'; // <-- UPDATED URL
     console.log(`→ Fetching XML feed from ${feedUrl}`);
-    
+
     const { data: xml } = await axios.get<string>(feedUrl, {
       responseType: 'text',
       timeout: 10000,
@@ -71,15 +53,17 @@ export default async function handler(
     });
 
     console.log('✔ XML feed received, parsing...');
-    const parsed = await parseStringPromise(xml, { 
+    const parsed = await parseStringPromise(xml, {
       explicitArray: false,
       trim: true,
-    }) as RssFeed;
+    });
 
     // 3. Normalize items array
-    const items = Array.isArray(parsed.rss.channel.item)
-      ? parsed.rss.channel.item
-      : [parsed.rss.channel.item];
+    const items = parsed?.weeklyevents?.event
+      ? Array.isArray(parsed.weeklyevents.event)
+        ? parsed.weeklyevents.event
+        : [parsed.weeklyevents.event]
+      : [];
 
     console.log(`→ Processing ${items.length} calendar events`);
 
@@ -89,26 +73,23 @@ export default async function handler(
     const skipped: string[] = [];
 
     for (const item of items) {
-      const eventId = item['ff:calendar_id'];
-      const actual = item['ff:actual'];
-      
+      const eventId = item.id || item.url || (item.title + item.date + item.time);
+      const actual = item.actual;
       if (!eventId) {
         skipped.push('missing-id');
         continue;
       }
-
       if (!actual) {
         skipped.push(eventId);
         continue;
       }
-
       try {
         const result = await prisma.market.updateMany({
-          where: { 
+          where: {
             externalId: eventId,
             outcome: null,
           },
-          data: { 
+          data: {
             outcome: actual,
             status: 'resolved',
           },
@@ -137,9 +118,9 @@ export default async function handler(
 
   } catch (error) {
     console.error('❌ Results import failed:', error);
-    return res.status(500).json({ 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error occurred' 
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
     });
   }
 }
