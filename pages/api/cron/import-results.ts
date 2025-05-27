@@ -1,54 +1,143 @@
 // pages/api/cron/import-results.ts
-
 import type { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 import { parseStringPromise } from 'xml2js';
-import prisma from '../../../lib/prisma';
+import { prisma } from '../../../lib/prisma';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Guard: allow secret via query or via Authorization: Bearer
-  const provided =
-    (req.query.secret as string) ||
+interface ApiResponse {
+  success: boolean;
+  importedResults?: number;
+  failures?: string[];
+  error?: string;
+  warning?: string;
+}
+
+interface ForexItem {
+  'ff:calendar_id': string;
+  'ff:actual'?: string;
+  [key: string]: any;
+}
+
+interface RssChannel {
+  item: ForexItem | ForexItem[];
+}
+
+interface RssFeed {
+  rss: {
+    channel: RssChannel;
+  };
+}
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse<ApiResponse>
+) {
+  // 1. Authentication
+  const providedSecret = 
+    (req.query.secret as string) || 
     req.headers.authorization?.split(' ')[1];
-  if (provided !== process.env.CRON_SECRET) {
-    return res.status(404).end();
+  
+  if (!process.env.CRON_SECRET) {
+    console.error('CRON_SECRET not configured');
+    return res.status(500).json({ 
+      success: false, 
+      error: 'Server configuration error' 
+    });
   }
 
-  try {
-    // 1. Fetch ForexFactory XML feed
-    const feedUrl = 'https://cdn-nfs.forexfactory.net/ff_calendar_thisweek.xml';
-    const { data: xml } = await axios.get<string>(feedUrl, { responseType: 'text' });
+  if (providedSecret !== process.env.CRON_SECRET) {
+    console.warn('Unauthorized access attempt to import-results');
+    return res.status(403).json({ 
+      success: false, 
+      error: 'Unauthorized' 
+    });
+  }
 
-    // 2. Parse XML to JS
-    const parsed = await parseStringPromise(xml, { explicitArray: false });
+  console.log('⏳ Starting results import job');
+
+  try {
+    // 2. Fetch and parse XML feed
+    const feedUrl = 'https://cdn-nfs.forexfactory.net/ff_calendar_thisweek.xml';
+    console.log(`→ Fetching XML feed from ${feedUrl}`);
+    
+    const { data: xml } = await axios.get<string>(feedUrl, {
+      responseType: 'text',
+      timeout: 10000, // 10 second timeout
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; ForexFactoryBot/1.0)',
+      },
+    });
+
+    console.log('✔ XML feed received, parsing...');
+    const parsed: RssFeed = await parseStringPromise(xml, { 
+      explicitArray: false,
+      trim: true,
+    });
+
+    // 3. Normalize items array
     const items = Array.isArray(parsed.rss.channel.item)
       ? parsed.rss.channel.item
       : [parsed.rss.channel.item];
 
-    // 3. Upsert outcomes
+    console.log(`→ Processing ${items.length} calendar events`);
+
+    // 4. Process and update outcomes
     let processed = 0;
     const failures: string[] = [];
+    const skipped: string[] = [];
 
     for (const item of items) {
       const eventId = item['ff:calendar_id'];
-      const actual  = item['ff:actual']?.trim();
-      if (!eventId || !actual) continue;
+      const actual = item['ff:actual'];
+      
+      if (!eventId) {
+        skipped.push('missing-id');
+        continue;
+      }
+
+      if (!actual) {
+        skipped.push(eventId);
+        continue;
+      }
 
       try {
-        await prisma.market.updateMany({
-          where:    { externalId: eventId },
-          data:     { outcome: actual },
+        const result = await prisma.market.updateMany({
+          where: { 
+            externalId: eventId,
+            outcome: null, // Only update if outcome isn't already set
+          },
+          data: { 
+            outcome: actual,
+            status: 'resolved', // Optionally update status
+          },
         });
-        processed++;
-      } catch {
+
+        if (result.count > 0) {
+          processed++;
+        } else {
+          skipped.push(eventId);
+        }
+      } catch (error) {
+        console.error(`Failed to update event ${eventId}:`, error);
         failures.push(eventId);
       }
     }
 
-    // 4. Return summary
-    return res.status(200).json({ importedResults: processed, failures });
-  } catch (err) {
-    console.error('import-results error', err);
-    return res.status(500).json({ error: 'Import of event outcomes failed.' });
+    console.log(`✔ Results import complete - ${processed} updated, ${failures.length} failed`);
+
+    // 5. Return comprehensive response
+    return res.status(200).json({
+      success: true,
+      importedResults: processed,
+      failures,
+      warning: skipped.length > 0 ? `${skipped.length} items skipped` : undefined,
+    });
+
+  } catch (error) {
+    console.error('❌ Results import failed:', error);
+    return res.status(500).json({ 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error occurred' 
+    });
   }
 }
