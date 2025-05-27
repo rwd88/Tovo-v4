@@ -4,6 +4,19 @@ import axios from 'axios'
 import { parseStringPromise } from 'xml2js'
 import { prisma } from '../../../lib/prisma'
 
+// Add this type for strict typing of the XML events:
+interface CalendarEvent {
+  id?: string;
+  url?: string;
+  title?: string;
+  date?: string;
+  time?: string;
+  impact?: string;
+  forecast?: string;
+  actual?: string;
+  previous?: string;
+}
+
 interface ApiResponse {
   success: boolean
   tradesDeleted?: number
@@ -67,7 +80,7 @@ export default async function handler(
       explicitArray: false,
       trim: true,
     })
-    const events = parsed?.weeklyevents?.event
+    const events: CalendarEvent[] = parsed?.weeklyevents?.event
       ? Array.isArray(parsed.weeklyevents.event)
         ? parsed.weeklyevents.event
         : [parsed.weeklyevents.event]
@@ -75,10 +88,10 @@ export default async function handler(
 
     console.log(`→ Found ${events.length} events`)
 
-    // 5) Prepare market data (example: only "High" impact)
+    // 5) Prepare market data (only "High" impact)
     const toCreate = events
-      .filter((ev: any) => ev.impact === 'High')
-      .map((ev: any) => {
+      .filter((ev: CalendarEvent) => ev.impact === 'High')
+      .map((ev: CalendarEvent) => {
         const date = ev.date?.trim() || ''
         const time = ev.time?.trim() || ''
         const eventName = ev.title?.trim() || ''
