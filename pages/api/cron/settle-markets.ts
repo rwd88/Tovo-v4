@@ -72,7 +72,13 @@ export default async function handler() {
     return { success: true, totalSettled };
 
   } catch (error) {
-    await sendAdminAlert(`🔥 Settlement failed: ${error.message}`);
-    throw error;
+  let message = "Unknown error";
+  if (error instanceof Error) {
+    message = error.message;
+  } else if (typeof error === "string") {
+    message = error;
   }
+  await sendAdminAlert(`🔥 Settlement failed: ${message}`);
+  throw error;
+}
 }
