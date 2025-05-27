@@ -15,7 +15,9 @@ interface ApiResponse {
 interface ForexItem {
   'ff:calendar_id': string;
   'ff:actual'?: string;
-  [key: string]: any;
+  'ff:title'?: string;
+  'ff:previous'?: string;
+  'ff:forecast'?: string;
 }
 
 interface RssChannel {
@@ -62,17 +64,17 @@ export default async function handler(
     
     const { data: xml } = await axios.get<string>(feedUrl, {
       responseType: 'text',
-      timeout: 10000, // 10 second timeout
+      timeout: 10000,
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; ForexFactoryBot/1.0)',
       },
     });
 
     console.log('✔ XML feed received, parsing...');
-    const parsed: RssFeed = await parseStringPromise(xml, { 
+    const parsed = await parseStringPromise(xml, { 
       explicitArray: false,
       trim: true,
-    });
+    }) as RssFeed;
 
     // 3. Normalize items array
     const items = Array.isArray(parsed.rss.channel.item)
@@ -104,11 +106,11 @@ export default async function handler(
         const result = await prisma.market.updateMany({
           where: { 
             externalId: eventId,
-            outcome: null, // Only update if outcome isn't already set
+            outcome: null,
           },
           data: { 
             outcome: actual,
-            status: 'resolved', // Optionally update status
+            status: 'resolved',
           },
         });
 

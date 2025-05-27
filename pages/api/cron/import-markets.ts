@@ -56,7 +56,7 @@ export default async function handler(
     console.log(`✔ Deleted ${marketsDel.count} markets`)
 
     // 4) Fetch current week's calendar
-    const CAL_URL = 'https://www.forexfactory.com/calendar.php?week=this'
+const CAL_URL = 'https://nfs.faireconomy.media/ff_calendar_thisweek.xml'
     console.log(`→ Fetching calendar from ${CAL_URL}`)
     
     const { data: html } = await axios.get<string>(CAL_URL, {
