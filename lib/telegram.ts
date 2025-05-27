@@ -10,69 +10,66 @@ interface TelegramMessage {
 
 export async function sendTelegramMessage(params: TelegramMessage) {
   try {
+    if (!process.env.TG_BOT_TOKEN) {
+      throw new Error('TG_BOT_TOKEN is not configured');
+    }
+    
     const response = await axios.post(
       `https://api.telegram.org/bot${process.env.TG_BOT_TOKEN}/sendMessage`,
       {
-        ...params,
-        disable_web_page_preview: true,
+        chat_id: params.chat_id,
+        text: params.text,
+        parse_mode: params.parse_mode,
+        disable_web_page_preview: true
       },
       {
-        timeout: 5000,
+        timeout: 3000,
+        validateStatus: () => true // Prevent axios from throwing on 4xx/5xx
       }
     );
+
+    if (!response.data.ok) {
+      throw new Error(`Telegram API error: ${response.data.description}`);
+    }
+
     return response.data;
   } catch (error) {
-    const axiosError = error as AxiosError;
-    console.error('Telegram API Error:', axiosError.response?.data || axiosError.message);
+    const err = error as AxiosError;
+    console.error('Telegram send failed:', {
+      config: err.config,
+      response: err.response?.data,
+      message: err.message
+    });
     throw error;
   }
 }
 
-// For public channel updates
-export async function sendCronSummary(text: string) {
-  try {
-    await sendTelegramMessage({
-      chat_id: process.env.TG_CHANNEL_ID!,
-      text: `📊 *Cron Update*\n${text}`,
-      parse_mode: 'Markdown'
-    });
-  } catch (error) {
-    const err = error as Error;
-    await sendAdminAlert(`❌ Cron summary failed: ${err.message}`);
-  }
-}
-
-// For admin alerts
 export async function sendAdminAlert(message: string) {
-  try {
-    await sendTelegramMessage({
-      chat_id: process.env.TG_ADMIN_ID!,
-      text: `🚨 *ADMIN ALERT*\n${message}`,
-      parse_mode: 'Markdown'
-    });
-  } catch (error) {
-    const err = error as Error;
-    console.error('FATAL: Admin alert failed:', err);
+  if (!process.env.TG_ADMIN_ID) {
+    console.error('ADMIN ALERT FAILED: TG_ADMIN_ID not set');
+    return;
   }
-}
-
-// Type-safe market announcement
-interface MarketAnnouncement {
-  question: string;
-  eventTime: Date;
-  poolYes: number;
-  poolNo: number;
-}
-
-export async function announceMarket(market: MarketAnnouncement) {
+  
   await sendTelegramMessage({
-    chat_id: process.env.TG_CHANNEL_ID!,
-    text: `🎯 *New Prediction Market*  
-❓ ${market.question}  
-⏱️ Ends: ${market.eventTime.toUTCString()}  
-✅ YES: $${market.poolYes.toFixed(2)}  
-❌ NO: $${market.poolNo.toFixed(2)}  
-👉 /predict`,
+    chat_id: process.env.TG_ADMIN_ID,
+    text: `🚨 ADMIN ALERT\n${message}`,
     parse_mode: 'Markdown'
+  }).catch(() => {
+    console.error('Fallback: Could not send admin alert');
+  });
+}
+
+export async function sendCronSummary(text: string) {
+  if (!process.env.TG_CHANNEL_ID) {
+    console.error('CRON SUMMARY FAILED: TG_CHANNEL_ID not set');
+    return;
+  }
+
+  await sendTelegramMessage({
+    chat_id: process.env.TG_CHANNEL_ID,
+    text: `📊 CRON UPDATE\n${text}`,
+    parse_mode: 'Markdown'
+  }).catch(() => {
+    console.error('Fallback: Could not send cron summary');
   });
 }
