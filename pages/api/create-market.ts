@@ -13,7 +13,9 @@ export default async function handler(
   }
 
   try {
+    // Destructure fields from request body, including externalId
     const {
+      externalId,
       question,
       status,
       eventTime,
@@ -23,8 +25,9 @@ export default async function handler(
       poolNo,
     } = req.body
 
-    // Validate payload
+    // Validate payload (make externalId required)
     if (
+      !externalId ||
       !question ||
       !status ||
       !eventTime ||
@@ -38,6 +41,7 @@ export default async function handler(
     // Create the market record
     const market = await prisma.market.create({
       data: {
+        externalId,
         question,
         status,
         eventTime: new Date(eventTime),
