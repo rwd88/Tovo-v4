@@ -15,9 +15,7 @@ interface ApiResponse {
 interface ForexItem {
   'ff:calendar_id': string;
   'ff:actual'?: string;
-  'ff:title'?: string;
-  'ff:previous'?: string;
-  'ff:forecast'?: string;
+  [key: string]: any;
 }
 
 interface RssChannel {
@@ -59,22 +57,22 @@ export default async function handler(
 
   try {
     // 2. Fetch and parse XML feed
-const feedUrl = 'https://nfs.faireconomy.media/ff_calendar_thisweek.xml';
+    const feedUrl = 'https://cdn-nfs.forexfactory.net/ff_calendar_thisweek.xml';
     console.log(`→ Fetching XML feed from ${feedUrl}`);
     
     const { data: xml } = await axios.get<string>(feedUrl, {
       responseType: 'text',
-      timeout: 10000,
+      timeout: 10000, // 10 second timeout
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; ForexFactoryBot/1.0)',
       },
     });
 
     console.log('✔ XML feed received, parsing...');
-    const parsed = await parseStringPromise(xml, { 
+    const parsed: RssFeed = await parseStringPromise(xml, { 
       explicitArray: false,
       trim: true,
-    }) as RssFeed;
+    });
 
     // 3. Normalize items array
     const items = Array.isArray(parsed.rss.channel.item)
@@ -106,11 +104,11 @@ const feedUrl = 'https://nfs.faireconomy.media/ff_calendar_thisweek.xml';
         const result = await prisma.market.updateMany({
           where: { 
             externalId: eventId,
-            outcome: null,
+            outcome: null, // Only update if outcome isn't already set
           },
           data: { 
             outcome: actual,
-            status: 'resolved',
+            status: 'resolved', // Optionally update status
           },
         });
 
