@@ -3,7 +3,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import axios from 'axios'
 import * as cheerio from 'cheerio'
-import { prisma } from '../../../lib/prisma'  // ← use named import
+import { prisma } from '../../../lib/prisma'   // ← use named import
 
 interface ApiResponse {
   success: boolean
@@ -28,7 +28,7 @@ export default async function handler(
     return res.status(403).json({ success: false, error: 'Unauthorized' })
   }
 
-  // 1) Only GET
+  // 1) Only allow GET
   if (req.method !== 'GET') {
     return res
       .status(405)
@@ -48,7 +48,7 @@ export default async function handler(
     const marketsDel = await prisma.market.deleteMany({})
     console.log(`✔ Markets deleted: ${marketsDel.count}`)
 
-    // 4) Fetch this week’s calendar
+    // 4) Fetch this week’s calendar HTML
     const CAL_URL = 'https://www.forexfactory.com/calendar.php?week=this'
     console.log(`→ Fetching calendar HTML from ${CAL_URL}`)
     const { data: html } = await axios.get<string>(CAL_URL, {
@@ -62,12 +62,12 @@ export default async function handler(
     })
     console.log('✔ HTML fetched, loading into cheerio…')
 
-    // 5) Parse high-impact rows
+    // 5) Parse all high-impact rows
     const $ = cheerio.load(html)
     const rows = $('span.impact-icon--high').closest('tr')
     console.log(`→ Found ${rows.length} high-impact rows`)
 
-    // 6) Build payload with required externalId, chunked insert
+    // 6) Build bulk-insert payload including externalId
     const toCreate = rows
       .map((_, el) => {
         const $row = $(el)
@@ -81,10 +81,10 @@ export default async function handler(
         const eventTime = new Date(`${dateText} ${timeText}`).toISOString()
 
         return {
-          externalId: eventTime,             // ← required by schema
+          externalId: eventTime,            // required by Prisma schema
           question:   $row.find('td.calendar__event').text().trim(),
           status:     'open' as const,
-          eventTime,                         // ISO string
+          eventTime,                        // ISO string
           forecast:   parseFloat(
                         $row.find('td.calendar__forecast').text().trim() || '0'
                       ),
@@ -95,17 +95,19 @@ export default async function handler(
       })
       .get()
 
+    // 7) Insert in batches of 100, skipping duplicates
     let added = 0
     for (let i = 0; i < toCreate.length; i += 100) {
+      const chunk = toCreate.slice(i, i + 100)
       const { count } = await prisma.market.createMany({
-        data: toCreate.slice(i, i + 100),
+        data: chunk,
         skipDuplicates: true,
       })
       added += count
     }
     console.log(`✔ Markets created: ${added}`)
 
-    // 7) Return summary
+    // 8) Return cron summary
     return res.status(200).json({
       success:        true,
       tradesDeleted:  tradesDel.count,
