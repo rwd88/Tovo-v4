@@ -1,7 +1,8 @@
 // pages/api/cron/import-markets.ts
+
 import type { NextApiRequest, NextApiResponse } from 'next'
 import axios from 'axios'
-import * as cheerio from 'cheerio'
+import { parseStringPromise } from 'xml2js'
 import { prisma } from '../../../lib/prisma'
 
 interface ApiResponse {
@@ -20,25 +21,25 @@ export default async function handler(
   const auth = req.headers.authorization
   if (!process.env.CRON_SECRET) {
     console.error('CRON_SECRET not configured')
-    return res.status(500).json({ 
-      success: false, 
-      error: 'Server configuration error' 
+    return res.status(500).json({
+      success: false,
+      error: 'Server configuration error'
     })
   }
-  
+
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
     console.warn('Unauthorized cron attempt')
-    return res.status(403).json({ 
-      success: false, 
-      error: 'Unauthorized' 
+    return res.status(403).json({
+      success: false,
+      error: 'Unauthorized'
     })
   }
 
   // 1) Only GET
   if (req.method !== 'GET') {
-    return res.status(405).json({ 
-      success: false, 
-      error: 'Only GET requests are allowed' 
+    return res.status(405).json({
+      success: false,
+      error: 'Only GET requests are allowed'
     })
   }
 
@@ -55,62 +56,59 @@ export default async function handler(
     const marketsDel = await prisma.market.deleteMany({})
     console.log(`✔ Deleted ${marketsDel.count} markets`)
 
-    // 4) Fetch current week's calendar
-    const CAL_URL = 'https://www.forexfactory.com/calendar.php?week=this'
-    console.log(`→ Fetching calendar from ${CAL_URL}`)
-    
-    const { data: html } = await axios.get<string>(CAL_URL, {
+    // 4) Fetch the current week's calendar (XML)
+    const CAL_URL = 'https://nfs.faireconomy.media/ff_calendar_thisweek.xml'
+    console.log(`→ Fetching calendar XML from ${CAL_URL}`)
+
+    const { data: xml } = await axios.get<string>(CAL_URL, {
       responseType: 'text',
-      timeout: 10000, // 10 second timeout
+      timeout: 10000,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        Accept: 'text/html,application/xhtml+xml',
-        'Accept-Language': 'en-US,en;q=0.9',
-      },
+        'User-Agent': 'Mozilla/5.0 (compatible; ForexFactoryBot/1.0)',
+      }
     })
 
-    console.log('✔ HTML fetched successfully')
-    const $ = cheerio.load(html)
+    // 5) Parse XML
+    const parsed = await parseStringPromise(xml, { explicitArray: false })
+    const events = parsed?.weeklyevents?.event
+      ? Array.isArray(parsed.weeklyevents.event)
+        ? parsed.weeklyevents.event
+        : [parsed.weeklyevents.event]
+      : []
 
-    // 5) Parse high-impact events
-    const rows = $('span.impact-icon--high').closest('tr')
-    console.log(`→ Found ${rows.length} high-impact events`)
+    console.log(`→ Found ${events.length} events in XML`)
 
-    // 6) Prepare market data
-    const toCreate = rows
-      .map((_, el) => {
-        const $row = $(el)
-        
-        const timeText = $row.find('td.calendar__time').text().trim()
-        const dateText = $row
-          .prevAll('tr.calendar__row--date')
-          .first()
-          .find('th')
-          .text()
-          .trim()
-          
-        const eventTime = new Date(`${dateText} ${timeText}`)
-        if (isNaN(eventTime.getTime())) {
-          console.warn('Invalid date for event:', $row.find('td.calendar__event').text().trim())
-          return null
+    // 6) Prepare data to insert
+    const toCreate = events
+      .map((event: any) => {
+        // Try to build a unique ID: date + time + title
+        const date = event.date?.replace(/\[|\]|<!\[CDATA\[|\]\]>/g, '').trim() || ''
+        const time = event.time?.replace(/\[|\]|<!\[CDATA\[|\]\]>/g, '').trim() || ''
+        const question = event.title?.replace(/\[|\]|<!\[CDATA\[|\]\]>/g, '').trim() || ''
+        const forecastText = event.forecast?.replace(/\[|\]|<!\[CDATA\[|\]\]>/g, '').trim() || ''
+        const eventTime = `${date} ${time}`.trim()
+        let eventTimeISO: string | null = null
+
+        // Try to parse eventTime to ISO
+        if (date && time) {
+          const tryDate = new Date(`${date} ${time}`)
+          eventTimeISO = isNaN(tryDate.getTime()) ? null : tryDate.toISOString()
         }
 
-        const eventName = $row.find('td.calendar__event').text().trim()
-        const forecastText = $row.find('td.calendar__forecast').text().trim()
-        
+        if (!eventTimeISO) return null
+
         return {
-          externalId: `${eventTime.toISOString()}-${eventName}`,
-          question: eventName,
+          externalId: `${eventTimeISO}-${question}`,
+          question,
           status: 'open' as const,
-          eventTime: eventTime.toISOString(),
+          eventTime: eventTimeISO,
           forecast: forecastText ? parseFloat(forecastText) : 0,
           outcome: null,
           poolYes: 0,
           poolNo: 0,
         }
       })
-      .get()
-      .filter(Boolean) // Filter out any null entries from failed date parsing
+      .filter(Boolean)
 
     // 7) Insert in batches
     let added = 0
@@ -135,12 +133,11 @@ export default async function handler(
       marketsDeleted: marketsDel.count,
       added,
     })
-
   } catch (err) {
     console.error('❌ Market import failed:', err)
-    return res.status(500).json({ 
-      success: false, 
-      error: err instanceof Error ? err.message : 'Unknown error occurred' 
+    return res.status(500).json({
+      success: false,
+      error: err instanceof Error ? err.message : 'Unknown error occurred'
     })
   }
 }
