@@ -1,5 +1,5 @@
 // lib/telegram.ts
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 
 interface TelegramMessage {
   chat_id: string | number;
@@ -17,13 +17,14 @@ export async function sendTelegramMessage(params: TelegramMessage) {
         disable_web_page_preview: true,
       },
       {
-        timeout: 5000, // 5-second timeout
+        timeout: 5000,
       }
     );
     return response.data;
   } catch (error) {
-    console.error('Telegram API Error:', error.response?.data || error.message);
-    throw error; // Re-throw for caller to handle
+    const axiosError = error as AxiosError;
+    console.error('Telegram API Error:', axiosError.response?.data || axiosError.message);
+    throw error;
   }
 }
 
@@ -36,30 +37,34 @@ export async function sendCronSummary(text: string) {
       parse_mode: 'Markdown'
     });
   } catch (error) {
-    await sendAdminAlert(`❌ Cron summary failed: ${error.message}`);
+    const err = error as Error;
+    await sendAdminAlert(`❌ Cron summary failed: ${err.message}`);
   }
 }
 
-// For admin alerts (uses your personal ID)
+// For admin alerts
 export async function sendAdminAlert(message: string) {
   try {
     await sendTelegramMessage({
-      chat_id: process.env.TG_ADMIN_ID!, // Your 7985574112
+      chat_id: process.env.TG_ADMIN_ID!,
       text: `🚨 *ADMIN ALERT*\n${message}`,
       parse_mode: 'Markdown'
     });
   } catch (error) {
-    console.error('FATAL: Admin alert failed:', error);
+    const err = error as Error;
+    console.error('FATAL: Admin alert failed:', err);
   }
 }
 
-// For formatted market announcements
-export async function announceMarket(market: {
+// Type-safe market announcement
+interface MarketAnnouncement {
   question: string;
   eventTime: Date;
   poolYes: number;
   poolNo: number;
-}) {
+}
+
+export async function announceMarket(market: MarketAnnouncement) {
   await sendTelegramMessage({
     chat_id: process.env.TG_CHANNEL_ID!,
     text: `🎯 *New Prediction Market*  
