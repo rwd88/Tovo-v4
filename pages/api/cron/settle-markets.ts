@@ -2,17 +2,20 @@
 import { prisma } from '../../../lib/prisma';
 import { sendCronSummary, sendAdminAlert } from '../../../lib/telegram';
 
-// Increase timeout for Vercel (requires Pro plan)
 export const config = {
-  maxDuration: 60, // 60 seconds (Hobby plan max)
+  maxDuration: 60,
 };
 
-export default async function handler() {
+import type { NextApiRequest, NextApiResponse } from 'next';
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
   try {
     console.log('⏳ Starting market settlement process...');
-    
-    // 1. Find markets ready for settlement in batches
-    const batchSize = 20; // Process 20 markets at a time
+
+    const batchSize = 20;
     let totalSettled = 0;
     let totalProfit = 0;
     let hasMoreMarkets = true;
@@ -26,16 +29,12 @@ export default async function handler() {
           status: 'open'
         },
         include: {
-          trades: {
-            where: {
-              settled: false // Only process unsettled trades
-            }
-          }
+          trades: true, // Don't filter by 'settled'
         },
         skip,
         take: batchSize,
         orderBy: {
-          eventTime: 'asc' // Process oldest first
+          eventTime: 'asc'
         }
       });
 
@@ -46,15 +45,25 @@ export default async function handler() {
 
       console.log(`Processing batch of ${markets.length} markets...`);
 
-      // 2. Process each market in parallel with error handling
+      // Process each market in parallel
       const batchResults = await Promise.allSettled(
         markets.map(async (market) => {
           try {
-            const winningOutcome = market.outcome!.toUpperCase() as 'YES' | 'NO';
-            const winningPool = winningOutcome === 'YES' ? market.poolYes : market.poolNo;
-            const winningTrades = market.trades.filter(t => t.type === winningOutcome);
+            // Make sure outcome exists and is string
+            const winningOutcome = (market.outcome ?? '').toString().toUpperCase();
+            if (!['YES', 'NO'].includes(winningOutcome)) {
+              // Mark as settled and skip
+              await prisma.market.update({
+                where: { id: market.id },
+                data: { status: 'settled' }
+              });
+              return { success: true, profit: 0 };
+            }
 
-            // Skip if no winning trades to process
+            const winningPool = winningOutcome === 'YES' ? market.poolYes : market.poolNo;
+            const winningTrades = market.trades.filter(t => t.type?.toUpperCase() === winningOutcome);
+
+            // If no winning trades, just settle the market
             if (winningTrades.length === 0) {
               await prisma.market.update({
                 where: { id: market.id },
@@ -67,33 +76,28 @@ export default async function handler() {
             const tradingFee = totalPool * 0.01 * 2;
             const houseCut = totalPool * 0.1;
             const netPool = totalPool - tradingFee - houseCut;
-            const profitShare = netPool / winningPool;
+            const profitShare = winningPool > 0 ? netPool / winningPool : 0;
 
-            // Process trades in sub-batches
+            // Update user balances in batches (if needed)
             const tradeBatchSize = 50;
             for (let i = 0; i < winningTrades.length; i += tradeBatchSize) {
               const tradeBatch = winningTrades.slice(i, i + tradeBatchSize);
-              
+
               await prisma.$transaction([
                 ...tradeBatch.map(trade =>
                   prisma.user.update({
                     where: { id: trade.userId },
-                    data: { 
-                      balance: { 
-                        increment: trade.amount * profitShare - trade.fee
-                      } 
+                    data: {
+                      balance: {
+                        increment: trade.amount * profitShare - (trade.fee ?? 0)
+                      }
                     }
                   })
-                ),
-                prisma.trade.updateMany({
-                  where: { 
-                    id: { in: tradeBatch.map(t => t.id) }
-                  },
-                  data: { settled: true }
-                })
+                )
               ]);
             }
 
+            // Mark market as settled
             await prisma.market.update({
               where: { id: market.id },
               data: { status: 'settled' }
@@ -107,11 +111,10 @@ export default async function handler() {
         })
       );
 
-      // 3. Count successful settlements
-      const successfulSettlements = batchResults.filter(r => 
-        r.status === 'fulfilled' && r.value.success
+      // Count successes and profits
+      const successfulSettlements = batchResults.filter(r =>
+        r.status === 'fulfilled' && r.value && r.value.success
       );
-      
       totalSettled += successfulSettlements.length;
       totalProfit += successfulSettlements.reduce(
         (sum, r) => sum + (r.status === 'fulfilled' ? r.value.profit : 0), 0
@@ -120,7 +123,7 @@ export default async function handler() {
       skip += batchSize;
     }
 
-    // 4. Final reporting
+    // Final reporting
     console.log(`✔ Successfully settled ${totalSettled} markets`);
     await sendCronSummary(
       `🏦 Settlement Complete\n` +
@@ -129,20 +132,19 @@ export default async function handler() {
       `⌛ Next: ${new Date(Date.now() + 86400000).toLocaleTimeString()}`
     );
 
-    return { 
-      success: true, 
+    return res.status(200).json({
+      success: true,
       totalSettled,
-      totalProfit 
-    };
+      totalProfit
+    });
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('❌ Settlement process failed:', error);
     await sendAdminAlert(`🚨 Settlement Failed: ${errorMessage}`);
-    
-    return {
+    return res.status(500).json({
       success: false,
       error: errorMessage
-    };
+    });
   }
 }
