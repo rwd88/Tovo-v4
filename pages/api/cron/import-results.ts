@@ -59,7 +59,7 @@ export default async function handler(
 
   try {
     // 2. Fetch and parse XML feed
-    const feedUrl = 'https://cdn-nfs.forexfactory.net/ff_calendar_thisweek.xml';
+const feedUrl = 'https://nfs.faireconomy.media/ff_calendar_thisweek.xml';
     console.log(`→ Fetching XML feed from ${feedUrl}`);
     
     const { data: xml } = await axios.get<string>(feedUrl, {
