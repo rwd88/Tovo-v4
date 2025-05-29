@@ -10,11 +10,6 @@ interface TradeRequest {
   type: 'YES' | 'NO';
 }
 
-interface UserWithName {
-  balance: number;
-  name: string | null;
-}
-
 export default async function handler(
   req: NextApiRequest, 
   res: NextApiResponse
@@ -48,14 +43,11 @@ export default async function handler(
       return res.status(400).json({ error: 'Market not available for trading' });
     }
 
-    // Check user balance with proper typing
+    // Check user balance
     const user = await prisma.user.findUnique({
       where: { telegramId: userId },
-      select: { 
-        balance: true,
-        name: true
-      }
-    }) as UserWithName | null;
+      select: { balance: true }
+    });
 
     const fee = Number((amount * 0.01).toFixed(2)); // 1% fee
     const totalCost = amount + fee;
@@ -93,12 +85,10 @@ export default async function handler(
     // Send notification
     await sendTelegramMessage(
       `🎯 New Prediction\n` +
-      `👤 ${user.name || 'Anonymous'}\n` +
+      `👤 Anonymous\n` +
       `💰 $${amount.toFixed(2)} on ${type}\n` +
       `❓ ${market.question}\n` +
-      `#${marketId.slice(0, 5)}`,
-      false,
-      process.env.TG_CHANNEL_ID!
+      `#${marketId.slice(0, 5)}`
     );
 
     return res.status(200).json({ 
