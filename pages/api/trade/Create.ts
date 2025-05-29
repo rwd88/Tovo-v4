@@ -44,10 +44,11 @@ export default async function handler(
     }
 
     // 3. Check user balance
-    const user = await prisma.user.findUnique({
-      where: { telegramId: userId },
-select: { balance: true }
-    });
+const user = await prisma.user.findUnique({
+  where: { telegramId: userId },
+  select: { balance: true, name: true }
+});
+
 
     const fee = Number((amount * 0.01).toFixed(2)); // 1% fee
     const totalCost = amount + fee;
@@ -85,7 +86,7 @@ select: { balance: true }
     // 5. Send notification
     await sendTelegramMessage(
       `🎯 New Trade Executed\n` +
-      `• User: ${user.name || 'Anonymous'}\n` +
+`• User: Anonymous\n` +
       `• Market: ${market.question}\n` +
       `• Direction: ${type} $${amount.toFixed(2)}\n` +
       `• Fee: $${fee.toFixed(2)}`,
