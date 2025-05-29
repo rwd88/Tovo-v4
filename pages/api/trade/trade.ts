@@ -1,4 +1,4 @@
-// pages/api/trade/create.ts
+// pages/api/trade/trade.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '../../../lib/prisma';
 import { sendTelegramMessage } from '../../../lib/telegram';
@@ -8,6 +8,11 @@ interface TradeRequest {
   marketId: string;
   amount: number;
   type: 'YES' | 'NO';
+}
+
+interface UserWithName {
+  balance: number;
+  name: string | null;
 }
 
 export default async function handler(
@@ -43,13 +48,16 @@ export default async function handler(
       return res.status(400).json({ error: 'Market not available for trading' });
     }
 
-    // Check user balance
+    // Check user balance with proper typing
     const user = await prisma.user.findUnique({
       where: { telegramId: userId },
-      select: { balance: true, name: true }
-    });
+      select: { 
+        balance: true,
+        name: true
+      }
+    }) as UserWithName | null;
 
-    const fee = amount * 0.01; // 1% fee
+    const fee = Number((amount * 0.01).toFixed(2)); // 1% fee
     const totalCost = amount + fee;
 
     if (!user || user.balance < totalCost) {
@@ -57,7 +65,7 @@ export default async function handler(
     }
 
     // Execute trade
-    await prisma.$transaction([
+    const [trade, updatedUser] = await prisma.$transaction([
       prisma.trade.create({
         data: {
           userId,
@@ -70,7 +78,8 @@ export default async function handler(
       }),
       prisma.user.update({
         where: { telegramId: userId },
-        data: { balance: { decrement: totalCost } }
+        data: { balance: { decrement: totalCost } },
+        select: { balance: true }
       }),
       prisma.market.update({
         where: { id: marketId },
@@ -94,7 +103,9 @@ export default async function handler(
 
     return res.status(200).json({ 
       success: true,
-      newBalance: user.balance - totalCost
+      tradeId: trade.id,
+      newBalance: updatedUser.balance,
+      marketQuestion: market.question
     });
 
   } catch (error) {
