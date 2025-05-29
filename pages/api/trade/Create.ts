@@ -11,7 +11,7 @@ interface TradeRequest {
 }
 
 export default async function handler(
-  req: NextApiRequest, 
+  req: NextApiRequest,
   res: NextApiResponse
 ) {
   if (req.method !== 'POST') {
@@ -20,44 +20,44 @@ export default async function handler(
   }
 
   try {
+    // 1. Validate request
     const { userId, marketId, amount, type } = req.body as TradeRequest;
 
-    // Validate input
-    if (!userId || !marketId || !amount || !type) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-    if (typeof amount !== 'number' || amount <= 0) {
-      return res.status(400).json({ error: 'Invalid amount' });
-    }
-    if (!['YES', 'NO'].includes(type)) {
-      return res.status(400).json({ error: 'Invalid trade type' });
+    if (
+      !userId ||
+      !marketId ||
+      typeof amount !== 'number' ||
+      amount <= 0 ||
+      !['YES', 'NO'].includes(type)
+    ) {
+      return res.status(400).json({ error: 'Invalid trade parameters' });
     }
 
-    // Check market exists and is open
+    // 2. Verify market availability
     const market = await prisma.market.findUnique({
-      where: { id: marketId },
-      select: { status: true, question: true }
+      where: { id: marketId, status: 'open' },
+      select: { question: true, eventTime: true }
     });
 
-    if (!market || market.status !== 'open') {
+    if (!market) {
       return res.status(400).json({ error: 'Market not available for trading' });
     }
 
-    // Check user balance
+    // 3. Check user balance
     const user = await prisma.user.findUnique({
       where: { telegramId: userId },
       select: { balance: true, name: true }
     });
 
-    const fee = amount * 0.01; // 1% fee
+    const fee = Number((amount * 0.01).toFixed(2)); // 1% fee
     const totalCost = amount + fee;
 
     if (!user || user.balance < totalCost) {
       return res.status(400).json({ error: 'Insufficient balance' });
     }
 
-    // Execute trade
-    await prisma.$transaction([
+    // 4. Execute trade transaction
+    const [trade, updatedUser] = await prisma.$transaction([
       prisma.trade.create({
         data: {
           userId,
@@ -70,7 +70,8 @@ export default async function handler(
       }),
       prisma.user.update({
         where: { telegramId: userId },
-        data: { balance: { decrement: totalCost } }
+        data: { balance: { decrement: totalCost } },
+        select: { balance: true }
       }),
       prisma.market.update({
         where: { id: marketId },
@@ -81,25 +82,27 @@ export default async function handler(
       })
     ]);
 
-    // Send notification
+    // 5. Send notification
     await sendTelegramMessage(
-      `🎯 New Prediction\n` +
-      `👤 ${user.name || 'Anonymous'}\n` +
-      `💰 $${amount.toFixed(2)} on ${type}\n` +
-      `❓ ${market.question}\n` +
-      `#${marketId.slice(0, 5)}`,
+      `🎯 New Trade Executed\n` +
+      `• User: ${user.name || 'Anonymous'}\n` +
+      `• Market: ${market.question}\n` +
+      `• Direction: ${type} $${amount.toFixed(2)}\n` +
+      `• Fee: $${fee.toFixed(2)}`,
       false,
       process.env.TG_CHANNEL_ID!
     );
 
-    return res.status(200).json({ 
+    return res.status(200).json({
       success: true,
-      newBalance: user.balance - totalCost
+      tradeId: trade.id,
+      newBalance: updatedUser.balance,
+      marketQuestion: market.question
     });
 
   } catch (error) {
-    console.error('Trade error:', error);
-    return res.status(500).json({ 
+    console.error('Trade execution failed:', error);
+    return res.status(500).json({
       error: 'Internal Server Error',
       details: error instanceof Error ? error.message : undefined
     });

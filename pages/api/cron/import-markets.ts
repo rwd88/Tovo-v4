@@ -4,7 +4,6 @@ import axios from 'axios'
 import { parseStringPromise } from 'xml2js'
 import { prisma } from '../../../lib/prisma'
 
-// Add this type for strict typing of the XML events:
 interface CalendarEvent {
   id?: string;
   url?: string;
@@ -25,16 +24,10 @@ interface ApiResponse {
   error?: string
 }
 
-// Type guard to remove nulls
-function notNull<T>(value: T | null): value is T {
-  return value !== null;
-}
-
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ApiResponse>
 ) {
-  // 0) Verify cron secret
   const auth = req.headers.authorization
   if (!process.env.CRON_SECRET) {
     console.error('CRON_SECRET not configured')
@@ -51,7 +44,6 @@ export default async function handler(
     })
   }
 
-  // 1) Only GET
   if (req.method !== 'GET') {
     return res.status(405).json({
       success: false,
@@ -62,13 +54,11 @@ export default async function handler(
   console.log('⏳ Starting market import cron job')
 
   try {
-    // 2) Delete existing trades and markets
     console.log('→ Clearing previous trades and markets...')
     const tradesDel = await prisma.trade.deleteMany({})
     const marketsDel = await prisma.market.deleteMany({})
     console.log(`✔ Deleted ${tradesDel.count} trades, ${marketsDel.count} markets`)
 
-    // 3) Fetch XML calendar
     const CAL_URL = 'https://nfs.faireconomy.media/ff_calendar_thisweek.xml'
     console.log(`→ Fetching calendar from ${CAL_URL}`)
 
@@ -80,7 +70,6 @@ export default async function handler(
       },
     })
 
-    // 4) Parse XML
     const parsed = await parseStringPromise(xml, {
       explicitArray: false,
       trim: true,
@@ -93,34 +82,32 @@ export default async function handler(
 
     console.log(`→ Found ${events.length} events`)
 
-    // 5) Prepare market data (only "High" impact)
-const toCreate = events
-  .filter((ev: CalendarEvent) =>
-    typeof ev.impact === 'string' &&
-    ev.impact.trim().toLowerCase() === 'high'
-  )
-  .map((ev: CalendarEvent) => {
-    const date = ev.date?.trim() || ''
-    const time = ev.time?.trim() || ''
-    const eventName = ev.title?.trim() || ''
-    const forecastText = ev.forecast?.trim() || ''
-    const eventTime = new Date(`${date} ${time}`)
-    if (isNaN(eventTime.getTime())) return null
+    const toCreate = events
+      .filter((ev: CalendarEvent) =>
+        typeof ev.impact === 'string' &&
+        ev.impact.trim().toLowerCase() === 'high'
+      )
+      .map((ev: CalendarEvent) => {
+        const date = ev.date?.trim() || ''
+        const time = ev.time?.trim() || ''
+        const eventName = ev.title?.trim() || ''
+        const forecastText = ev.forecast?.trim() || ''
+        const eventTime = new Date(`${date} ${time}`)
+        if (isNaN(eventTime.getTime())) return null
 
-    return {
-      externalId: ev.url || (eventName + date + time),
-      question: eventName,
-      status: 'open' as const,
-      eventTime: eventTime.toISOString(),
-      forecast: forecastText ? parseFloat(forecastText) : 0,
-      outcome: null,
-      poolYes: 0,
-      poolNo: 0,
-    }
-  })
-  .filter(Boolean)
+        return {
+          externalId: ev.url || (eventName + date + time),
+          question: eventName,
+          status: 'open' as const,
+          eventTime: eventTime.toISOString(),
+          forecast: forecastText ? parseFloat(forecastText) : 0,
+          outcome: null,
+          poolYes: 0,
+          poolNo: 0,
+        }
+      })
+      .filter((v): v is NonNullable<typeof v> => Boolean(v))
 
-    // 6) Insert in batches
     let added = 0
     const batchSize = 100
     for (let i = 0; i < toCreate.length; i += batchSize) {
