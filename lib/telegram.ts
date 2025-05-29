@@ -1,4 +1,3 @@
-// lib/telegram.ts
 import axios, { AxiosError } from 'axios';
 
 interface TelegramMessage {
@@ -6,25 +5,49 @@ interface TelegramMessage {
   text: string;
   parse_mode?: 'Markdown' | 'HTML';
   disable_web_page_preview?: boolean;
+  disable_notification?: boolean;
 }
 
-export async function sendTelegramMessage(params: TelegramMessage) {
+// Overload signatures
+export async function sendTelegramMessage(params: TelegramMessage): Promise<any>;
+export async function sendTelegramMessage(
+  text: string,
+  disableNotification?: boolean,
+  chatId?: string
+): Promise<any>;
+
+// Implementation
+export async function sendTelegramMessage(
+  arg1: TelegramMessage | string,
+  disableNotification = false,
+  chatId = process.env.TG_CHANNEL_ID!
+): Promise<any> {
   try {
     if (!process.env.TG_BOT_TOKEN) {
       throw new Error('TG_BOT_TOKEN is not configured');
     }
-    
+
+    const payload: TelegramMessage =
+      typeof arg1 === 'string'
+        ? {
+            chat_id: chatId,
+            text: arg1,
+            parse_mode: 'Markdown',
+            disable_notification: disableNotification,
+            disable_web_page_preview: true
+          }
+        : {
+            ...arg1,
+            disable_web_page_preview: true,
+            parse_mode: arg1.parse_mode ?? 'Markdown'
+          };
+
     const response = await axios.post(
       `https://api.telegram.org/bot${process.env.TG_BOT_TOKEN}/sendMessage`,
-      {
-        chat_id: params.chat_id,
-        text: params.text,
-        parse_mode: params.parse_mode,
-        disable_web_page_preview: true
-      },
+      payload,
       {
         timeout: 3000,
-        validateStatus: () => true // Prevent axios from throwing on 4xx/5xx
+        validateStatus: () => true
       }
     );
 
@@ -49,7 +72,7 @@ export async function sendAdminAlert(message: string) {
     console.error('ADMIN ALERT FAILED: TG_ADMIN_ID not set');
     return;
   }
-  
+
   await sendTelegramMessage({
     chat_id: process.env.TG_ADMIN_ID,
     text: `🚨 ADMIN ALERT\n${message}`,
