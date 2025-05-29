@@ -24,8 +24,8 @@ model Market {
   status     String   // open, locked, settled
   eventTime  DateTime
   forecast   Float
-outcome    String?  // yes / no
-  externalId String   @unique  // ← ForexFactory calendar_id
+  outcome    String?  // yes / no
+  externalId String   @unique
   poolYes    Float    @default(0)
   poolNo     Float    @default(0)
   trades     Trade[]
@@ -40,6 +40,7 @@ model Trade {
   amount    Float
   payout    Float?
   fee       Float
+  settled   Boolean  @default(false) // ✅ added
   createdAt DateTime @default(now())
 
   user   User   @relation(fields: [userId], references: [id])
