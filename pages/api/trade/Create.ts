@@ -46,7 +46,7 @@ export default async function handler(
     // 3. Check user balance
     const user = await prisma.user.findUnique({
       where: { telegramId: userId },
-      select: { balance: true, name: true }
+select: { balance: true }
     });
 
     const fee = Number((amount * 0.01).toFixed(2)); // 1% fee
