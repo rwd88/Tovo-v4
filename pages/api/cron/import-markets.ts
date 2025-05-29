@@ -94,28 +94,31 @@ export default async function handler(
     console.log(`→ Found ${events.length} events`)
 
     // 5) Prepare market data (only "High" impact)
-    const toCreate = events
-      .filter((ev: CalendarEvent) => ev.impact === 'High')
-      .map((ev: CalendarEvent) => {
-        const date = ev.date?.trim() || ''
-        const time = ev.time?.trim() || ''
-        const eventName = ev.title?.trim() || ''
-        const forecastText = ev.forecast?.trim() || ''
-        const eventTime = new Date(`${date} ${time}`)
-        if (isNaN(eventTime.getTime())) return null
+const toCreate = events
+  .filter((ev: CalendarEvent) =>
+    typeof ev.impact === 'string' &&
+    ev.impact.trim().toLowerCase() === 'high'
+  )
+  .map((ev: CalendarEvent) => {
+    const date = ev.date?.trim() || ''
+    const time = ev.time?.trim() || ''
+    const eventName = ev.title?.trim() || ''
+    const forecastText = ev.forecast?.trim() || ''
+    const eventTime = new Date(`${date} ${time}`)
+    if (isNaN(eventTime.getTime())) return null
 
-        return {
-          externalId: ev.id || ev.url || (eventName + date + time),
-          question: eventName,
-          status: 'open' as const,
-          eventTime: eventTime.toISOString(),
-          forecast: forecastText ? parseFloat(forecastText) : 0,
-          outcome: null,
-          poolYes: 0,
-          poolNo: 0,
-        }
-      })
-      .filter(notNull) // <--- Fix here!
+    return {
+      externalId: ev.url || (eventName + date + time),
+      question: eventName,
+      status: 'open' as const,
+      eventTime: eventTime.toISOString(),
+      forecast: forecastText ? parseFloat(forecastText) : 0,
+      outcome: null,
+      poolYes: 0,
+      poolNo: 0,
+    }
+  })
+  .filter(Boolean)
 
     // 6) Insert in batches
     let added = 0
