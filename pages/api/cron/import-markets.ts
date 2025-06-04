@@ -91,28 +91,55 @@ export default async function handler(
         }
         return isHigh;
       })
-      .map((ev: CalendarEvent) => {
-        const date = ev.date?.trim() || ''
-        const time = ev.time?.trim() || ''
-        const eventName = ev.title?.trim() || ''
-        const forecastText = ev.forecast?.trim() || ''
-        const eventTime = new Date(`${date} ${time}`)
-        if (isNaN(eventTime.getTime())) {
-          console.warn(`⚠ Invalid date: "${date} ${time}" from "${eventName}"`)
-          return null
-        }
+.map((ev: CalendarEvent) => {
+  const date = ev.date?.trim() || ''
+  const time = ev.time?.trim().toLowerCase() || ''
+  const eventName = ev.title?.trim() || ''
+  const forecastText = ev.forecast?.trim() || ''
 
-        return {
-          externalId: ev.url || (eventName + date + time),
-          question: eventName,
-          status: 'open' as const,
-          eventTime: eventTime.toISOString(),
-          forecast: forecastText ? parseFloat(forecastText) : 0,
-          outcome: null,
-          poolYes: 0,
-          poolNo: 0,
-        }
-      })
+  // Convert MM-DD-YYYY to YYYY-MM-DD
+  const [month, day, year] = date.split('-')
+  if (!month || !day || !year) {
+    console.warn(`⚠ Invalid date format: "${date}" from "${eventName}"`)
+    return null
+  }
+  const isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+
+  // Convert time like "2:30pm" to "14:30"
+  let formattedTime = ''
+  const timeMatch = time.match(/^(\d{1,2})(:(\d{2}))?(am|pm)$/)
+  if (timeMatch) {
+    let hour = parseInt(timeMatch[1], 10)
+    const minutes = timeMatch[3] || '00'
+    const period = timeMatch[4]
+
+    if (period === 'pm' && hour < 12) hour += 12
+    if (period === 'am' && hour === 12) hour = 0
+
+    formattedTime = `${hour.toString().padStart(2, '0')}:${minutes}`
+  } else {
+    console.warn(`⚠ Invalid time format: "${time}" from "${eventName}"`)
+    return null
+  }
+
+  const eventTime = new Date(`${isoDate}T${formattedTime}`)
+  if (isNaN(eventTime.getTime())) {
+    console.warn(`⚠ Still invalid datetime: "${isoDate}T${formattedTime}" from "${eventName}"`)
+    return null
+  }
+
+  return {
+    externalId: ev.url || (eventName + date + time),
+    question: eventName,
+    status: 'open' as const,
+    eventTime: eventTime.toISOString(),
+    forecast: forecastText ? parseFloat(forecastText) : 0,
+    outcome: null,
+    poolYes: 0,
+    poolNo: 0,
+  }
+})
+
       .filter((v): v is NonNullable<typeof v> => Boolean(v))
 
     let added = 0
