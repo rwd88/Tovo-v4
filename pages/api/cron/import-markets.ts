@@ -31,24 +31,16 @@ export default async function handler(
   const auth = req.headers.authorization
   if (!process.env.CRON_SECRET) {
     console.error('CRON_SECRET not configured')
-    return res.status(500).json({
-      success: false,
-      error: 'Server configuration error'
-    })
+    return res.status(500).json({ success: false, error: 'Server configuration error' })
   }
+
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
     console.warn('Unauthorized cron attempt')
-    return res.status(403).json({
-      success: false,
-      error: 'Unauthorized'
-    })
+    return res.status(403).json({ success: false, error: 'Unauthorized' })
   }
 
   if (req.method !== 'GET') {
-    return res.status(405).json({
-      success: false,
-      error: 'Only GET requests are allowed'
-    })
+    return res.status(405).json({ success: false, error: 'Only GET requests are allowed' })
   }
 
   console.log('⏳ Starting market import cron job')
@@ -74,6 +66,7 @@ export default async function handler(
       explicitArray: false,
       trim: true,
     })
+
     const events: CalendarEvent[] = parsed?.weeklyevents?.event
       ? Array.isArray(parsed.weeklyevents.event)
         ? parsed.weeklyevents.event
@@ -82,6 +75,7 @@ export default async function handler(
 
     console.log(`→ Found ${events.length} events`)
 
+    const now = new Date()
     const toCreate = events
       .filter((ev: CalendarEvent) =>
         typeof ev.impact === 'string' &&
@@ -93,7 +87,11 @@ export default async function handler(
         const eventName = ev.title?.trim() || ''
         const forecastText = ev.forecast?.trim() || ''
         const eventTime = new Date(`${date} ${time}`)
-        if (isNaN(eventTime.getTime())) return null
+
+        const isFuture = eventTime > now
+        console.log(`[Event] ${eventName} @ ${eventTime.toISOString()} | Future: ${isFuture}`)
+
+        if (isNaN(eventTime.getTime()) || eventTime < now) return null
 
         return {
           externalId: ev.url || (eventName + date + time),
@@ -122,6 +120,7 @@ export default async function handler(
         console.error(`Error processing batch ${i / batchSize + 1}:`, batchError)
       }
     }
+
     console.log(`✔ Created ${added} new markets`)
 
     return res.status(200).json({
