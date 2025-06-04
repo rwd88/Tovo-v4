@@ -75,36 +75,42 @@ export default async function handler(
 
     console.log(`→ Found ${events.length} events`)
 
-    const now = new Date()
-    const toCreate = events
-      .filter((ev: CalendarEvent) =>
-        typeof ev.impact === 'string' &&
-        ev.impact.trim().toLowerCase() === 'high'
-      )
-      .map((ev: CalendarEvent) => {
-        const date = ev.date?.trim() || ''
-        const time = ev.time?.trim() || ''
-        const eventName = ev.title?.trim() || ''
-        const forecastText = ev.forecast?.trim() || ''
-        const eventTime = new Date(`${date} ${time}`)
+const today = new Date().toISOString().split('T')[0]; // "YYYY-MM-DD"
 
-        const isFuture = eventTime > now
-        console.log(`[Event] ${eventName} @ ${eventTime.toISOString()} | Future: ${isFuture}`)
+const toCreate = events
+  .filter((ev: CalendarEvent) => {
+    const impact = ev.impact?.trim().toLowerCase();
+    const date = ev.date?.trim();
+    return (
+      impact === 'high' &&
+      date === today
+    );
+  })
+  .map((ev: CalendarEvent) => {
+    const date = ev.date?.trim() || '';
+    const time = ev.time?.trim() || '';
+    const eventName = ev.title?.trim() || '';
+    const forecastText = ev.forecast?.trim() || '';
+    const eventTime = new Date(`${date} ${time}`);
 
-        if (isNaN(eventTime.getTime()) || eventTime < now) return null
+    if (isNaN(eventTime.getTime())) {
+      console.warn(`Skipping event with invalid date/time:`, ev);
+      return null;
+    }
 
-        return {
-          externalId: ev.url || (eventName + date + time),
-          question: eventName,
-          status: 'open' as const,
-          eventTime: eventTime.toISOString(),
-          forecast: forecastText ? parseFloat(forecastText) : 0,
-          outcome: null,
-          poolYes: 0,
-          poolNo: 0,
-        }
-      })
-      .filter((v): v is NonNullable<typeof v> => Boolean(v))
+    return {
+      externalId: ev.url || (eventName + date + time),
+      question: eventName,
+      status: 'open' as const,
+      eventTime: eventTime.toISOString(),
+      forecast: forecastText ? parseFloat(forecastText) : 0,
+      outcome: null,
+      poolYes: 0,
+      poolNo: 0,
+    };
+  })
+  .filter((v): v is NonNullable<typeof v> => Boolean(v));
+
 
     let added = 0
     const batchSize = 100
