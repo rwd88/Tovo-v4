@@ -31,61 +31,76 @@ export default async function handler(
   const auth = req.headers.authorization
   if (!process.env.CRON_SECRET) {
     console.error('CRON_SECRET not configured')
-    return res.status(500).json({ success: false, error: 'Server configuration error' })
+    return res.status(500).json({
+      success: false,
+      error: 'Server configuration error'
+    })
   }
-
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
     console.warn('Unauthorized cron attempt')
-    return res.status(403).json({ success: false, error: 'Unauthorized' })
+    return res.status(403).json({
+      success: false,
+      error: 'Unauthorized'
+    })
   }
 
   if (req.method !== 'GET') {
-    return res.status(405).json({ success: false, error: 'Only GET requests are allowed' })
+    return res.status(405).json({
+      success: false,
+      error: 'Only GET requests are allowed'
+    })
   }
 
   console.log('⏳ Starting market import cron job')
 
   try {
+    console.log('→ Clearing previous trades and markets...')
     const tradesDel = await prisma.trade.deleteMany({})
     const marketsDel = await prisma.market.deleteMany({})
     console.log(`✔ Deleted ${tradesDel.count} trades, ${marketsDel.count} markets`)
 
     const CAL_URL = 'https://nfs.faireconomy.media/ff_calendar_thisweek.xml'
+    console.log(`→ Fetching calendar from ${CAL_URL}`)
+
     const { data: xml } = await axios.get<string>(CAL_URL, {
       responseType: 'text',
       timeout: 10000,
-      headers: { 'User-Agent': 'Mozilla/5.0 (ForexFactoryBot/1.0)' },
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; ForexFactoryBot/1.0)',
+      },
     })
 
-    const parsed = await parseStringPromise(xml, { explicitArray: false, trim: true })
+    const parsed = await parseStringPromise(xml, {
+      explicitArray: false,
+      trim: true,
+    })
+
     const events: CalendarEvent[] = parsed?.weeklyevents?.event
       ? Array.isArray(parsed.weeklyevents.event)
         ? parsed.weeklyevents.event
         : [parsed.weeklyevents.event]
       : []
 
-    const today = new Date().toISOString().split('T')[0] // e.g., "2025-06-04"
-    console.log('✅ Today is:', today)
-    console.log('🔍 Previewing event dates:')
-    events.slice(0, 10).forEach(ev => {
-      console.log(`- ${ev.title} @ ${ev.date} ${ev.time}, impact: ${ev.impact}`)
-    })
+    console.log(`→ Found ${events.length} events`)
 
     const toCreate = events
-      .filter(ev =>
-        typeof ev.impact === 'string' &&
-        ev.impact.trim().toLowerCase() === 'high' &&
-        typeof ev.date === 'string' &&
-        ev.date.trim().startsWith(today)
-      )
-      .map(ev => {
+      .filter(ev => {
+        const isHigh = typeof ev.impact === 'string' && ev.impact.trim().toLowerCase() === 'high';
+        if (isHigh) {
+          console.log(`✔ High impact: ${ev.title} @ ${ev.date} ${ev.time}`);
+        }
+        return isHigh;
+      })
+      .map((ev: CalendarEvent) => {
         const date = ev.date?.trim() || ''
         const time = ev.time?.trim() || ''
         const eventName = ev.title?.trim() || ''
         const forecastText = ev.forecast?.trim() || ''
         const eventTime = new Date(`${date} ${time}`)
-
-        if (isNaN(eventTime.getTime())) return null
+        if (isNaN(eventTime.getTime())) {
+          console.warn(`⚠ Invalid date: "${date} ${time}" from "${eventName}"`)
+          return null
+        }
 
         return {
           externalId: ev.url || (eventName + date + time),
@@ -111,10 +126,9 @@ export default async function handler(
         })
         added += count
       } catch (batchError) {
-        console.error(`❌ Error processing batch ${i / batchSize + 1}:`, batchError)
+        console.error(`Error processing batch ${i / batchSize + 1}:`, batchError)
       }
     }
-
     console.log(`✔ Created ${added} new markets`)
 
     return res.status(200).json({
@@ -123,6 +137,7 @@ export default async function handler(
       marketsDeleted: marketsDel.count,
       added,
     })
+
   } catch (err) {
     console.error('❌ Market import failed:', err)
     return res.status(500).json({
