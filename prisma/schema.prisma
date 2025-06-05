@@ -19,30 +19,32 @@ model User {
 }
 
 model Market {
-  id         String   @id @default(uuid())
-  question   String
-  status     String   // open, locked, settled
-  eventTime  DateTime
-  forecast   Float
-  outcome    String?  // yes / no
-  externalId String   @unique
-  poolYes    Float    @default(0)
-  poolNo     Float    @default(0)
-  trades     Trade[]
-  createdAt  DateTime @default(now())
+  id            String   @id @default(uuid())
+  question      String
+  status        String   @default("open") // open | locked | settled
+  eventTime     DateTime
+  resolutionTime DateTime?  // When market officially closes
+  forecast      Float?
+  outcome       String?  // "yes" | "no"
+  externalId    String   @unique  // ForexFactory event ID
+  poolYes       Float    @default(0)
+  poolNo        Float    @default(0)
+  feeCollected  Float    @default(0)  // House earnings
+  trades        Trade[]
+  createdAt     DateTime @default(now())
 }
 
 model Trade {
-  id        String   @id @default(uuid())
+  id        String   @id @default(cuid())
   userId    String
   marketId  String
-  type      String   // yes or no
+  type      String   // "yes" | "no"
   amount    Float
-  payout    Float?
-  fee       Float
-  settled   Boolean  @default(false) // ✅ added
+  fee       Float    @default(0)  // 1% trade fee
+  shares    Float    // CPMM shares bought
+  settled   Boolean  @default(false)
   createdAt DateTime @default(now())
 
-  user   User   @relation(fields: [userId], references: [id])
-  market Market @relation(fields: [marketId], references: [id])
+  user      User     @relation(fields: [userId], references: [telegramId])
+  market    Market   @relation(fields: [marketId], references: [id])
 }
