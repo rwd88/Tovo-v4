@@ -19,8 +19,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!market) return res.status(404).json({ error: 'Market not found' });
 
     const totalPool = market.poolYes + market.poolNo;
-    const yesOdds = totalPool > 0 ? (market.poolNo / totalPool) * 100 : 50;
-    const noOdds  = totalPool > 0 ? (market.poolYes / totalPool) * 100 : 50;
+    const yesOdds   = totalPool > 0 ? (market.poolNo  / totalPool) * 100 : 50;
+    const noOdds    = totalPool > 0 ? (market.poolYes / totalPool) * 100 : 50;
 
     const tradeFee      = amount * 0.01;
     const earlyCloseFee = prediction.endsWith('_early') ? amount * 0.10 : 0;
@@ -36,7 +36,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           type: baseType,
           amount: netAmount,
           fee: totalFee,
-          // ← removed `isEarlyClose` here
+          shares: netAmount,        // ← add this
         }
       }),
       prisma.market.update({
