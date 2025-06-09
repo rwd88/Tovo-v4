@@ -7,47 +7,55 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const { userId, marketId, prediction, amount } = req.body;
 
   try {
-    if (!userId || !marketId || !prediction || typeof amount !== 'number') {
-      return res.status(400).json({ error: 'Missing or invalid parameters' });
+    // Validate input
+    if (!marketId || !prediction || !amount || !userId) {
+      return res.status(400).json({ error: 'Missing parameters' });
     }
 
+    // Get market details
     const market = await prisma.market.findUnique({
       where: { externalId: marketId },
       select: { question: true, poolYes: true, poolNo: true }
     });
 
-    if (!market) return res.status(404).json({ error: 'Market not found' });
+    if (!market) {
+      return res.status(404).json({ error: 'Market not found' });
+    }
 
+    // Calculate current odds using CPMM formula
     const totalPool = market.poolYes + market.poolNo;
-    const yesOdds   = totalPool > 0 ? (market.poolNo  / totalPool) * 100 : 50;
-    const noOdds    = totalPool > 0 ? (market.poolYes / totalPool) * 100 : 50;
+    const yesOdds = totalPool > 0 ? (market.poolNo / totalPool) * 100 : 50;
+    const noOdds = totalPool > 0 ? (market.poolYes / totalPool) * 100 : 50;
 
-    const tradeFee      = amount * 0.01;
+    // Calculate fee (1% trade fee + 10% early close if applicable)
+    const tradeFee = amount * 0.01;
     const earlyCloseFee = prediction.endsWith('_early') ? amount * 0.10 : 0;
-    const totalFee      = tradeFee + earlyCloseFee;
-    const netAmount     = amount - totalFee;
-    const baseType      = prediction.replace('_early', '');
+    const totalFee = tradeFee + earlyCloseFee;
+    const netAmount = amount - totalFee;
+    const isEarlyClose = prediction.endsWith('_early');
 
+    // Execute trade
     await prisma.$transaction([
       prisma.trade.create({
         data: {
           userId,
           marketId,
-          type: baseType,
+          type: prediction.replace('_early', ''),
           amount: netAmount,
           fee: totalFee,
-          shares: netAmount,        // ← add this
+          isEarlyClose,  // Now matches the schema
         }
       }),
       prisma.market.update({
         where: { externalId: marketId },
         data: {
           poolYes: prediction.startsWith('YES') ? { increment: netAmount } : undefined,
-          poolNo:  prediction.startsWith('NO')  ? { increment: netAmount } : undefined,
+          poolNo: prediction.startsWith('NO') ? { increment: netAmount } : undefined
         }
       })
     ]);
 
+    // Send confirmation
     await sendTelegramMessage(
       `✅ Prediction placed!\n` +
       `📌 ${market.question}\n` +
@@ -58,10 +66,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       userId
     );
 
-    return res.status(200).json({ success: true });
+    res.status(200).json({ success: true });
 
   } catch (error) {
     console.error('Prediction error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error' });
   }
 }

@@ -1,0 +1,9 @@
+-- AlterTable
+ALTER TABLE "Market" ADD COLUMN     "feeCollected" DOUBLE PRECISION NOT NULL DEFAULT 0,
+ADD COLUMN     "resolutionTime" TIMESTAMP(3),
+ALTER COLUMN "status" SET DEFAULT 'open',
+ALTER COLUMN "forecast" DROP NOT NULL;
+
+-- AlterTable
+ALTER TABLE "Trade" ALTER COLUMN "fee" SET DEFAULT 0,
+ALTER COLUMN "settled" SET DEFAULT false;
