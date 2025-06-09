@@ -2,38 +2,55 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '../../../lib/prisma';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // ... (your existing code)
-
+export default async function handler(_req: NextApiRequest, res: NextApiResponse) {
   try {
-    // ... (your existing settlement logic)
+    // Example settlement logic - replace with your actual implementation
+    const unsettledMarkets = await prisma.market.findMany({
+      where: { 
+        status: 'open',
+        eventTime: { lt: new Date() } // Markets where event time has passed
+      },
+      include: {
+        trades: true
+      }
+    });
 
-    await prisma.$transaction([
-      // Update market status
-      prisma.market.update({
-        where: { id: marketId },
-        data: { status: 'settled', outcome }
-      }),
-      // Update trades with payouts
-      ...trades.map(trade => 
-        prisma.trade.update({
-          where: { id: trade.id },
-          data: { 
-            settled: true,
-            payout: calculatePayout(trade) // Your payout calculation function
-          }
-        })
-      )
-    ]);
+    for (const market of unsettledMarkets) {
+      // Determine outcome (replace with your actual logic)
+      const outcome = market.poolYes > market.poolNo ? 'YES' : 'NO';
 
-    // ... (rest of your code)
-  } catch (error) {
-    // ... (error handling)
+      await prisma.$transaction([
+        // Update market status
+        prisma.market.update({
+          where: { id: market.id },
+          data: { status: 'settled', outcome }
+        }),
+        // Update all trades with payouts
+        ...market.trades.map(trade => 
+          prisma.trade.update({
+            where: { id: trade.id },
+            data: { 
+              settled: true,
+              payout: trade.type === outcome ? 
+                trade.amount * (1 + (trade.type === 'YES' ? 
+                  market.poolNo / market.poolYes : 
+                  market.poolYes / market.poolNo)) : 
+                0
+            }
+          })
+        )
+      ]);
+    }
+
+    return res.status(200).json({ 
+      success: true,
+      settledMarkets: unsettledMarkets.length 
+    });
+  } catch (err) {
+    console.error('Settlement error:', err);
+    return res.status(500).json({ 
+      success: false,
+      error: 'Failed to settle markets' 
+    });
   }
-}
-
-// Example payout calculation function
-function calculatePayout(trade) {
-  // Implement your payout logic here
-  return trade.amount * 1.5; // Example
 }
