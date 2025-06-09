@@ -15,37 +15,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Get market details
     const market = await prisma.market.findUnique({
       where: { externalId: marketId },
-      select: { question: true, poolYes: true, poolNo: true }
+      select: { question: true, poolYes: true, poolNo: true, status: true }
     });
 
-    if (!market) {
-      return res.status(404).json({ error: 'Market not found' });
+    if (!market || market.status !== 'open') {
+      return res.status(400).json({ error: 'Market not found or closed' });
     }
 
-    // Calculate current odds using CPMM formula
-    const totalPool = market.poolYes + market.poolNo;
-    const yesOdds = totalPool > 0 ? (market.poolNo / totalPool) * 100 : 50;
-    const noOdds = totalPool > 0 ? (market.poolYes / totalPool) * 100 : 50;
-
-    // Calculate fee (1% trade fee + 10% early close if applicable)
+    // Calculate fees and amounts
+    const isEarly = prediction.endsWith('_early');
     const tradeFee = amount * 0.01;
-    const earlyCloseFee = prediction.endsWith('_early') ? amount * 0.10 : 0;
+    const earlyCloseFee = isEarly ? amount * 0.10 : 0;
     const totalFee = tradeFee + earlyCloseFee;
     const netAmount = amount - totalFee;
-    const isEarlyClose = prediction.endsWith('_early');
 
-    // Execute trade
+    // Create trade with explicit type
+    const tradeData = {
+      userId,
+      marketId,
+      type: prediction.replace('_early', ''),
+      amount: netAmount,
+      fee: totalFee,
+      isEarlyClose: isEarly,
+      shares: netAmount // Simplified for example
+    };
+
     await prisma.$transaction([
-      prisma.trade.create({
-        data: {
-          userId,
-          marketId,
-          type: prediction.replace('_early', ''),
-          amount: netAmount,
-          fee: totalFee,
-          isEarlyClose,  // Now matches the schema
-        }
-      }),
+      prisma.trade.create({ data: tradeData }),
       prisma.market.update({
         where: { externalId: marketId },
         data: {
@@ -57,19 +53,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Send confirmation
     await sendTelegramMessage(
-      `✅ Prediction placed!\n` +
+      `✅ Trade executed!\n` +
       `📌 ${market.question}\n` +
-      `🔮 Your prediction: ${prediction}\n` +
-      `💰 Amount: $${amount.toFixed(2)} (Fee: $${totalFee.toFixed(2)})\n` +
-      `📊 New odds: YES ${yesOdds.toFixed(1)}% | NO ${noOdds.toFixed(1)}%`,
+      `🔮 ${prediction} (${isEarly ? 'Early ' : ''}Close)\n` +
+      `💰 Net: $${netAmount.toFixed(2)} (Fee: $${totalFee.toFixed(2)})`,
       false,
       userId
     );
 
-    res.status(200).json({ success: true });
+    return res.status(200).json({ success: true });
 
   } catch (error) {
-    console.error('Prediction error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Trade error:', error);
+    return res.status(500).json({ error: 'Trade processing failed' });
   }
 }
