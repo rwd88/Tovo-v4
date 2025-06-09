@@ -4,12 +4,13 @@ import { prisma } from '../../../lib/prisma';
 import { sendTelegramMessage } from '../../../lib/telegram';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { command, userId, marketId, prediction, amount } = req.body;
+  // Destructure only the fields we actually use
+  const { userId, marketId, prediction, amount } = req.body;
 
   try {
     // Validate input
-    if (!marketId || !prediction || !amount || !userId) {
-      return res.status(400).json({ error: 'Missing parameters' });
+    if (!userId || !marketId || !prediction || typeof amount !== 'number') {
+      return res.status(400).json({ error: 'Missing or invalid parameters' });
     }
 
     // Get market details
@@ -27,13 +28,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const yesOdds = totalPool > 0 ? (market.poolNo / totalPool) * 100 : 50;
     const noOdds = totalPool > 0 ? (market.poolYes / totalPool) * 100 : 50;
 
-    // Calculate fee (1% trade fee + 10% early close if applicable)
+    // Calculate fees
     const tradeFee = amount * 0.01;
     const earlyCloseFee = prediction.endsWith('_early') ? amount * 0.10 : 0;
     const totalFee = tradeFee + earlyCloseFee;
     const netAmount = amount - totalFee;
 
-    // Execute trade
+    // Execute trade and update pools in a transaction
     await prisma.$transaction([
       prisma.trade.create({
         data: {
@@ -54,7 +55,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       })
     ]);
 
-    // Send confirmation
+    // Send Telegram confirmation
     await sendTelegramMessage(
       `✅ Prediction placed!\n` +
       `📌 ${market.question}\n` +
@@ -65,10 +66,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       userId
     );
 
-    res.status(200).json({ success: true });
+    return res.status(200).json({ success: true });
 
   } catch (error) {
     console.error('Prediction error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }
