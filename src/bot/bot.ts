@@ -1,3 +1,4 @@
+// src/bot/bot.ts
 import { Telegraf, Markup } from 'telegraf';
 import { PrismaClient } from '@prisma/client';
 import axios from 'axios';
@@ -9,24 +10,8 @@ const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN!);
 
 // Constants
 const TRADE_FEE = 0.01;  // 1% fee on trades
-const LOSER_FEE = 0.10;  // 10% fee on losing bets
 
 // --- Helper Functions ---
-
-/**
- * Fetch high-impact events from ForexFactory
- */
-async function fetchForexFactoryEvents(): Promise<CalendarEvent[]> {
-  const CAL_URL = 'https://nfs.faireconomy.media/ff_calendar_thisweek.xml';
-  const { data: xml } = await axios.get<string>(CAL_URL);
-  const parsed = await parseStringPromise(xml, { explicitArray: false, trim: true });
-
-  return parsed?.weeklyevents?.event
-    ? Array.isArray(parsed.weeklyevents.event)
-      ? parsed.weeklyevents.event
-      : [parsed.weeklyevents.event]
-    : [];
-}
 
 /**
  * Calculate shares using CPMM (Constant Product Market Maker)
@@ -95,7 +80,7 @@ bot.command('balance', async (ctx) => {
 // --- Bet Handling ---
 
 bot.action(/bet_(yes|no)_(.+)/, async (ctx) => {
-  const [_, side, marketId] = ctx.match;
+  const [, side, marketId] = ctx.match; // Removed unused underscore
   const userId = ctx.from.id.toString();
   const betAmount = 10; // Default bet (replace with user input)
 
@@ -161,12 +146,3 @@ bot.launch();
 // Graceful shutdown
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
-
-// Types
-interface CalendarEvent {
-  title?: string;
-  date?: string;
-  time?: string;
-  impact?: string;
-  url?: string;
-}
