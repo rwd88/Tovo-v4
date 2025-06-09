@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Trade" ADD COLUMN     "isEarlyClose" BOOLEAN NOT NULL DEFAULT false,
+ALTER COLUMN "fee" DROP DEFAULT;

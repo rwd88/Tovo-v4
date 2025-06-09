@@ -35,16 +35,18 @@ model Market {
 }
 
 model Trade {
-  id        String   @id @default(cuid())
-  userId    String
-  marketId  String
-  type      String   // "yes" | "no"
-  amount    Float
-  fee       Float    @default(0)  // 1% trade fee
-  shares    Float    // CPMM shares bought
-  settled   Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  userId      String
+  marketId    String
+  type        String   // "yes" or "no"
+  amount      Float
+  fee         Float
+  shares      Float
+  isEarlyClose Boolean @default(false)
+  settled     Boolean  @default(false)
+  payout      Float?   // Add this new field
+  createdAt   DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [telegramId])
-  market    Market   @relation(fields: [marketId], references: [id])
+  user        User     @relation(fields: [userId], references: [telegramId])
+  market      Market   @relation(fields: [marketId], references: [id])
 }
