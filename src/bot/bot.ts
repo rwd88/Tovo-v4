@@ -1,8 +1,6 @@
 // src/bot/bot.ts
 import { Telegraf, Markup } from 'telegraf';
 import { PrismaClient } from '@prisma/client';
-import axios from 'axios';
-import { parseStringPromise } from 'xml2js';
 
 // Initialize Prisma and Telegraf
 const prisma = new PrismaClient();
@@ -80,7 +78,7 @@ bot.command('balance', async (ctx) => {
 // --- Bet Handling ---
 
 bot.action(/bet_(yes|no)_(.+)/, async (ctx) => {
-  const [, side, marketId] = ctx.match; // Removed unused underscore
+  const [, side, marketId] = ctx.match; // Removed unused capture group
   const userId = ctx.from.id.toString();
   const betAmount = 10; // Default bet (replace with user input)
 
