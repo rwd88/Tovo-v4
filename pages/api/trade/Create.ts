@@ -22,7 +22,6 @@ export default async function handler(
   try {
     // 1. Validate request
     const { userId, marketId, amount, type } = req.body as TradeRequest;
-
     if (
       !userId ||
       !marketId ||
@@ -38,7 +37,6 @@ export default async function handler(
       where: { id: marketId, status: 'open' },
       select: { question: true, eventTime: true }
     });
-
     if (!market) {
       return res.status(400).json({ error: 'Market not available for trading' });
     }
@@ -48,10 +46,8 @@ export default async function handler(
       where: { telegramId: userId },
       select: { balance: true }
     });
-
-    const fee = Number((amount * 0.01).toFixed(2)); // 1% fee
+    const fee       = Number((amount * 0.01).toFixed(2)); // 1% fee
     const totalCost = amount + fee;
-
     if (!user || user.balance < totalCost) {
       return res.status(400).json({ error: 'Insufficient balance' });
     }
@@ -65,6 +61,8 @@ export default async function handler(
           type,
           amount,
           fee,
+          payout: 0,       // ← initial payout
+          shares: amount,  // ← required non-nullable field
           settled: false
         }
       }),
@@ -77,7 +75,7 @@ export default async function handler(
         where: { id: marketId },
         data: {
           poolYes: type === 'YES' ? { increment: amount } : undefined,
-          poolNo: type === 'NO' ? { increment: amount } : undefined
+          poolNo:  type === 'NO'  ? { increment: amount } : undefined
         }
       })
     ]);
@@ -85,7 +83,7 @@ export default async function handler(
     // 5. Send notification
     await sendTelegramMessage(
       `🎯 New Trade Executed\n` +
-      `• User: Anonymous\n` +
+      `• User: ${userId}\n` +
       `• Market: ${market.question}\n` +
       `• Direction: ${type} $${amount.toFixed(2)}\n` +
       `• Fee: $${fee.toFixed(2)}`,
