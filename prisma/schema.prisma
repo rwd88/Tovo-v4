@@ -8,45 +8,40 @@ datasource db {
 }
 
 model User {
-  id         String   @id @default(uuid())
+  id         String   @id @default(cuid())
   telegramId String   @unique
-  solana     String?  @unique
-  bsc        String?  @unique
-  tron       String?  @unique
+  username   String?
   balance    Float    @default(0)
   trades     Trade[]
   createdAt  DateTime @default(now())
 }
 
 model Market {
-  id            String   @id @default(uuid())
-  question      String
-  status        String   @default("open") // open | locked | settled
-  eventTime     DateTime
-  resolutionTime DateTime?  // When market officially closes
-  forecast      Float?
-  outcome       String?  // "yes" | "no"
-  externalId    String   @unique  // ForexFactory event ID
-  poolYes       Float    @default(0)
-  poolNo        Float    @default(0)
-  feeCollected  Float    @default(0)  // House earnings
-  trades        Trade[]
-  createdAt     DateTime @default(now())
+  id           String   @id @default(cuid())
+  question     String
+  description  String?
+  poolYes      Float    @default(0)
+  poolNo       Float    @default(0)
+  status       String   @default("open") // open, closed, resolved
+  feeCollected Float    @default(0) // House earnings
+  trades       Trade[]
+  createdAt    DateTime @default(now())
 }
 
 model Trade {
-  id          String   @id @default(cuid())
-  userId      String
-  marketId    String
-  type        String   // "yes" or "no"
-  amount      Float
-  fee         Float
-  shares      Float
-  isEarlyClose Boolean @default(false)
-  settled     Boolean  @default(false)
-  payout      Float?   // Add this new field
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  market    Market   @relation(fields: [marketId], references: [id])
+  marketId  String
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  type      String // 'yes' or 'no'
+  amount    Float
+  fee       Float
+  payout    Float
+  shares    Float
+  settled   Boolean  @default(false)
+  createdAt DateTime @default(now())
 
-  user        User     @relation(fields: [userId], references: [telegramId])
-  market      Market   @relation(fields: [marketId], references: [id])
+  @@index([marketId])
+  @@index([userId])
 }
