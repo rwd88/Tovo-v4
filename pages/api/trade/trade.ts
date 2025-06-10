@@ -2,7 +2,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '../../../lib/prisma';
 import { sendTelegramMessage } from '../../../lib/telegram';
-import { calculateShares } from '../../../lib/cpmm';
+import { calculateShares, calculatePotentialPayout } from '../../../lib/cpmm';
 
 interface TradeRequest {
   userId: string;
@@ -23,6 +23,7 @@ export default async function handler(
   try {
     const { userId, marketId, amount, type } = req.body as TradeRequest;
 
+    // Input validation
     if (!userId || !marketId || !amount || !type) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
@@ -35,18 +36,30 @@ export default async function handler(
       return res.status(400).json({ error: 'Invalid trade type' });
     }
 
+    // Fetch market data
     const market = await prisma.market.findUnique({
       where: { id: marketId },
-      select: { status: true, question: true, poolYes: true, poolNo: true }
+      select: { 
+        status: true, 
+        question: true, 
+        poolYes: true, 
+        poolNo: true,
+        closeDate: true
+      }
     });
 
-    if (!market || market.status !== 'open') {
+    if (!market) {
+      return res.status(404).json({ error: 'Market not found' });
+    }
+
+    if (market.status !== 'open') {
       return res.status(400).json({ error: 'Market not available for trading' });
     }
 
+    // Check user balance
     const user = await prisma.user.findUnique({
       where: { telegramId: userId },
-      select: { balance: true }
+      select: { balance: true, username: true }
     });
 
     const fee = Number((amount * 0.01).toFixed(2));
@@ -56,7 +69,7 @@ export default async function handler(
       return res.status(400).json({ error: 'Insufficient balance' });
     }
 
-    // Calculate shares using CPMM
+    // Calculate trade details
     const shares = calculateShares(
       amount,
       market.poolYes,
@@ -64,7 +77,15 @@ export default async function handler(
       type
     );
 
-    const [trade, updatedUser] = await prisma.$transaction([
+    const payout = calculatePotentialPayout(
+      shares,
+      market.poolYes,
+      market.poolNo,
+      type
+    );
+
+    // Execute transaction
+    const [trade, updatedUser, updatedMarket] = await prisma.$transaction([
       prisma.trade.create({
         data: {
           userId,
@@ -72,30 +93,37 @@ export default async function handler(
           type,
           amount,
           fee,
+          shares,
+          payout,
           settled: false,
-          shares
+          createdAt: new Date()
         }
       }),
       prisma.user.update({
         where: { telegramId: userId },
         data: { balance: { decrement: totalCost } },
-        select: { balance: true }
+        select: { balance: true, username: true }
       }),
       prisma.market.update({
         where: { id: marketId },
         data: {
           poolYes: type === 'YES' ? { increment: amount } : undefined,
-          poolNo: type === 'NO' ? { increment: amount } : undefined
+          poolNo: type === 'NO' ? { increment: amount } : undefined,
+          volume: { increment: amount }
         }
       })
     ]);
 
+    // Send notification
+    const username = user.username || 'Anonymous';
     await sendTelegramMessage(
-      `🎯 New Prediction\n` +
-      `👤 Anonymous\n` +
+      `🎯 New Trade\n` +
+      `👤 ${username}\n` +
       `💰 $${amount.toFixed(2)} on ${type}\n` +
-      `📊 Shares: ${shares.toFixed(4)}\n` +
+      `📊 ${shares.toFixed(4)} shares\n` +
+      `🏆 Potential payout: $${payout.toFixed(2)}\n` +
       `❓ ${market.question}\n` +
+      `📅 Closes: ${new Date(market.closeDate).toLocaleDateString()}\n` +
       `#${marketId.slice(0, 5)}`
     );
 
@@ -104,7 +132,10 @@ export default async function handler(
       tradeId: trade.id,
       newBalance: updatedUser.balance,
       marketQuestion: market.question,
-      shares
+      shares,
+      potentialPayout: payout,
+      newPoolYes: updatedMarket.poolYes,
+      newPoolNo: updatedMarket.poolNo
     });
 
   } catch (error) {
