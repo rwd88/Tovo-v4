@@ -12,7 +12,10 @@ export default async function handler(
 
   try {
     const markets = await prisma.market.findMany({
-      where: { status: 'open' },          // drop eventTime filter for now
+      where: {
+        status: 'open',
+        eventTime: { gt: new Date() },
+      },
       orderBy: { eventTime: 'asc' },
       select: {
         id: true,
