@@ -18,9 +18,12 @@ model User {
 
 model Market {
   id           String   @id @default(cuid())
-  externalId   String?  @unique(map: "Market_externalId_key") // Single unique constraint with explicit name
+  externalId   String?  @unique(map: "Market_externalId_key")
   question     String
   description  String?
+  eventTime    DateTime // Add this line
+  forecast     Float?
+  outcome      String?
   poolYes      Float    @default(0)
   poolNo       Float    @default(0)
   status       String   @default("open")

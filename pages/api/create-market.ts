@@ -2,6 +2,17 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { prisma } from '../../lib/prisma'
 
+interface CreateMarketRequest {
+  externalId: string
+  question: string
+  status: string
+  eventTime: string | Date
+  forecast?: number
+  outcome?: string
+  poolYes: number
+  poolNo: number
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -11,7 +22,7 @@ export default async function handler(
   }
 
   try {
-    // Destructure fields from request body, including externalId
+    // Destructure with proper typing
     const {
       externalId,
       question,
@@ -21,15 +32,14 @@ export default async function handler(
       outcome,
       poolYes,
       poolNo,
-    } = req.body
+    } = req.body as CreateMarketRequest
 
-    // Validate payload (make externalId required)
+    // Validate payload
     if (
       !externalId ||
       !question ||
       !status ||
       !eventTime ||
-      forecast === undefined ||
       poolYes === undefined ||
       poolNo === undefined
     ) {
@@ -42,7 +52,7 @@ export default async function handler(
         externalId,
         question,
         status,
-        eventTime: new Date(eventTime),
+        eventTime: new Date(eventTime), // Now matches schema
         forecast,
         outcome,
         poolYes,
@@ -50,9 +60,12 @@ export default async function handler(
       },
     })
 
-    return res.status(200).json(market)
+    return res.status(201).json(market)
   } catch (error) {
     console.error('Create market error:', error)
-    return res.status(500).json({ error: 'Internal server error' })
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : undefined
+    })
   }
 }
