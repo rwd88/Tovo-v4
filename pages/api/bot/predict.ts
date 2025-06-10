@@ -1,12 +1,12 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { prisma } from '../../../lib/prisma';  // Fixed import path
-import { calculateShares } from '../../../lib/cpmm';  // Fixed import path
+import { prisma } from '../../../lib/prisma';
+import { calculateShares } from '../../../lib/cpmm';
 
 interface PredictRequest {
   userId: string;
   marketId: string;
   amount: number;
-  prediction: 'yes' | 'no';
+  prediction: 'YES' | 'NO'; // Changed to uppercase
 }
 
 export default async function handler(
@@ -30,6 +30,10 @@ export default async function handler(
       return res.status(400).json({ error: 'Invalid amount' });
     }
 
+    if (!['YES', 'NO'].includes(prediction)) { // Changed to uppercase
+      return res.status(400).json({ error: 'Invalid prediction type' });
+    }
+
     // Get market details
     const market = await prisma.market.findUnique({
       where: { id: marketId },
@@ -51,11 +55,11 @@ export default async function handler(
       amount,
       market.poolYes,
       market.poolNo,
-      prediction
+      prediction // Now matches the expected type
     );
 
     const fee = amount * 0.01;
-    const payout = shares * (prediction === 'yes' 
+    const payout = shares * (prediction === 'YES' 
       ? market.poolYes / market.poolNo 
       : market.poolNo / market.poolYes
     );
@@ -66,7 +70,7 @@ export default async function handler(
         data: {
           userId,
           marketId,
-          type: prediction,
+          type: prediction.toLowerCase() as 'yes' | 'no', // Convert to lowercase for DB
           amount,
           fee,
           payout,
