@@ -3,6 +3,17 @@ import axios from 'axios';
 import { parseStringPromise } from 'xml2js';
 import { prisma } from '../../../lib/prisma';
 
+export default async function handler(req, res) {
+  try {
+    const xml = (await axios.get(process.env.FF_XML_URL!)).data;
+    const json = await parseStringPromise(xml, {
+      explicitArray: false,
+      trim: true,
+      mergeAttrs: true
+    });
+
+    // DEBUG: log the structure to see where events live
+    console.log(JSON.stringify(json, null, 2));
 interface CalendarEvent {
   id?: string;
   url?: string;
