@@ -1,0 +1,8 @@
+-- AlterTable
+ALTER TABLE "Market" ADD COLUMN     "eventTime" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ADD COLUMN     "forecast" DOUBLE PRECISION,
+ADD COLUMN     "outcome" TEXT;
+
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN     "bsc" TEXT,
+ADD COLUMN     "solana" TEXT;

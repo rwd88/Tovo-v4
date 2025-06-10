@@ -8,12 +8,14 @@ datasource db {
 }
 
 model User {
-  id         String   @id @default(cuid())
+  id         String   @id
   telegramId String   @unique
   username   String?
   balance    Float    @default(0)
-  trades     Trade[]
   createdAt  DateTime @default(now())
+  solana     String? // new
+  bsc        String? // new
+  trades     Trade[] // renamed back-relation
 }
 
 model Market {
@@ -21,7 +23,7 @@ model Market {
   externalId   String?  @unique(map: "Market_externalId_key")
   question     String
   description  String?
-  eventTime    DateTime // Add this line
+  eventTime    DateTime @default(now())
   forecast     Float?
   outcome      String?
   poolYes      Float    @default(0)
