@@ -1,5 +1,6 @@
 // src/bot/bot.ts
 import { Telegraf, Markup } from 'telegraf';
+import type { Message } from 'telegraf/typings/core/types/typegram';
 import { PrismaClient } from '@prisma/client';
 
 // Initialize Prisma and Telegraf
@@ -120,8 +121,9 @@ bot.action(/bet_(yes|no)_(.+)/, async (ctx) => {
   ]);
 
   // 5. Confirm bet
+  const originalMessage = ctx.callbackQuery.message as Message.TextMessage | undefined;
   await ctx.editMessageText(
-    `${ctx.callbackQuery.message?.text}\n\n` +
+`${originalMessage?.text ?? ''}\n\n` +
     `✅ @${ctx.from.username} bet $${betAmount} on ${side.toUpperCase()}!` +
     ` (Shares: ${shares.toFixed(2)}, Fee: $${fee.toFixed(2)})`
   );
