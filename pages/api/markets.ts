@@ -1,12 +1,11 @@
 // pages/api/markets.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { prisma } from '../lib/prisma';
+import { prisma } from '../../lib/prisma';  // ← fixed path
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  // Only allow GET
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Only GET allowed' });
   }
@@ -16,7 +15,7 @@ export default async function handler(
     const markets = await prisma.market.findMany({
       where: {
         status: 'open',
-        eventTime: { gt: now },       // only future events
+        eventTime: { gt: now },
       },
       orderBy: { eventTime: 'asc' },
       select: {
@@ -26,7 +25,7 @@ export default async function handler(
         eventTime: true,
         poolYes: true,
         poolNo: true,
-      }
+      },
     });
 
     return res.status(200).json(markets);
