@@ -1,25 +1,39 @@
 // lib/verifyTelegram.ts
 import crypto from 'crypto';
 
-export function isValidTelegramInitData(initData: string, botToken: string): boolean {
+export function verifyTelegramWebAppData(token: string, initData: string): boolean {
   const urlSearchParams = new URLSearchParams(initData);
   const hash = urlSearchParams.get('hash');
-  if (!hash) return false;
-
   urlSearchParams.delete('hash');
 
-  const dataCheckString = [...urlSearchParams.entries()]
+  // Backward-compatible iteration
+  const entries: [string, string][] = [];
+  urlSearchParams.forEach((val, key) => entries.push([key, val]));
+
+  const dataCheckString = entries
+    .sort(([a], [b]) => a.localeCompare(b))
     .map(([key, val]) => `${key}=${val}`)
-    .sort()
     .join('\n');
 
-  const secretKey = crypto.createHash('sha256')
-    .update(botToken)
-    .digest();
-
-  const hmac = crypto.createHmac('sha256', secretKey)
+  const secretKey = crypto.createHmac('sha256', 'WebAppData').update(token).digest();
+  const calculatedHash = crypto
+    .createHmac('sha256', secretKey)
     .update(dataCheckString)
     .digest('hex');
 
-  return hmac === hash;
+  return calculatedHash === hash;
+}
+
+// Alternative simplified version if you don't need sorting:
+export function quickVerifyTelegramData(token: string, initData: string): boolean {
+  const urlSearchParams = new URLSearchParams(initData);
+  const hash = urlSearchParams.get('hash');
+  
+  const secretKey = crypto.createHmac('sha256', 'WebAppData').update(token).digest();
+  const calculatedHash = crypto
+    .createHmac('sha256', secretKey)
+    .update(initData.replace(/&hash=[^&]*/, '').replace(/hash=[^&]*&?/, ''))
+    .digest('hex');
+
+  return calculatedHash === hash;
 }
