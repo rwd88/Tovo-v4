@@ -17,18 +17,16 @@ model User {
 }
 
 model Market {
-  id          String   @id @default(cuid())
-  externalId  String?  @unique  // Add this line if you need external IDs
-  question    String
-  description String?
-  poolYes     Float    @default(0)
-  poolNo      Float    @default(0)
-  status      String   @default("open")
-  feeCollected Float   @default(0)
-  trades      Trade[]
-  createdAt   DateTime @default(now())
-  
-  @@unique([externalId])  // Ensure externalId is unique if it exists
+  id           String   @id @default(cuid())
+  externalId   String?  @unique(map: "Market_externalId_key") // Single unique constraint with explicit name
+  question     String
+  description  String?
+  poolYes      Float    @default(0)
+  poolNo       Float    @default(0)
+  status       String   @default("open")
+  feeCollected Float    @default(0)
+  trades       Trade[]
+  createdAt    DateTime @default(now())
 }
 
 model Trade {
