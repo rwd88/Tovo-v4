@@ -1,56 +1,93 @@
-// pages/api/settle.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { prisma } from '../../../lib/prisma';
+import { prisma } from '@/lib/prisma';
 
-export default async function handler(_req: NextApiRequest, res: NextApiResponse) {
+interface SettlementResult {
+  success: boolean;
+  settledMarkets?: number;
+  error?: string;
+}
+
+export default async function handler(
+  _req: NextApiRequest,
+  res: NextApiResponse<SettlementResult>
+) {
   try {
-    // Example settlement logic - replace with your actual implementation
-    const unsettledMarkets = await prisma.market.findMany({
-      where: { 
+    // 1. Find markets ready for settlement
+    const marketsToSettle = await prisma.market.findMany({
+      where: {
         status: 'open',
-        eventTime: { lt: new Date() } // Markets where event time has passed
+        eventTime: { lt: new Date() } // Past their event time
       },
       include: {
         trades: true
       }
     });
 
-    for (const market of unsettledMarkets) {
-      // Determine outcome (replace with your actual logic)
-      const outcome = market.poolYes > market.poolNo ? 'YES' : 'NO';
+    // 2. Process each market
+    for (const market of marketsToSettle) {
+      const outcome = determineOutcome(market); // Your logic here
+      const updatePromises = market.trades.map(trade => 
+        updateTradeSettlement(trade, outcome, market)
+      );
 
       await prisma.$transaction([
-        // Update market status
         prisma.market.update({
           where: { id: market.id },
           data: { status: 'settled', outcome }
         }),
-        // Update all trades with payouts
-        ...market.trades.map(trade => 
-          prisma.trade.update({
-            where: { id: trade.id },
-            data: { 
-              settled: true,
-              payout: trade.type === outcome ? 
-                trade.amount * (1 + (trade.type === 'YES' ? 
-                  market.poolNo / market.poolYes : 
-                  market.poolYes / market.poolNo)) : 
-                0
-            }
-          })
-        )
+        ...updatePromises
       ]);
     }
 
-    return res.status(200).json({ 
+    return res.status(200).json({
       success: true,
-      settledMarkets: unsettledMarkets.length 
+      settledMarkets: marketsToSettle.length
     });
+
   } catch (err) {
-    console.error('Settlement error:', err);
-    return res.status(500).json({ 
+    console.error('Settlement failed:', err);
+    return res.status(500).json({
       success: false,
-      error: 'Failed to settle markets' 
+      error: 'Internal server error'
     });
   }
 }
+
+// Helper functions
+function determineOutcome(market: MarketWithTrades): 'YES' | 'NO' {
+  // Implement your actual outcome logic
+  return market.poolYes > market.poolNo ? 'YES' : 'NO';
+}
+
+function updateTradeSettlement(trade: Trade, outcome: string, market: Market) {
+  const isWinningTrade = trade.type === outcome;
+  return prisma.trade.update({
+    where: { id: trade.id },
+    data: {
+      settled: true,
+      payout: isWinningTrade ? calculatePayout(trade, market) : 0
+    }
+  });
+}
+
+function calculatePayout(trade: Trade, market: Market): number {
+  // Implement your payout calculation
+  const pool = trade.type === 'YES' ? market.poolYes : market.poolNo;
+  const oppositePool = trade.type === 'YES' ? market.poolNo : market.poolYes;
+  return trade.amount * (1 + (oppositePool / pool));
+}
+
+// Types
+type MarketWithTrades = Market & { trades: Trade[] };
+type Trade = {
+  id: string;
+  type: string;
+  amount: number;
+  // ... other trade fields
+};
+type Market = {
+  id: string;
+  poolYes: number;
+  poolNo: number;
+  // ... other market fields
+};
