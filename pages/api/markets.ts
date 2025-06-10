@@ -1,51 +1,37 @@
 // pages/api/markets.ts
-import type { NextApiRequest, NextApiResponse } from 'next'
-import { prisma } from '../../lib/prisma'
-
-interface Market {
-  id: string
-  question: string
-  eventTime: Date
-  poolYes: number
-  poolNo: number
-}
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { prisma } from '../lib/prisma';
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse<Market[] | { error: string }>
+  res: NextApiResponse
 ) {
+  // Only allow GET
   if (req.method !== 'GET') {
-    res.setHeader('Allow', ['GET'])
-    return res.status(405).json({ 
-      error: 'Method Not Allowed. Only GET requests are supported.' 
-    })
+    return res.status(405).json({ error: 'Only GET allowed' });
   }
 
   try {
+    const now = new Date();
     const markets = await prisma.market.findMany({
-      where: { 
+      where: {
         status: 'open',
-        eventTime: {
-          gte: new Date() // Only include future markets
-        }
+        eventTime: { gt: now },       // only future events
       },
-      orderBy: { 
-        eventTime: 'asc' 
-      },
+      orderBy: { eventTime: 'asc' },
       select: {
         id: true,
+        externalId: true,
         question: true,
         eventTime: true,
         poolYes: true,
         poolNo: true,
-      },
-    })
+      }
+    });
 
-    return res.status(200).json(markets)
+    return res.status(200).json(markets);
   } catch (err) {
-    console.error('Failed to fetch markets:', err)
-    return res.status(500).json({ 
-      error: 'Internal Server Error: Failed to fetch markets data' 
-    })
+    console.error('[/api/markets] error:', err);
+    return res.status(500).json({ error: 'Server error' });
   }
 }
