@@ -40,7 +40,6 @@ export default async function handler(
       trim: true,
     });
 
-    // Adjust this path if your feed nests under a different root
     const events: CalendarEvent[] = parsed?.weeklyevents?.event
       ? Array.isArray(parsed.weeklyevents.event)
         ? parsed.weeklyevents.event
@@ -54,24 +53,21 @@ export default async function handler(
     const now = new Date();
 
     for (const ev of events) {
-      // 1. Filter high-impact
       if (ev.impact?.trim().toLowerCase() !== 'high') {
         skipped++;
         continue;
       }
 
-      // 2. Date & time strings
-      const dateStr = ev.date?.trim();        // e.g. "06-11-2025"
-      let timeStr = ev.time?.trim().toLowerCase(); // e.g. "12:30pm"
-      if (!dateStr || !timeStr) {
+      const dateStr = ev.date?.trim();
+      const rawTimeStr = ev.time?.trim().toLowerCase();  // rename and const
+      if (!dateStr || !rawTimeStr) {
         skipped++;
         continue;
       }
 
-      // 3. Parse 12h to 24h
-      const m = timeStr.match(/^(\d{1,2}):(\d{2})(am|pm)$/);
+      const m = rawTimeStr.match(/^(\d{1,2}):(\d{2})(am|pm)$/);
       if (!m) {
-        console.warn(`⚠ Bad time "${timeStr}" for "${ev.title}"`);
+        console.warn(`⚠ Bad time "${rawTimeStr}" for "${ev.title}"`);
         skipped++;
         continue;
       }
@@ -82,22 +78,14 @@ export default async function handler(
       if (ampm === 'am' && hour === 12) hour = 0;
       const timeFormatted = `${hour.toString().padStart(2, '0')}:${minute}:00`;
 
-      // 4. Build ISO date
-      // Assuming date is MM-DD-YYYY; if it’s DD-MM-YYYY adjust accordingly
       const [mm, dd, yyyy] = dateStr.split('-');
       const isoDate = `${yyyy}-${mm}-${dd}T${timeFormatted}Z`;
       const eventTime = new Date(isoDate);
-      if (isNaN(eventTime.getTime())) {
-        console.warn(`⚠ Invalid datetime "${isoDate}" for "${ev.title}"`);
-        skipped++;
-        continue;
-      }
-      if (eventTime < now) {
+      if (isNaN(eventTime.getTime()) || eventTime < now) {
         skipped++;
         continue;
       }
 
-      // 5. Upsert into DB
       const externalId = ev.url?.trim() || `ff-${ev.title}-${dateStr}-${timeFormatted}`;
       try {
         await prisma.market.upsert({
