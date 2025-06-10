@@ -59,7 +59,7 @@ export default async function handler(
         type,
         amount,
         fee,
-        payout,            // remove if you didn't add this to schema
+        payout,            // payout included in schema
         shares: amount,    // <— required non-nullable field
       },
     })

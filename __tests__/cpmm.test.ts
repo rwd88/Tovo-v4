@@ -15,6 +15,10 @@ describe('calculateShares', () => {
     const shares = calculateShares(50, 100, 100, 'YES');
     expect(shares).toBeCloseTo(33.333, 3);
   });
+test('calculates shares for NO bet', () => {
+    const shares = calculateShares(50, 100, 100, 'NO');
+    expect(shares).toBeCloseTo(33.333, 3);
+  });
 
   test('handles zero pools', () => {
     const shares = calculateShares(10, 0, 0, 'YES');

@@ -38,8 +38,8 @@ export default function PredictForm({ marketId }: { marketId: string }) {
       return;
     }
 
-    const res = await fetch('/api/trade/create', {
-      method: 'POST',
+const res = await fetch('/api/trade/Create', {
+        method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         userId,

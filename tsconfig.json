@@ -20,8 +20,7 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "downlevelIteration": true // Add this line
-    ,
+"downlevelIteration": true,
     "allowJs": true,
     "noEmit": true,
     "incremental": true,
