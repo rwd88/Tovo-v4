@@ -1,5 +1,5 @@
-// pages/api/trade/create.ts
-import type { NextApiRequest, NextApiResponse } from 'next';
+// pages/api/trade/Create.ts
+// import type { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '../../../lib/prisma';
 import { sendTelegramMessage } from '../../../lib/telegram';
 

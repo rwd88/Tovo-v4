@@ -5,8 +5,8 @@ export function getCpmmProbability(poolYes: number, poolNo: number): { probYes: 
   if (total === 0) return { probYes: 0.5, probNo: 0.5 }; // default odds
 
   return {
-    probYes: poolNo / total,
-    probNo: poolYes / total
+    probYes: poolYes / total,
+    probNo: poolNo / total
   };
 }
 
