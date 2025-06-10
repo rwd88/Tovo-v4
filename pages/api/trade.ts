@@ -38,35 +38,42 @@ export default async function handler(
     }
 
     // 2) Ensure the user exists (or create them)
-    //    your schema requires telegramId, so we include it here
     await prisma.user.upsert({
       where: { id: userId },
       create: {
         id: userId,
-        telegramId: userId,    // <–– now satisfies the required field
+        telegramId: userId,
       },
-      update: {},              // no changes if they already exist
+      update: {},
     })
 
     // 3) Calculate fee & payout
-    const fee = amount * 0.01
+    const fee    = amount * 0.01
     const payout = amount - fee
 
-    // 4) Record the trade
+    // 4) Record the trade (now including `shares`)
     const trade = await prisma.trade.create({
-      data: { marketId, userId, type, amount, fee, payout },
+      data: {
+        marketId,
+        userId,
+        type,
+        amount,
+        fee,
+        payout,            // remove if you didn't add this to schema
+        shares: amount,    // <— required non-nullable field
+      },
     })
 
     // 5) Update the market pools
     const updatedMarket = await prisma.market.update({
       where: { id: marketId },
-      data:
-        type === 'yes'
-          ? { poolYes: market.poolYes + amount }
-          : { poolNo:  market.poolNo  + amount },
+      data: type === 'yes'
+        ? { poolYes: market.poolYes + amount }
+        : { poolNo:  market.poolNo  + amount },
     })
 
     return res.status(200).json({ trade, market: updatedMarket })
+
   } catch (err) {
     console.error('[/api/trade] error:', err)
     return res.status(500).json({ error: 'Server error' })
