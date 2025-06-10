@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { prisma } from '../../../../lib/prisma';
-import { calculateShares } from '../../../../lib/cpmm';
+import { prisma } from '../../../lib/prisma';  // Fixed import path
+import { calculateShares } from '../../../lib/cpmm';  // Fixed import path
 
 interface PredictRequest {
   userId: string;
@@ -30,9 +30,9 @@ export default async function handler(
       return res.status(400).json({ error: 'Invalid amount' });
     }
 
-    // Get market details - using id instead of externalId
+    // Get market details
     const market = await prisma.market.findUnique({
-      where: { id: marketId },  // Changed from externalId to id
+      where: { id: marketId },
       select: { 
         question: true, 
         poolYes: true, 
