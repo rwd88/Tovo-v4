@@ -10,19 +10,13 @@ const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN!);
 const TRADE_FEE = 0.01;  // 1% fee on trades
 
 // --- Helper Functions ---
-
-/**
- * Calculate shares using CPMM (Constant Product Market Maker)
- */
 function calculateShares(poolSize: number, amount: number): number {
   return poolSize === 0 ? amount : (amount * poolSize) / (amount + poolSize);
 }
 
 // --- Telegram Commands ---
 
-/**
- * /start - Welcome message
- */
+// /start - Welcome message
 bot.start((ctx) => {
   ctx.reply(
     `👋 Welcome to *Tovo*, the prediction market bot!\n\n` +
@@ -31,9 +25,7 @@ bot.start((ctx) => {
   );
 });
 
-/**
- * /listpools - Show active markets with Yes/No buttons
- */
+// /listpools - Show active markets with Yes/No buttons
 bot.command('listpools', async (ctx) => {
   const markets = await prisma.market.findMany({
     where: { status: 'open' },
@@ -59,26 +51,18 @@ bot.command('listpools', async (ctx) => {
   }
 });
 
-/**
- * /balance - Show user's balance
- */
+// /balance - Show user's balance
 bot.command('balance', async (ctx) => {
   const user = await prisma.user.findUnique({
     where: { telegramId: ctx.from.id.toString() },
   });
 
-  ctx.reply(
-    `💰 Your balance: $${user?.balance.toFixed(2) || '0.00'}\n` +
-    `🔗 Wallets:\n` +
-    `SOL: ${user?.solana || 'Not linked'}\n` +
-    `BSC: ${user?.bsc || 'Not linked'}`
-  );
+  ctx.reply(`💰 Your balance: $${user?.balance.toFixed(2) || '0.00'}`);
 });
 
 // --- Bet Handling ---
-
 bot.action(/bet_(yes|no)_(.+)/, async (ctx) => {
-  const [, side, marketId] = ctx.match; // Removed unused capture group
+  const [, side, marketId] = ctx.match;
   const userId = ctx.from.id.toString();
   const betAmount = 10; // Default bet (replace with user input)
 
@@ -88,10 +72,14 @@ bot.action(/bet_(yes|no)_(.+)/, async (ctx) => {
     return ctx.answerCbQuery('Market closed or invalid!');
   }
 
-  // 2. Check user balance (simplified)
+  // 2. Check or create user
   const user = await prisma.user.upsert({
     where: { telegramId: userId },
-    create: { telegramId: userId, balance: 100 }, // Default balance
+    create: {
+      id: userId,
+      telegramId: userId,
+      balance: 100, // Default balance
+    },
     update: {},
   });
 
