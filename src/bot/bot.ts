@@ -110,6 +110,7 @@ bot.action(/bet_(yes|no)_(.+)/, async (ctx) => {
         amount: betAmount,
         fee,
         shares,
+        payout: 0,      // ← required field
       },
     }),
     prisma.user.update({
