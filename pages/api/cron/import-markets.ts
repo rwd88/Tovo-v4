@@ -24,7 +24,6 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ApiResponse>
 ) {
-  // Simple bearer auth
   const auth = req.headers.authorization;
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(403).json({ success: false, error: 'Unauthorized' });
@@ -38,10 +37,10 @@ export default async function handler(
     const { data: xml } = await axios.get<string>(CAL_URL);
     const parsed = await parseStringPromise(xml, {
       explicitArray: false,
-      trim: true
+      trim: true,
     });
 
-    // Pull out the events array (or wrap single object in array)
+    // Adjust this path if your feed nests under a different root
     const events: CalendarEvent[] = parsed?.weeklyevents?.event
       ? Array.isArray(parsed.weeklyevents.event)
         ? parsed.weeklyevents.event
@@ -55,36 +54,51 @@ export default async function handler(
     const now = new Date();
 
     for (const ev of events) {
-      // 1) Filter only high-impact
-      const impact = ev.impact?.trim().toLowerCase();
-      if (impact !== 'high') {
+      // 1. Filter high-impact
+      if (ev.impact?.trim().toLowerCase() !== 'high') {
         skipped++;
         continue;
       }
 
-      // 2) Parse date & time
-      const dateStr = ev.date?.trim();
-      const timeStr = ev.time?.trim();
+      // 2. Date & time strings
+      const dateStr = ev.date?.trim();        // e.g. "06-11-2025"
+      let timeStr = ev.time?.trim().toLowerCase(); // e.g. "12:30pm"
       if (!dateStr || !timeStr) {
-        console.warn(`⚠ Missing date/time for "${ev.title}"`);
-        skipped++;
-        continue;
-      }
-      const eventTime = new Date(`${dateStr}T${timeStr}Z`);
-      if (isNaN(eventTime.getTime())) {
-        console.warn(`⚠ Invalid date/time "${dateStr} ${timeStr}" for "${ev.title}"`);
         skipped++;
         continue;
       }
 
-      // 3) Skip past events
+      // 3. Parse 12h to 24h
+      const m = timeStr.match(/^(\d{1,2}):(\d{2})(am|pm)$/);
+      if (!m) {
+        console.warn(`⚠ Bad time "${timeStr}" for "${ev.title}"`);
+        skipped++;
+        continue;
+      }
+      let hour = parseInt(m[1], 10);
+      const minute = m[2];
+      const ampm = m[3];
+      if (ampm === 'pm' && hour < 12) hour += 12;
+      if (ampm === 'am' && hour === 12) hour = 0;
+      const timeFormatted = `${hour.toString().padStart(2, '0')}:${minute}:00`;
+
+      // 4. Build ISO date
+      // Assuming date is MM-DD-YYYY; if it’s DD-MM-YYYY adjust accordingly
+      const [mm, dd, yyyy] = dateStr.split('-');
+      const isoDate = `${yyyy}-${mm}-${dd}T${timeFormatted}Z`;
+      const eventTime = new Date(isoDate);
+      if (isNaN(eventTime.getTime())) {
+        console.warn(`⚠ Invalid datetime "${isoDate}" for "${ev.title}"`);
+        skipped++;
+        continue;
+      }
       if (eventTime < now) {
         skipped++;
         continue;
       }
 
-      // 4) Upsert into DB
-      const externalId = ev.url || `ff-${ev.title}-${dateStr}-${timeStr}`;
+      // 5. Upsert into DB
+      const externalId = ev.url?.trim() || `ff-${ev.title}-${dateStr}-${timeFormatted}`;
       try {
         await prisma.market.upsert({
           where: { externalId },
@@ -95,9 +109,9 @@ export default async function handler(
             eventTime,
             forecast: ev.forecast ? parseFloat(ev.forecast) : null,
             poolYes: 0,
-            poolNo: 0
+            poolNo: 0,
           },
-          update: {} // leave existing markets unchanged
+          update: {},
         });
         added++;
       } catch (dbErr) {
@@ -107,7 +121,6 @@ export default async function handler(
     }
 
     return res.status(200).json({ success: true, added, skipped });
-
   } catch (err) {
     console.error('❌ Import-markets error:', err);
     return res
