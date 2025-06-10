@@ -1,21 +1,10 @@
+// pages/api/cron/import-markets.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 import { parseStringPromise } from 'xml2js';
 import { prisma } from '../../../lib/prisma';
 
-export default async function handler(req, res) {
-  try {
-    const xml = (await axios.get(process.env.FF_XML_URL!)).data;
-    const json = await parseStringPromise(xml, {
-      explicitArray: false,
-      trim: true,
-      mergeAttrs: true
-    });
-
-    // DEBUG: log the structure to see where events live
-    console.log(JSON.stringify(json, null, 2));
 interface CalendarEvent {
-  id?: string;
   url?: string;
   title?: string;
   date?: string;
@@ -26,8 +15,6 @@ interface CalendarEvent {
 
 interface ApiResponse {
   success: boolean;
-  tradesDeleted?: number;
-  marketsDeleted?: number;
   added?: number;
   skipped?: number;
   error?: string;
@@ -37,12 +24,11 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ApiResponse>
 ) {
-  // Auth check
+  // Simple bearer auth
   const auth = req.headers.authorization;
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(403).json({ success: false, error: 'Unauthorized' });
   }
-
   if (req.method !== 'GET') {
     return res.status(405).json({ success: false, error: 'Only GET allowed' });
   }
@@ -50,81 +36,82 @@ export default async function handler(
   try {
     const CAL_URL = 'https://nfs.faireconomy.media/ff_calendar_thisweek.xml';
     const { data: xml } = await axios.get<string>(CAL_URL);
-    const parsed = await parseStringPromise(xml, { explicitArray: false, trim: true });
+    const parsed = await parseStringPromise(xml, {
+      explicitArray: false,
+      trim: true
+    });
 
+    // Pull out the events array (or wrap single object in array)
     const events: CalendarEvent[] = parsed?.weeklyevents?.event
       ? Array.isArray(parsed.weeklyevents.event)
         ? parsed.weeklyevents.event
         : [parsed.weeklyevents.event]
       : [];
 
-    console.log(`📅 Fetched ${events.length} events`);
+    console.log(`📅 Fetched ${events.length} total events`);
 
-    // Skip deletion (markets/trades) unless explicitly needed
     let added = 0;
     let skipped = 0;
+    const now = new Date();
 
     for (const ev of events) {
+      // 1) Filter only high-impact
       const impact = ev.impact?.trim().toLowerCase();
       if (impact !== 'high') {
         skipped++;
         continue;
       }
 
+      // 2) Parse date & time
       const dateStr = ev.date?.trim();
       const timeStr = ev.time?.trim();
       if (!dateStr || !timeStr) {
-        console.warn(`⚠ Missing date/time for event: ${ev.title}`);
+        console.warn(`⚠ Missing date/time for "${ev.title}"`);
         skipped++;
         continue;
       }
-
-      // Parse date safely (UTC)
       const eventTime = new Date(`${dateStr}T${timeStr}Z`);
       if (isNaN(eventTime.getTime())) {
-        console.warn(`⚠ Invalid date: ${dateStr} ${timeStr} for "${ev.title}"`);
+        console.warn(`⚠ Invalid date/time "${dateStr} ${timeStr}" for "${ev.title}"`);
         skipped++;
         continue;
       }
 
-      // Skip past events
-      if (eventTime < new Date()) {
+      // 3) Skip past events
+      if (eventTime < now) {
         skipped++;
         continue;
       }
 
-      // Create market
+      // 4) Upsert into DB
+      const externalId = ev.url || `ff-${ev.title}-${dateStr}-${timeStr}`;
       try {
         await prisma.market.upsert({
-          where: { externalId: ev.url || `ff-${ev.title}-${dateStr}-${timeStr}` },
+          where: { externalId },
           create: {
-            externalId: ev.url || `ff-${ev.title}-${dateStr}-${timeStr}`,
-            question: ev.title?.trim() || 'Unknown Event',
+            externalId,
+            question: ev.title?.trim() || 'Unnamed Event',
             status: 'open',
             eventTime,
             forecast: ev.forecast ? parseFloat(ev.forecast) : null,
             poolYes: 0,
-            poolNo: 0,
+            poolNo: 0
           },
-          update: {}, // No updates if exists
+          update: {} // leave existing markets unchanged
         });
         added++;
-      } catch (err) {
-        console.error(`❌ Failed to upsert market: ${err}`);
+      } catch (dbErr) {
+        console.error(`❌ DB upsert failed for "${ev.title}":`, dbErr);
+        skipped++;
       }
     }
 
-    return res.status(200).json({
-      success: true,
-      added,
-      skipped,
-    });
+    return res.status(200).json({ success: true, added, skipped });
 
   } catch (err) {
-    console.error('❌ Import failed:', err);
-    return res.status(500).json({
-      success: false,
-      error: err instanceof Error ? err.message : 'Unknown error',
-    });
+    console.error('❌ Import-markets error:', err);
+    return res
+      .status(500)
+      .json({ success: false, error: (err as Error).message });
   }
 }
