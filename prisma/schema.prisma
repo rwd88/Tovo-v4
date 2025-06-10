@@ -17,15 +17,18 @@ model User {
 }
 
 model Market {
-  id           String   @id @default(cuid())
-  question     String
-  description  String?
-  poolYes      Float    @default(0)
-  poolNo       Float    @default(0)
-  status       String   @default("open") // open, closed, resolved
-  feeCollected Float    @default(0) // House earnings
-  trades       Trade[]
-  createdAt    DateTime @default(now())
+  id          String   @id @default(cuid())
+  externalId  String?  @unique  // Add this line if you need external IDs
+  question    String
+  description String?
+  poolYes     Float    @default(0)
+  poolNo      Float    @default(0)
+  status      String   @default("open")
+  feeCollected Float   @default(0)
+  trades      Trade[]
+  createdAt   DateTime @default(now())
+  
+  @@unique([externalId])  // Ensure externalId is unique if it exists
 }
 
 model Trade {

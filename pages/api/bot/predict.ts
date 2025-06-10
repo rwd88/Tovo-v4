@@ -1,70 +1,98 @@
-// pages/api/bot/predict.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { prisma } from '../../../lib/prisma';
-import { sendTelegramMessage } from '../../../lib/telegram';
+import { prisma } from '../../../../lib/prisma';
+import { calculateShares } from '../../../../lib/cpmm';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { userId, marketId, prediction, amount } = req.body;
+interface PredictRequest {
+  userId: string;
+  marketId: string;
+  amount: number;
+  prediction: 'yes' | 'no';
+}
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', ['POST']);
+    return res.status(405).json({ error: 'Method Not Allowed' });
+  }
 
   try {
+    const { userId, marketId, amount, prediction } = req.body as PredictRequest;
+
     // Validate input
-    if (!marketId || !prediction || !amount || !userId) {
-      return res.status(400).json({ error: 'Missing parameters' });
+    if (!userId || !marketId || !amount || !prediction) {
+      return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // Get market details
+    if (typeof amount !== 'number' || amount <= 0) {
+      return res.status(400).json({ error: 'Invalid amount' });
+    }
+
+    // Get market details - using id instead of externalId
     const market = await prisma.market.findUnique({
-      where: { externalId: marketId },
-      select: { question: true, poolYes: true, poolNo: true, status: true }
+      where: { id: marketId },  // Changed from externalId to id
+      select: { 
+        question: true, 
+        poolYes: true, 
+        poolNo: true, 
+        status: true,
+        externalId: true 
+      }
     });
 
     if (!market || market.status !== 'open') {
-      return res.status(400).json({ error: 'Market not found or closed' });
+      return res.status(400).json({ error: 'Market not available for trading' });
     }
 
-    // Calculate fees and amounts
-    const isEarly = prediction.endsWith('_early');
-    const tradeFee = amount * 0.01;
-    const earlyCloseFee = isEarly ? amount * 0.10 : 0;
-    const totalFee = tradeFee + earlyCloseFee;
-    const netAmount = amount - totalFee;
+    // Calculate trade details
+    const shares = calculateShares(
+      amount,
+      market.poolYes,
+      market.poolNo,
+      prediction
+    );
 
-    // Create trade with explicit type
-    const tradeData = {
-      userId,
-      marketId,
-      type: prediction.replace('_early', ''),
-      amount: netAmount,
-      fee: totalFee,
-      isEarlyClose: isEarly,
-      shares: netAmount // Simplified for example
-    };
+    const fee = amount * 0.01;
+    const payout = shares * (prediction === 'yes' 
+      ? market.poolYes / market.poolNo 
+      : market.poolNo / market.poolYes
+    );
 
-    await prisma.$transaction([
-      prisma.trade.create({ data: tradeData }),
-      prisma.market.update({
-        where: { externalId: marketId },
+    // Execute transaction
+    const [trade, updatedUser] = await prisma.$transaction([
+      prisma.trade.create({
         data: {
-          poolYes: prediction.startsWith('YES') ? { increment: netAmount } : undefined,
-          poolNo: prediction.startsWith('NO') ? { increment: netAmount } : undefined
+          userId,
+          marketId,
+          type: prediction,
+          amount,
+          fee,
+          payout,
+          shares,
+          settled: false
         }
+      }),
+      prisma.user.update({
+        where: { telegramId: userId },
+        data: { balance: { decrement: amount + fee } }
       })
     ]);
 
-    // Send confirmation
-    await sendTelegramMessage(
-      `✅ Trade executed!\n` +
-      `📌 ${market.question}\n` +
-      `🔮 ${prediction} (${isEarly ? 'Early ' : ''}Close)\n` +
-      `💰 Net: $${netAmount.toFixed(2)} (Fee: $${totalFee.toFixed(2)})`,
-      false,
-      userId
-    );
-
-    return res.status(200).json({ success: true });
+    return res.status(200).json({
+      success: true,
+      tradeId: trade.id,
+      shares,
+      payout,
+      newBalance: updatedUser.balance
+    });
 
   } catch (error) {
-    console.error('Trade error:', error);
-    return res.status(500).json({ error: 'Trade processing failed' });
+    console.error('Prediction error:', error);
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      details: error instanceof Error ? error.message : undefined
+    });
   }
 }
