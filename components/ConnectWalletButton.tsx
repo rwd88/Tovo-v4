@@ -1,6 +1,5 @@
 // components/ConnectWalletButton.tsx
-import React from 'react'
-import { useEthereum } from '@/contexts/EthereumContext'
+import { useEthereum } from '../contexts/EthereumContext'
 
 export default function ConnectWalletButton() {
   const { address, connect, disconnect } = useEthereum()
