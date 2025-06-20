@@ -51,3 +51,13 @@ model Trade {
   @@index([marketId])
   @@index([userId])
 }
+model Deposit {
+  id        String   @id @default(cuid())
+  network   String
+  txHash    String   @unique
+  status    String   @default("pending")  // pending/approved/rejected
+  createdAt DateTime @default(now())
+  // optional: link to User
+  // user      User?    @relation(fields: [userId], references: [id])
+  // userId    String?
+}
