@@ -1,14 +1,14 @@
 // pages/api/trade.ts
 
-import type { NextApiRequest, NextApiResponse } from 'next'
-import { PrismaClient } from '@prisma/client'
-import { verifyMessage } from 'ethers'
+import type { NextApiRequest, NextApiResponse } from "next"
+import { PrismaClient } from "@prisma/client"
+import { verifyMessage } from "ethers"
 
 const prisma = new PrismaClient()
 
 type TradeRequest = {
   marketId: string
-  side: 'UP' | 'DOWN'
+  side: "UP" | "DOWN"
   amount: number
   walletAddress: string
   signature?: string
@@ -18,8 +18,8 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' })
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" })
   }
 
   try {
@@ -35,10 +35,10 @@ export default async function handler(
     if (
       !marketId ||
       !walletAddress ||
-      !['UP', 'DOWN'].includes(side) ||
-      typeof amount !== 'number'
+      !["UP", "DOWN"].includes(side) ||
+      typeof amount !== "number"
     ) {
-      return res.status(400).json({ error: 'Invalid or missing fields' })
+      return res.status(400).json({ error: "Invalid or missing fields" })
     }
 
     // Optional: verify user signature
@@ -46,14 +46,16 @@ export default async function handler(
       const message = `Tovo Trade:${marketId}:${side}:${amount}`
       const signer = verifyMessage(message, signature)
       if (signer.toLowerCase() !== walletAddress.toLowerCase()) {
-        return res.status(401).json({ error: 'Signature verification failed' })
+        return res.status(401).json({ error: "Signature verification failed" })
       }
     }
 
     // 1) Ensure the market exists
-    const market = await prisma.market.findUnique({ where: { id: marketId } })
+    const market = await prisma.market.findUnique({
+      where: { id: marketId },
+    })
     if (!market) {
-      return res.status(404).json({ error: 'Market not found' })
+      return res.status(404).json({ error: "Market not found" })
     }
 
     // 2) Upsert the user by wallet address
@@ -61,7 +63,7 @@ export default async function handler(
       where: { id: walletAddress },
       create: {
         id: walletAddress,
-        telegramId: walletAddress,  // ← use walletAddress instead of null
+        telegramId: walletAddress, // or some default string
       },
       update: {},
     })
@@ -71,17 +73,17 @@ export default async function handler(
     const payout = parseFloat((amount - fee).toFixed(6))
     const shares = amount
 
-    // 4) Record the trade
+    // 4) Record the trade, mapping `side` → Prisma field `type`
     const trade = await prisma.trade.create({
       data: {
         marketId,
         userId: walletAddress,
-        side,
+        type: side,       // <— use the Prisma column `type`
         amount,
         fee,
         payout,
         shares,
-        status: 'pending',
+        status: "pending",
       },
     })
 
@@ -89,15 +91,17 @@ export default async function handler(
     const updatedMarket = await prisma.market.update({
       where: { id: marketId },
       data:
-        side === 'UP'
+        side === "UP"
           ? { poolYes: market.poolYes + amount }
           : { poolNo:  market.poolNo  + amount },
     })
 
-    return res.status(200).json({ success: true, trade, market: updatedMarket })
+    return res
+      .status(200)
+      .json({ success: true, trade, market: updatedMarket })
   } catch (err) {
-    console.error('[/api/trade] error:', err)
-    return res.status(500).json({ error: 'Server error' })
+    console.error("[/api/trade] error:", err)
+    return res.status(500).json({ error: "Server error" })
   } finally {
     await prisma.$disconnect()
   }
