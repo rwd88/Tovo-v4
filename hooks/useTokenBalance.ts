@@ -1,43 +1,47 @@
+// hooks/useTokenBalance.ts
+
 import { useState, useEffect } from 'react'
-import { Contract } from 'ethers'
+import { Contract, ethers } from 'ethers'
 import { useEthereum } from '../contexts/EthereumContext'
 
-// Minimal ERC-20 ABI fragment
+// Minimal ERC-20 ABI for balanceOf & decimals
 const ERC20_ABI = [
   'function balanceOf(address) view returns (uint256)',
   'function decimals() view returns (uint8)'
 ]
 
 /**
- * Given a token contract address, returns the user's balance as a string.
+ * Returns the formatted token balance for the connected wallet.
+ * @param tokenAddress The ERC-20 contract address
  */
-export function useTokenBalance(tokenAddress: string) {
+export function useTokenBalance(tokenAddress: string): string {
   const { provider, address } = useEthereum()
-  const [balance, setBalance] = useState<string>('0.0')
+  const [balance, setBalance] = useState('0.0')
 
   useEffect(() => {
     if (!provider || !address) return
 
     let stale = false
-    const contract = new Contract(tokenAddress, ERC20_ABI, provider)
+    // Cast to any so Contract accepts it as a runner
+    const contract = new Contract(tokenAddress, ERC20_ABI, provider as any)
 
-    // Fetch decimals + raw balance, then format
-    Promise.all([
-      contract.decimals() as Promise<number>,
-      contract.balanceOf(address) as Promise<bigint>
-    ])
-      .then(([decimals, raw]) => {
-        if (stale) return
-        // formatUnits accepts string or BigNumber; raw is bigint so convert
-        const formatted = provider.formatter.bigNumber(raw).toString() // fallback
-        // Better: use ethers.utils.formatUnits(raw, decimals)
-        import('ethers').then(({ utils }) => {
-          if (!stale) setBalance(utils.formatUnits(raw.toString(), decimals))
-        })
-      })
-      .catch((err) => {
+    async function fetchBalance() {
+      try {
+        const [decimals, raw] = await Promise.all([
+          contract.decimals() as Promise<number>,
+          contract.balanceOf(address) as Promise<ethers.BigNumber>
+        ])
+
+        if (!stale) {
+          const formatted = ethers.utils.formatUnits(raw, decimals)
+          setBalance(formatted)
+        }
+      } catch (err) {
         console.error('useTokenBalance error', err)
-      })
+      }
+    }
+
+    fetchBalance()
 
     return () => {
       stale = true
