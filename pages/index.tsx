@@ -4,8 +4,9 @@ import Image from "next/image"
 import { Geist, Geist_Mono } from "next/font/google"
 import styles from "../styles/Home.module.css"
 
-import { useEthereum } from "../contexts/EthereumContext"   // ← now used
+import { useEthereum } from "../contexts/EthereumContext"
 import ConnectWalletButton from "../components/ConnectWalletButton"
+import TradeForm from "../components/TradeForm"
 import { useTokenBalance } from "../hooks/useTokenBalance"
 
 const geistSans = Geist({
@@ -19,7 +20,7 @@ const geistMono = Geist_Mono({
 })
 
 export default function Home() {
-  const { address } = useEthereum()  // ← actually pull address
+  const { address } = useEthereum()
 
   // ERC-20 token addresses on Ethereum mainnet
   const USDT_ADDRESS = "0xdAC17F958D2ee523a2206206994597C13D831ec7"
@@ -50,6 +51,13 @@ export default function Home() {
             <div className="mb-6">
               <p>USDT Balance: {usdtBalance}</p>
               <p>USDC Balance: {usdcBalance}</p>
+            </div>
+          )}
+
+          {/* Trade form */}
+          {address && (
+            <div className="mb-8">
+              <TradeForm />
             </div>
           )}
 
