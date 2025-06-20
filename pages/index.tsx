@@ -4,12 +4,9 @@ import Image from "next/image"
 import { Geist, Geist_Mono } from "next/font/google"
 import styles from "../styles/Home.module.css"
 
-// ← Add this line here:
-import { useEthereum } from "../contexts/EthereumContext"
-
+import { useEthereum } from "../contexts/EthereumContext"   // ← now used
 import ConnectWalletButton from "../components/ConnectWalletButton"
 import { useTokenBalance } from "../hooks/useTokenBalance"
-
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -22,7 +19,9 @@ const geistMono = Geist_Mono({
 })
 
 export default function Home() {
-  // ERC-20 token addresses on Ethereum mainnet (swap for testnet addresses if needed)
+  const { address } = useEthereum()  // ← actually pull address
+
+  // ERC-20 token addresses on Ethereum mainnet
   const USDT_ADDRESS = "0xdAC17F958D2ee523a2206206994597C13D831ec7"
   const USDC_ADDRESS = "0xA0b86991C6218B36c1d19D4a2e9Eb0cE3606EB48"
 
@@ -47,7 +46,7 @@ export default function Home() {
           </div>
 
           {/* Show balances as soon as wallet is connected */}
-  {address && (
+          {address && (
             <div className="mb-6">
               <p>USDT Balance: {usdtBalance}</p>
               <p>USDC Balance: {usdcBalance}</p>
