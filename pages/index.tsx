@@ -3,8 +3,13 @@ import Head from "next/head"
 import Image from "next/image"
 import { Geist, Geist_Mono } from "next/font/google"
 import styles from "../styles/Home.module.css"
+
+// ← Add this line here:
+import { useEthereum } from "../contexts/EthereumContext"
+
 import ConnectWalletButton from "../components/ConnectWalletButton"
 import { useTokenBalance } from "../hooks/useTokenBalance"
+
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -41,8 +46,8 @@ export default function Home() {
             <ConnectWalletButton />
           </div>
 
-          {/* Show balances once connected */}
-          {(usdtBalance !== "0.0" || usdcBalance !== "0.0") && (
+          {/* Show balances as soon as wallet is connected */}
+  {address && (
             <div className="mb-6">
               <p>USDT Balance: {usdtBalance}</p>
               <p>USDC Balance: {usdcBalance}</p>
