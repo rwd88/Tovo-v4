@@ -26,10 +26,8 @@ export const EthereumProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const instance = await web3Modal.connect()
     const web3provider = new ethers.providers.Web3Provider(instance)
     setProvider(web3provider)
-
     const signer = web3provider.getSigner()
-    const addr = await signer.getAddress()
-    setAddress(addr)
+    setAddress(await signer.getAddress())
   }
 
   const disconnect = () => {
@@ -39,9 +37,7 @@ export const EthereumProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }
 
   useEffect(() => {
-    if (web3Modal.cachedProvider) {
-      connect()
-    }
+    if (web3Modal.cachedProvider) connect()
   }, [])
 
   return (
