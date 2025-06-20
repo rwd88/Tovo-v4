@@ -10,22 +10,25 @@ export default function TradeForm() {
   const { address } = useEthereum()
   const [markets, setMarkets] = useState<Market[]>([])
   const [marketId, setMarketId] = useState<string>("")
-  const [side, setSide] = useState<"UP"|"DOWN">("UP")
+  const [side, setSide] = useState<"UP" | "DOWN">("UP")
   const [amount, setAmount] = useState<number>(0)
-  const [status, setStatus] = useState<string|null>(null)
+  const [status, setStatus] = useState<string | null>(null)
 
-  // 1) Fetch markets on mount
+  // Fetch markets on mount
   useEffect(() => {
     fetch("/api/markets")
-      .then(res => res.json())
+      .then((res) => res.json())
       .then((data: Market[]) => {
         setMarkets(data)
         if (data.length) setMarketId(data[0].id)
       })
-      .catch(console.error)
+      .catch((err) => {
+        console.error("Failed to load markets:", err)
+        setStatus("Failed to load markets")
+      })
   }, [])
 
-  // 2) Form submit handler
+  // Form submit handler
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!address) {
@@ -41,11 +44,14 @@ export default function TradeForm() {
         body: JSON.stringify({ marketId, side, amount, walletAddress: address }),
       })
       const payload = await res.json()
-      if (!res.ok) throw new Error(payload.error || "Unknown error")
+      if (!res.ok) {
+        throw new Error(payload.error ?? "Unknown error")
+      }
       setStatus(`Trade successful! You ${side} ${amount}`)
-    } catch (err: any) {
-      console.error(err)
-      setStatus("Error: " + err.message)
+    } catch (err: unknown) {
+      console.error("Trade error:", err)
+      const message = err instanceof Error ? err.message : String(err)
+      setStatus("Error: " + message)
     }
   }
 
@@ -57,10 +63,10 @@ export default function TradeForm() {
         <label className="block mb-1">Market</label>
         <select
           value={marketId}
-          onChange={e => setMarketId(e.target.value)}
+          onChange={(e) => setMarketId(e.target.value)}
           className="w-full p-2 border rounded"
         >
-          {markets.map(m => (
+          {markets.map((m) => (
             <option key={m.id} value={m.id}>
               {m.question}
             </option>
@@ -71,14 +77,14 @@ export default function TradeForm() {
       <div>
         <label className="block mb-1">Side</label>
         <div className="flex gap-4">
-          {["UP", "DOWN"].map(s => (
+          {(["UP", "DOWN"] as const).map((s) => (
             <label key={s} className="inline-flex items-center">
               <input
                 type="radio"
                 name="side"
                 value={s}
                 checked={side === s}
-                onChange={() => setSide(s as "UP"|"DOWN")}
+                onChange={() => setSide(s)}
                 className="mr-2"
               />
               {s === "UP" ? "Yes/Up" : "No/Down"}
@@ -94,7 +100,7 @@ export default function TradeForm() {
           step="0.01"
           min="0"
           value={amount}
-          onChange={e => setAmount(parseFloat(e.target.value))}
+          onChange={(e) => setAmount(parseFloat(e.target.value))}
           className="w-full p-2 border rounded"
         />
       </div>
