@@ -3,7 +3,8 @@ import Head from "next/head"
 import Image from "next/image"
 import { Geist, Geist_Mono } from "next/font/google"
 import styles from "../styles/Home.module.css"
-import ConnectWalletButton from "../components/ConnectWalletButton"  // ← relative import
+import ConnectWalletButton from "../components/ConnectWalletButton"
+import { useTokenBalance } from "../hooks/useTokenBalance"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -16,6 +17,14 @@ const geistMono = Geist_Mono({
 })
 
 export default function Home() {
+  // ERC-20 token addresses on Ethereum mainnet (swap for testnet addresses if needed)
+  const USDT_ADDRESS = "0xdAC17F958D2ee523a2206206994597C13D831ec7"
+  const USDC_ADDRESS = "0xA0b86991C6218B36c1d19D4a2e9Eb0cE3606EB48"
+
+  // Fetch balances via our custom hook
+  const usdtBalance = useTokenBalance(USDT_ADDRESS)
+  const usdcBalance = useTokenBalance(USDC_ADDRESS)
+
   return (
     <>
       <Head>
@@ -27,10 +36,18 @@ export default function Home() {
 
       <div className={`${styles.page} ${geistSans.variable} ${geistMono.variable}`}>
         <main className={styles.main}>
-          {/* Connect button */}
+          {/* Wallet Connect */}
           <div className="mb-6">
             <ConnectWalletButton />
           </div>
+
+          {/* Show balances once connected */}
+          {(usdtBalance !== "0.0" || usdcBalance !== "0.0") && (
+            <div className="mb-6">
+              <p>USDT Balance: {usdtBalance}</p>
+              <p>USDC Balance: {usdcBalance}</p>
+            </div>
+          )}
 
           {/* Logo & intro */}
           <Image
