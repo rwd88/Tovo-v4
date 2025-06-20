@@ -51,9 +51,7 @@ export default async function handler(
     }
 
     // 1) Ensure the market exists
-    const market = await prisma.market.findUnique({
-      where: { id: marketId },
-    })
+    const market = await prisma.market.findUnique({ where: { id: marketId } })
     if (!market) {
       return res.status(404).json({ error: "Market not found" })
     }
@@ -63,7 +61,7 @@ export default async function handler(
       where: { id: walletAddress },
       create: {
         id: walletAddress,
-        telegramId: walletAddress, // or some default string
+        telegramId: walletAddress,
       },
       update: {},
     })
@@ -73,17 +71,16 @@ export default async function handler(
     const payout = parseFloat((amount - fee).toFixed(6))
     const shares = amount
 
-    // 4) Record the trade, mapping `side` → Prisma field `type`
+    // 4) Record the trade (no `status` field here)
     const trade = await prisma.trade.create({
       data: {
         marketId,
         userId: walletAddress,
-        type: side,       // <— use the Prisma column `type`
+        type: side,    // Prisma field `type`
         amount,
         fee,
         payout,
         shares,
-        status: "pending",
       },
     })
 
