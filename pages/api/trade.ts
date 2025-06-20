@@ -41,7 +41,7 @@ export default async function handler(
       return res.status(400).json({ error: 'Invalid or missing fields' })
     }
 
-    // Optional: verify user signature for authentication
+    // Optional: verify user signature
     if (signature) {
       const message = `Tovo Trade:${marketId}:${side}:${amount}`
       const signer = verifyMessage(message, signature)
@@ -51,9 +51,7 @@ export default async function handler(
     }
 
     // 1) Ensure the market exists
-    const market = await prisma.market.findUnique({
-      where: { id: marketId },
-    })
+    const market = await prisma.market.findUnique({ where: { id: marketId } })
     if (!market) {
       return res.status(404).json({ error: 'Market not found' })
     }
@@ -61,14 +59,17 @@ export default async function handler(
     // 2) Upsert the user by wallet address
     await prisma.user.upsert({
       where: { id: walletAddress },
-      create: { id: walletAddress, telegramId: null },
+      create: {
+        id: walletAddress,
+        telegramId: walletAddress,  // ← use walletAddress instead of null
+      },
       update: {},
     })
 
     // 3) Calculate fee, payout & shares
     const fee    = parseFloat((amount * 0.01).toFixed(6))
     const payout = parseFloat((amount - fee).toFixed(6))
-    const shares = amount   // or some other logic
+    const shares = amount
 
     // 4) Record the trade
     const trade = await prisma.trade.create({
