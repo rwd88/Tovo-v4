@@ -41,7 +41,7 @@ export default async function handler(
 
   try {
     // 2. Fetch and parse XML feed
-    const feedUrl = 'https://nfs.faireconomy.media/ff_calendar_thisweek.xml'; // <-- UPDATED URL
+    const feedUrl = 'https://nfs.faireconomy.media/ff_calendar_thisweek.xml';
     console.log(`→ Fetching XML feed from ${feedUrl}`);
 
     const { data: xml } = await axios.get<string>(feedUrl, {
@@ -73,6 +73,7 @@ export default async function handler(
     const skipped: string[] = [];
 
     for (const item of items) {
+      // use a stable identifier for your markets
       const eventId = item.id || item.url || (item.title + item.date + item.time);
       const actual = item.actual;
       if (!eventId) {
@@ -88,6 +89,7 @@ export default async function handler(
           where: {
             externalId: eventId,
             outcome: null,
+            eventTime: { lte: new Date() },    // ← only resolve past events
           },
           data: {
             outcome: actual,
@@ -106,7 +108,9 @@ export default async function handler(
       }
     }
 
-    console.log(`✔ Results import complete - ${processed} updated, ${failures.length} failed`);
+    console.log(
+      `✔ Results import complete - ${processed} updated, ${failures.length} failed, ${skipped.length} skipped`
+    );
 
     // 5. Return comprehensive response
     return res.status(200).json({
@@ -115,12 +119,11 @@ export default async function handler(
       failures,
       warning: skipped.length > 0 ? `${skipped.length} items skipped` : undefined,
     });
-
   } catch (error) {
     console.error('❌ Results import failed:', error);
     return res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
+      error: error instanceof Error ? error.message : 'Unknown error occurred',
     });
   }
 }
