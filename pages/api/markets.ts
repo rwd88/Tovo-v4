@@ -11,10 +11,14 @@ export default async function handler(
   }
 
   try {
+    // current UTC time
+    const now = new Date();
+
+    // only open markets with eventTime in the future
     const markets = await prisma.market.findMany({
       where: {
         status: 'open',
-        eventTime: { gt: new Date() },
+        eventTime: { gt: now },
       },
       orderBy: { eventTime: 'asc' },
       select: {
