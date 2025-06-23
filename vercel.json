@@ -1,8 +1,13 @@
+// vercel.json
 {
   "crons": [
     {
-      "path": "/api/cron/import-markets",
-      "schedule": "0 0 * * *"
+      "path": "/api/cron/import-markets", 
+      "schedule": "0 0 * * *"          // every day at midnight UTC
+    },
+    {
+      "path": "/api/cron/import-results?secret=${CRON_SECRET}",
+      "schedule": "0 * * * *"          // every hour on the hour
     }
   ]
 }
