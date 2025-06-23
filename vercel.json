@@ -2,8 +2,8 @@
 {
   "crons": [
     {
-      "path": "/api/cron/import-markets",
-      "schedule": "59 23 * * *"
+      "path": "/api/cron/import-markets", 
+      "schedule": "0 0 * * *"          // every day at midnight UTC
     },
     {
       "path": "/api/cron/import-results?secret=${CRON_SECRET}",
