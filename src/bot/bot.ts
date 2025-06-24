@@ -1,4 +1,5 @@
 // src/bot/bot.ts
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Telegraf, Markup } from 'telegraf'
 import type { Message } from 'telegraf/typings/core/types/typegram'
 import axios from 'axios'
