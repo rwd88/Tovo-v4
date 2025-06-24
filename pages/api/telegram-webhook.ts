@@ -1,9 +1,9 @@
-// pages/api/telegram-webhook.ts
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { NextApiRequest, NextApiResponse } from 'next'
 import getRawBody from 'raw-body'
 import bot from '../../../src/bot/bot'
 
-// Disable Next’s default body parsing, so Telegraf can consume the raw JSON
+// Turn off Next’s JSON parsing so Telegraf can see the raw body
 export const config = {
   api: {
     bodyParser: false,
@@ -24,13 +24,13 @@ export default async function handler(
     const raw = await getRawBody(req)
     const update = JSON.parse(raw.toString('utf-8'))
 
-    // Let Telegraf process the update
-    await bot.handleUpdate(update, res as any)
+    // Let Telegraf process it
+    await bot.handleUpdate(update as any, res as any)
 
-    // Telegram just needs a 200
+    // A simple 200 back to Telegram
     return res.status(200).send('OK')
   } catch (err) {
-    console.error('⚠️ Telegram webhook error', err)
+    console.error('❌ Telegram webhook error', err)
     return res.status(500).send('Error')
   }
 }
