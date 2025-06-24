@@ -76,15 +76,15 @@ bot.command('link_solana', async (ctx) => {
   }
   try {
     await prisma.user.upsert({
-    where: { telegramId: ctx.from.id.toString() },
-    update: { solanaWallet: address },
-    create: {
-      id:            ctx.from.id.toString(),  // ← add this
-      telegramId:    ctx.from.id.toString(),
-      balance:       0,
-      solanaWallet:  address,
-    },
-  });
+      where: { telegramId: ctx.from.id.toString() },
+      update: { solanaWallet: address },
+      create: {
+        id:            ctx.from.id.toString(),
+        telegramId:    ctx.from.id.toString(),
+        balance:       0,
+        solanaWallet:  address,
+      },
+    });
     return ctx.reply(`✅ Linked your Solana wallet: \`${address}\``);
   } catch (err) {
     console.error('Link Solana error:', err);
@@ -104,21 +104,27 @@ bot.command('link_bsc', async (ctx) => {
   }
   try {
     await prisma.user.upsert({
-    where: { telegramId: ctx.from.id.toString() },
-    update: { bscWallet: address },
-    create: {
-      id:           ctx.from.id.toString(),  // ← add this
-      telegramId:   ctx.from.id.toString(),
-      balance:      0,
-      bscWallet:    address,
-    },
-  });
+      where: { telegramId: ctx.from.id.toString() },
+      update: { bscWallet: address },
+      create: {
+        id:           ctx.from.id.toString(),
+        telegramId:   ctx.from.id.toString(),
+        balance:      0,
+        bscWallet:    address,
+      },
+    });
+    return ctx.reply(`✅ Linked your BSC wallet: \`${address}\``);
+  } catch (err) {
+    console.error('Link BSC error:', err);
+    return ctx.reply('❌ Couldn’t link your BSC wallet. Please try again later.');
+  }
+});
 
 // --- Bet Handling ---
 bot.action(/bet_(yes|no)_(.+)/, async (ctx) => {
   const [, side, marketId] = ctx.match;
   const userId = ctx.from.id.toString();
-  const betAmount = 10; // Default bet (replace with user input)
+  const betAmount = 10; // Default bet
 
   // 1. Check if market exists
   const market = await prisma.market.findUnique({ where: { id: marketId } });
@@ -153,7 +159,7 @@ bot.action(/bet_(yes|no)_(.+)/, async (ctx) => {
       where: { id: marketId },
       data: {
         [`pool${side.toUpperCase()}`]: { increment: amountAfterFee },
-        feeCollected:                   { increment: fee },
+        feeCollected:                  { increment: fee },
       },
     }),
     prisma.trade.create({
@@ -164,7 +170,7 @@ bot.action(/bet_(yes|no)_(.+)/, async (ctx) => {
         amount: betAmount,
         fee,
         shares,
-        payout:   0, // required field
+        payout: 0, // required field
       },
     }),
     prisma.user.update({
@@ -186,5 +192,7 @@ bot.action(/bet_(yes|no)_(.+)/, async (ctx) => {
 bot.launch();
 
 // Graceful shutdown
-process.once('SIGINT', () => bot.stop('SIGINT'));
+process.once('SIGINT',  () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
+
+export default bot;
