@@ -76,14 +76,15 @@ bot.command('link_solana', async (ctx) => {
   }
   try {
     await prisma.user.upsert({
-      where: { telegramId: ctx.from.id.toString() },
-      update: { solanaWallet: address },
-      create: {
-        telegramId:   ctx.from.id.toString(),
-        balance:      0,
-        solanaWallet: address,
-      },
-    });
+    where: { telegramId: ctx.from.id.toString() },
+    update: { solanaWallet: address },
+    create: {
+      id:            ctx.from.id.toString(),  // ← add this
+      telegramId:    ctx.from.id.toString(),
+      balance:       0,
+      solanaWallet:  address,
+    },
+  });
     return ctx.reply(`✅ Linked your Solana wallet: \`${address}\``);
   } catch (err) {
     console.error('Link Solana error:', err);
@@ -103,20 +104,15 @@ bot.command('link_bsc', async (ctx) => {
   }
   try {
     await prisma.user.upsert({
-      where: { telegramId: ctx.from.id.toString() },
-      update: { bscWallet: address },
-      create: {
-        telegramId: ctx.from.id.toString(),
-        balance:    0,
-        bscWallet:  address,
-      },
-    });
-    return ctx.reply(`✅ Linked your BSC wallet: \`${address}\``);
-  } catch (err) {
-    console.error('Link BSC error:', err);
-    return ctx.reply('❌ Couldn’t link your BSC wallet. Please try again later.');
-  }
-});
+    where: { telegramId: ctx.from.id.toString() },
+    update: { bscWallet: address },
+    create: {
+      id:           ctx.from.id.toString(),  // ← add this
+      telegramId:   ctx.from.id.toString(),
+      balance:      0,
+      bscWallet:    address,
+    },
+  });
 
 // --- Bet Handling ---
 bot.action(/bet_(yes|no)_(.+)/, async (ctx) => {
