@@ -8,7 +8,7 @@ type TradeType = 'YES' | 'NO';
 interface TradeRequest {
   userId?: string;    // primary field
   id?: string;        // alias for backwards-compatibility
-  marketId: string | number;
+  marketId: string;   // now always a string
   amount: number;
   type: TradeType;
 }
@@ -23,15 +23,14 @@ export default async function handler(
   }
 
   // 1️⃣ Extract & normalize inputs
-  const { userId: uid, id: altId, marketId: rawMid, amount, type } =
+  const { userId: uid, id: altId, marketId, amount, type } =
     req.body as TradeRequest;
   const userId = uid ?? altId;
-  const marketId = typeof rawMid === 'string' ? parseInt(rawMid, 10) : rawMid;
 
   // 2️⃣ Validate
   if (
     !userId ||
-    isNaN(marketId) ||
+    !marketId ||
     typeof amount !== 'number' ||
     amount <= 0 ||
     (type !== 'YES' && type !== 'NO')
@@ -45,7 +44,7 @@ export default async function handler(
       where: { telegramId: userId },
       update: {},
       create: {
-        id: userId,          // ← supply the required `id` field
+        id: userId,          // satisfy the required `id` field
         telegramId: userId,
         balance: 0,
       },
@@ -79,7 +78,7 @@ export default async function handler(
       prisma.trade.create({
         data: {
           userId,
-          marketId,
+          marketId,       // now a string
           type,
           amount,
           fee,
