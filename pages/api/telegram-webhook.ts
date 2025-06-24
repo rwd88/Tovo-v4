@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { NextApiRequest, NextApiResponse } from 'next'
 import getRawBody from 'raw-body'
-import bot from '../../../src/bot/bot'
+import bot from '../../src/bot/bot'
 
 // Turn off Next’s JSON parsing so Telegraf can see the raw body
 export const config = {
