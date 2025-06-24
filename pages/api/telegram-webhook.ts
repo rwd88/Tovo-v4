@@ -1,22 +1,29 @@
-// pages/api/telegram-webhook.ts
+/* pages/api/telegram-webhook.ts */
 import type { NextApiRequest, NextApiResponse } from 'next'
 import getRawBody from 'raw-body'
-import bot from '../../src/bot/bot'   // <- make sure the path is correct
+import bot from '../../src/bot/bot'    // ← only two “..” to reach src/bot/bot.ts
 
 export const config = {
   api: {
-    bodyParser: false,  // we need the raw body for telegraf
+    bodyParser: false,  // disable Next’s JSON parsing
   },
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') return res.status(405).send('Only POST allowed')
-  const raw = await getRawBody(req)
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse,
+) {
+  if (req.method !== 'POST') {
+    return res.status(405).end('Method Not Allowed')
+  }
+
   try {
-    await bot.handleUpdate(JSON.parse(raw.toString()))
+    const buf = await getRawBody(req)
+    const update = JSON.parse(buf.toString())
+    await bot.handleUpdate(update)
     return res.status(200).send('OK')
   } catch (err) {
-    console.error(err)
+    console.error('🛑 Webhook error', err)
     return res.status(500).send('Error')
   }
 }
