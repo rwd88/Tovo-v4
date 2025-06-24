@@ -1,17 +1,19 @@
 // tests/api/markets.test.ts
 import express from 'express';
 import request from 'supertest';
-import handler from '../pages/api/markets'; // adjust if your folder is named `test` instead of `tests`
-import { prisma } from '../lib/prisma';
+import handler from '../../pages/api/markets';
+import { prisma } from '../../lib/prisma';
 
 const app = express();
 app.get('/api/markets', (req, res) => handler(req as any, res as any));
 
 describe('/api/markets GET', () => {
   beforeAll(async () => {
-    // 1) clear out all existing markets
+    // 0) clear out any trades so we can delete markets without FK errors
+    await prisma.trade.deleteMany({});
+    // 1) clear all existing markets
     await prisma.market.deleteMany({});
-    // 2) seed just two rows
+    // 2) seed exactly two markets
     await prisma.market.createMany({
       data: [
         {
@@ -35,8 +37,10 @@ describe('/api/markets GET', () => {
   });
 
   afterAll(async () => {
-    // clean up seeds
-    await prisma.market.deleteMany({ where: { externalId: { in: ['past', 'future'] } } });
+    // clean up our seeds
+    await prisma.market.deleteMany({
+      where: { externalId: { in: ['past', 'future'] } },
+    });
     await prisma.$disconnect();
   });
 
