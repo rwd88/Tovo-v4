@@ -1,46 +1,52 @@
+// prisma/schema.prisma
+
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-provider = "postgresql"        // ← hard-code your actual provider here
-url      = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
-  id         String   @id
-  telegramId String   @unique
-  username   String?
-  balance    Float    @default(0)
-  createdAt  DateTime @default(now())
-  solanaWallet  String?  // newly linked
-  bscWallet     String?  // newly linked
-  trades     Trade[] // renamed back-relation
+  id            String    @id
+  telegramId    String    @unique
+  username      String?
+  balance       Float     @default(0)
+  createdAt     DateTime  @default(now())
+  solanaWallet  String?   // newly linked
+  bscWallet     String?   // newly linked
+  trades        Trade[]   // back-relation
+
+  @@map("users")
 }
 
 model Market {
-  id           String   @id @default(cuid())
-  externalId   String?  @unique(map: "Market_externalId_key")
+  id           String    @id @default(cuid())
+  externalId   String?   @unique(map: "Market_externalId_key")
   question     String
   description  String?
-  eventTime    DateTime @default(now())
+  eventTime    DateTime  @default(now())
   forecast     Float?
   outcome      String?
-  poolYes      Float    @default(0)
-  poolNo       Float    @default(0)
-  status       String   @default("open")
-  feeCollected Float    @default(0)
+  poolYes      Float     @default(0)
+  poolNo       Float     @default(0)
+  status       String    @default("open")
+  feeCollected Float     @default(0)
   trades       Trade[]
-  createdAt    DateTime @default(now())
+  createdAt    DateTime  @default(now())
+
+  @@map("markets")
 }
 
 model Trade {
   id        String   @id @default(cuid())
   market    Market   @relation(fields: [marketId], references: [id])
   marketId  String
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId],   references: [id])
   userId    String
-  type      String // 'yes' or 'no'
+  type      String   // 'yes' or 'no'
   amount    Float
   fee       Float
   payout    Float
@@ -50,27 +56,30 @@ model Trade {
 
   @@index([marketId])
   @@index([userId])
+  @@map("trades")
 }
+
 model Deposit {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   network   String
-  txHash    String   @unique
-  status    String   @default("pending")  // pending/approved/rejected
-  createdAt DateTime @default(now())
-  // optional: link to User
-  // user      User?    @relation(fields: [userId], references: [id])
-  // userId    String?
+  txHash    String    @unique
+  status    String    @default("pending")  // pending/approved/rejected
+  createdAt DateTime  @default(now())
+
+  @@map("deposits")
 }
+
 model Withdrawal {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   userId     String
   chain      String
   amount     Float
-  nonce      String   @unique
+  nonce      String    @unique
   expiresAt  DateTime
-  status     String   // pending | signed | completed | cancelled
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  status     String    // pending | signed | completed | cancelled
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   @@index([userId])
+  @@map("withdrawals")
 }
