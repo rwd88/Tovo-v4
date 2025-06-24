@@ -1,4 +1,4 @@
-// pages/api/withdraw/create.ts
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '../../../lib/prisma';
 import { z } from 'zod';
@@ -7,7 +7,7 @@ import { buildTypedData } from '../../../lib/eip712';
 
 const WithdrawSchema = z.object({
   userId: z.string(),
-  chain:  z.enum(['solana','bsc','erc20','trc20']),
+  chain:  z.enum(['solana', 'bsc', 'erc20', 'trc20']),
   amount: z.number().gt(0),
 });
 
@@ -17,10 +17,10 @@ interface ErrorResponse {
 }
 
 interface SuccessResponse {
-  success:    true;
-  nonce:      string;
-  typedData:  any;
-  expiresAt:  string;
+  success:   true;
+  nonce:     string;
+  typedData: any;
+  expiresAt: string;
 }
 
 export default async function handler(
