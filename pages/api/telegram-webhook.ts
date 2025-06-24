@@ -1,4 +1,6 @@
 /* pages/api/telegram-webhook.ts */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import type { NextApiRequest, NextApiResponse } from 'next'
 import getRawBody from 'raw-body'
 import bot from '../../src/bot/bot
