@@ -1,79 +1,71 @@
 // tests/api/trade.test.ts
-import express from 'express';
-import request from 'supertest';
-import tradeHandler from '../../pages/api/trade/Create';
+import { createMocks } from 'node-mocks-http';
+import type { NextApiRequest, NextApiResponse } from 'next';
+
+// Import your handler and the *mocked* modules
+import handler from '../../pages/api/trade/Create';
 import { prisma } from '../../lib/prisma';
+import { sendTelegramMessage } from '../../lib/telegram';
 
-const app = express();
-app.use(express.json());
-app.post('/api/trade/Create', (req, res) => tradeHandler(req as any, res as any));
+// Tell Jest to replace these with the files in __mocks__/
+jest.mock('../../lib/prisma');
+jest.mock('../../lib/telegram');
 
-describe('/api/trade/Create POST', () => {
-  let marketId: number;
+describe('POST /api/trade/Create', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
 
-  beforeAll(async () => {
-    // 1) Clear out dependent tables
-    await prisma.trade.deleteMany({});
-    await prisma.user.deleteMany({});
-    await prisma.market.deleteMany({});
+    // Happy-path mocks:
+    prisma.user.upsert.mockResolvedValue({});
+    prisma.market.findFirst.mockResolvedValue({ question: 'Is 2+2=4?' });
+    prisma.user.findUnique.mockResolvedValue({ balance: 100 });
+    prisma.trade.create.mockResolvedValue({ id: 'TRADE_ID' });
+    prisma.user.update.mockResolvedValue({ balance: 79.8 });
+    prisma.market.update.mockResolvedValue({ poolYes: 20 });
+    prisma.$transaction.mockImplementation(ops =>
+      // run each step in order and return their results
+      Promise.all(ops.map((op: any) => op))
+    );
+  });
 
-    // 2) Seed one market
-    const m = await prisma.market.create({
-      data: {
-        externalId: 'test-1',
-        question: 'Test Market',
-        eventTime: new Date(Date.now() + 3600 * 1000),
-        status: 'open',
-        poolYes: 0,
-        poolNo: 0,
+  it('returns 200 and calls prisma + Telegram correctly', async () => {
+    const { req, res } = createMocks<NextApiRequest, NextApiResponse>({
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: {
+        userId:   'U1',
+        marketId: 'M1',
+        amount:   20,
+        type:     'YES',
       },
     });
-    marketId = m.id;
-  });
 
-  afterAll(async () => {
-    // Clean up
-    await prisma.trade.deleteMany({});
-    await prisma.user.deleteMany({});
-    await prisma.market.deleteMany({});
-    await prisma.$disconnect();
-  });
+    await handler(req, res);
 
-  it('creates a trade and updates the correct pool', async () => {
-    const payload = {
-      userId: 'user-abc',
-      marketId,
-      outcome: 'yes',
-      shares: 5,
-    };
+    // HTTP status
+    expect(res._getStatusCode()).toBe(200);
 
-    const res = await request(app)
-      .post('/api/trade/Create')
-      .send(payload);
-
-    expect(res.status).toBe(200);
-    // Check response shape
-    expect(res.body).toMatchObject({
-      tradeId: expect.any(Number),
-      userId: 'user-abc',
-      marketId,
-      outcome: 'yes',
-      shares: 5,
+    // JSON payload
+    const json = res._getJSONData();
+    expect(json).toMatchObject({
+      success:        true,
+      tradeId:        'TRADE_ID',
+      newBalance:     79.8,
+      marketQuestion: 'Is 2+2=4?',
     });
 
-    // Verify the trade exists in DB
-    const trade = await prisma.trade.findUnique({
-      where: { id: res.body.tradeId },
-    });
-    expect(trade).not.toBeNull();
-    expect(trade!.shares).toBe(5);
-    expect(trade!.outcome).toBe('yes');
-    expect(trade!.userId).toBe('user-abc');
+    // Verify Prisma calls
+    expect(prisma.user.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where:  { telegramId: 'U1' },
+        create: { id: 'U1', telegramId: 'U1', balance: 0 },
+      })
+    );
+    expect(prisma.trade.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ amount: 20 }) })
+    );
 
-    // Verify the pool was updated
-    const updatedMarket = await prisma.market.findUnique({ where: { id: marketId } });
-    expect(updatedMarket).not.toBeNull();
-    expect(updatedMarket!.poolYes).toBe(5);
-    expect(updatedMarket!.poolNo).toBe(0);
+    // And that we notified Telegram
+    expect(sendTelegramMessage).toHaveBeenCalled();
   });
 });

@@ -7,8 +7,8 @@ type TradeType = 'YES' | 'NO';
 
 interface TradeRequest {
   userId?: string;    // primary field
-  id?: string;        // alias for backwards-compatibility
-  marketId: string;   // now always a string
+  id?: string;        // backwards‐compat alias
+  marketId: string;   // always a string
   amount: number;
   type: TradeType;
 }
@@ -17,17 +17,18 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
+  // only POST allowed
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST']);
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  // 1️⃣ Extract & normalize inputs
+  // 1️⃣ extract
   const { userId: uid, id: altId, marketId, amount, type } =
     req.body as TradeRequest;
   const userId = uid ?? altId;
 
-  // 2️⃣ Validate
+  // 2️⃣ validate
   if (
     !userId ||
     !marketId ||
@@ -39,21 +40,21 @@ export default async function handler(
   }
 
   try {
-    // 3️⃣ Ensure user record exists (starting balance = 0)
+    // 3️⃣ ensure user record exists
     await prisma.user.upsert({
       where: { telegramId: userId },
       update: {},
       create: {
-        id: userId,          // satisfy the required `id` field
+        id: userId,
         telegramId: userId,
         balance: 0,
       },
     });
 
-    // 4️⃣ Load & lock the market (must be open)
+    // 4️⃣ load & lock the market
     const market = await prisma.market.findFirst({
       where: { id: marketId, status: 'open' },
-      select: { question: true, eventTime: true },
+      select: { question: true },
     });
     if (!market) {
       return res
@@ -61,24 +62,23 @@ export default async function handler(
         .json({ error: 'Market not available for trading' });
     }
 
-    // 5️⃣ Check user balance
+    // 5️⃣ check user balance
     const user = await prisma.user.findUnique({
       where: { telegramId: userId },
       select: { balance: true },
     });
-    const fee = Number((amount * 0.01).toFixed(2)); // 1%
+    const fee = Number((amount * 0.01).toFixed(2));
     const totalCost = amount + fee;
     if (!user || user.balance < totalCost) {
       return res.status(400).json({ error: 'Insufficient balance' });
     }
 
-    // 6️⃣ Execute all in one transaction
+    // 6️⃣ transaction: record trade, debit user, bump pool
     const [trade, updatedUser] = await prisma.$transaction([
-      // a) create the trade
       prisma.trade.create({
         data: {
           userId,
-          marketId,       // now a string
+          marketId,
           type,
           amount,
           fee,
@@ -87,13 +87,11 @@ export default async function handler(
           settled: false,
         },
       }),
-      // b) debit the user
       prisma.user.update({
         where: { telegramId: userId },
         data: { balance: { decrement: totalCost } },
         select: { balance: true },
       }),
-      // c) bump the correct pool
       prisma.market.update({
         where: { id: marketId },
         data: {
@@ -103,7 +101,7 @@ export default async function handler(
       }),
     ]);
 
-    // 7️⃣ Let the Telegram channel know
+    // 7️⃣ notify Telegram channel
     await sendTelegramMessage(
       `🎯 New Trade Executed\n` +
         `• User: ${userId}\n` +
@@ -114,7 +112,7 @@ export default async function handler(
       process.env.TG_CHANNEL_ID!
     );
 
-    // 8️⃣ Reply
+    // 8️⃣ success response
     return res.status(200).json({
       success: true,
       tradeId: trade.id,

@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "target": "es2015", // Changed from es5
+    "target": "es2015",                     // Changed from es5
     "lib": [
       "dom",
       "dom.iterable",
@@ -20,19 +20,23 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-"downlevelIteration": true,
+    "downlevelIteration": true,
     "allowJs": true,
     "noEmit": true,
     "incremental": true,
     "moduleResolution": "node",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "jsx": "preserve"
+    "jsx": "preserve",
+
+    // ← Add this so TS picks up your custom types
+    "typeRoots": ["./types", "./node_modules/@types"]
   },
   "include": [
     "next-env.d.ts",
     "**/*.ts",
-    "**/*.tsx"
+    "**/*.tsx",
+    "types/**/*.d.ts"    // ← Include your ambient-declarations folder
   ],
   "exclude": [
     "node_modules"
