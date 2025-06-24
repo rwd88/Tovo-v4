@@ -61,3 +61,16 @@ model Deposit {
   // user      User?    @relation(fields: [userId], references: [id])
   // userId    String?
 }
+model Withdrawal {
+  id         String   @id @default(cuid())
+  userId     String
+  chain      String
+  amount     Float
+  nonce      String   @unique
+  expiresAt  DateTime
+  status     String   // pending | signed | completed | cancelled
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId])
+}
