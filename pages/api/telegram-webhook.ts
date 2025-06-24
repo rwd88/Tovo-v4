@@ -1,7 +1,7 @@
 /* pages/api/telegram-webhook.ts */
 import type { NextApiRequest, NextApiResponse } from 'next'
 import getRawBody from 'raw-body'
-import bot from '../../src/bot/bot'    // ← only two “..” to reach src/bot/bot.ts
+import bot from '../../src/bot/bot
 
 export const config = {
   api: {
