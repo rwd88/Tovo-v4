@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = env("DATABASE_PROVIDER")    // ← provider now comes from .env
   url      = env("DATABASE_URL")
 }
 
@@ -13,8 +13,8 @@ model User {
   username   String?
   balance    Float    @default(0)
   createdAt  DateTime @default(now())
-  solana     String? // new
-  bsc        String? // new
+  solanaWallet  String?  // newly linked
+  bscWallet     String?  // newly linked
   trades     Trade[] // renamed back-relation
 }
 
