@@ -44,7 +44,11 @@ export default async function handler(
     await prisma.user.upsert({
       where: { telegramId: userId },
       update: {},
-      create: { telegramId: userId, balance: 0 },
+      create: {
+        id: userId,          // ← supply the required `id` field
+        telegramId: userId,
+        balance: 0,
+      },
     });
 
     // 4️⃣ Load & lock the market (must be open)
