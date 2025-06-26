@@ -5,7 +5,7 @@ import { PrismaClient } from '@prisma/client';
 
 // Initialize Prisma and Telegraf
 const prisma = new PrismaClient();
-const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN!);
+const bot = new Telegraf(process.env.TG_BOT_TOKEN!);
 
 // Constants
 const TRADE_FEE = 0.01;  // 1% fee on trades
