@@ -25,9 +25,7 @@ const SolanaContext = createContext<SolanaContextType | undefined>(
 /**
  * 3) Provider component
  */
-export function SolanaWalletProvider(props: { children: ReactNode }) {
-  const { children } = props
-
+export const SolanaWalletProvider: React.FC<{ children?: ReactNode }> = ({ children }) => {
   const [walletPubkey, setWalletPubkey] = useState<PublicKey | null>(null)
   const connection = new Connection(
     'https://api.mainnet-beta.solana.com'
