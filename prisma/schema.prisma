@@ -15,9 +15,9 @@ model User {
   username      String?
   balance       Float     @default(0)
   createdAt     DateTime  @default(now())
-  solanaWallet  String?   // newly linked
-  bscWallet     String?   // newly linked
-  trades        Trade[]   // back-relation
+  solanaWallet  String?
+  bscWallet     String?
+  trades        Trade[]
 
   @@map("users")
 }
@@ -60,10 +60,11 @@ model Trade {
 }
 
 model Deposit {
+  /// Your existing manual‐deposit flow
   id        String    @id @default(cuid())
   network   String
   txHash    String    @unique
-  status    String    @default("pending")  // pending/approved/rejected
+  status    String    @default("pending")
   createdAt DateTime  @default(now())
 
   @@map("deposits")
@@ -83,23 +84,30 @@ model Withdrawal {
   @@index([userId])
   @@map("withdrawals")
 }
+
+///––– On-chain deposit monitoring models –––
+
 model DepositAddress {
-  id          Int      @id @default(autoincrement())
-  chainId     Int
-  address     String   @unique
-  lastBalance String
-  deposits    Deposit[]  @relation("AddressDeposits", fields: [address], references: [address])
+  id             Int              @id @default(autoincrement())
+  chainId        Int
+  address        String           @unique
+  lastBalance    String
+  onChainDeposits OnChainDeposit[] @relation("AddressDeposits")
+
+  @@map("deposit_addresses")
 }
 
-model Deposit {
-  id          Int      @id @default(autoincrement())
-  chainId     Int
-  address     String
-  amount      String
-  txHash      String
-  blockNumber Int
-  createdAt   DateTime @default(now())
-  
-  // relation back to the address (optional)
-  depositAddress DepositAddress? @relation("AddressDeposits", fields: [address], references: [address])
+/// Records each detected on-chain deposit
+model OnChainDeposit {
+  id              Int             @id @default(autoincrement())
+  chainId         Int
+  address         String
+  amount          String
+  txHash          String          @unique
+  blockNumber     Int
+  createdAt       DateTime        @default(now())
+
+  depositAddress  DepositAddress? @relation("AddressDeposits", fields: [address], references: [address])
+
+  @@map("onchain_deposits")
 }
