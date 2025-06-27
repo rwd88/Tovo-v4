@@ -1,46 +1,84 @@
 // src/services/autoSettleMarkets.ts
 
-import { PrismaClient } from '@prisma/client';
-import TelegramBot from 'node-telegram-bot-api';
-import { settleMarket } from './marketService'; // your existing settle logic
+import { PrismaClient } from '@prisma/client'
+import TelegramBot from 'node-telegram-bot-api'
 
-const prisma  = new PrismaClient();
-const bot     = new TelegramBot(process.env.TG_BOT_TOKEN!, { polling: false });
-const CHAT_ID = process.env.TG_CHANNEL_ID!;
+const prisma = new PrismaClient()
+const bot = new TelegramBot(process.env.TG_BOT_TOKEN!, { polling: false })
+const CHAT_ID = process.env.TG_CHANNEL_ID!
 
-/**
- * Finds all open markets that have expired, settles them,
- * then notifies the channel of each result.
- */
 export async function autoSettleMarkets() {
-  const now = new Date();
-  // 1) Grab all markets whose eventTime ≤ now and still open
+  const now = new Date()
+  // 1) find ready-to-settle markets
   const markets = await prisma.market.findMany({
     where: {
       eventTime: { lte: now },
-      status:    'open'
+      status:    'open',
+      outcome:   { not: null },
+    },
+    include: { trades: true },
+  })
+
+  let totalSettled = 0
+  let totalProfit  = 0
+
+  for (const market of markets) {
+    const winning = (market.outcome ?? '').toUpperCase()
+    if (!['YES','NO'].includes(winning)) {
+      // just close it
+      await prisma.market.update({
+        where: { id: market.id },
+        data:  { status: 'settled' },
+      })
+      continue
     }
-  });
-  if (markets.length === 0) return;
 
-  // 2) Settle each market and send a Telegram summary
-  for (const m of markets) {
-    try {
-      // your existing function that sets m.outcome, updates pools, payouts, etc.
-      const result = await settleMarket(m.id);
+    const winPool    = winning === 'YES' ? market.poolYes : market.poolNo
+    const winners    = market.trades.filter(t => t.type?.toUpperCase() === winning)
+    const totalPool  = market.poolYes + market.poolNo
+    const tradingFee = totalPool * 0.01 * 2
+    const houseCut   = totalPool * 0.1
+    const netPool    = totalPool - tradingFee - houseCut
+    const shareFactor= winPool > 0 ? netPool / winPool : 0
 
-      // 3) Notify in Telegram
-      const text = 
-        `📣 *Market Settled*\n` +
-        `*${m.question}*\n\n` +
-        `Result: *${result.outcome.toUpperCase()}*\n` +
-        `Yes pool: ${m.poolYes.toFixed(2)}  No pool: ${m.poolNo.toFixed(2)}\n` +
-        `Total Payouts: ${result.totalPayout.toFixed(2)} USDC\n\n` +
-        `_Settled at ${now.toUTCString()}_`;
-      await bot.sendMessage(CHAT_ID, text, { parse_mode: 'Markdown' });
-
-    } catch (err) {
-      console.error('Failed to settle market', m.id, err);
+    // batch DB updates
+    const txs: any[] = []
+    // 1) pay out winners
+    for (const t of winners) {
+      const profit = t.amount * shareFactor - (t.fee ?? 0)
+      txs.push(
+        prisma.user.update({
+          where: { id: t.userId },
+          data:  { balance: { increment: profit } },
+        })
+      )
     }
+    // 2) mark winning trades settled
+    txs.push(
+      prisma.trade.updateMany({
+        where: { marketId: market.id, type: winning },
+        data:  { settled: true },
+      })
+    )
+    // 3) close the market
+    txs.push(
+      prisma.market.update({
+        where: { id: market.id },
+        data:  { status: 'settled' },
+      })
+    )
+
+    await prisma.$transaction(txs)
+    totalSettled++
+    totalProfit += houseCut
   }
+
+  // 4) send Telegram summary
+  const nextRun = new Date(Date.now() + 24*60*60*1000).toUTCString()
+  const text = 
+    `🏦 Settlement Complete\n` +
+    `• Markets settled: ${totalSettled}\n` +
+    `• House profit: $${totalProfit.toFixed(2)}\n` +
+    `⌛ Next: ${nextRun}`
+  await bot.sendMessage(CHAT_ID, text, { parse_mode: 'Markdown' })
 }
