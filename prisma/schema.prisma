@@ -22,23 +22,25 @@ model User {
   @@map("users")
 }
 
-model Market {
-  id           String    @id @default(cuid())
-  externalId   String?   @unique(map: "Market_externalId_key")
-  question     String
-  description  String?
-  eventTime    DateTime  @default(now())
-  forecast     Float?
-  outcome      String?
-  poolYes      Float     @default(0)
-  poolNo       Float     @default(0)
-  status       String    @default("open")
-  feeCollected Float     @default(0)
-  trades       Trade[]
-  createdAt    DateTime  @default(now())
+// prisma/schema.prisma
+ model Market {
+   id           String    @id @default(cuid())
+   externalId   String?   @unique(map: "Market_externalId_key")
+   question     String
+   description  String?
+   eventTime    DateTime  @default(now())
+   forecast     Float?
+   outcome      String?
+   poolYes      Float     @default(0)
+   poolNo       Float     @default(0)
+   status       String    @default("open")
+   feeCollected Float     @default(0)
+   trades       Trade[]
+   createdAt    DateTime  @default(now())
+  notified     Boolean   @default(false)   // ← new field
+   @@map("markets")
+ }
 
-  @@map("markets")
-}
 
 model Trade {
   id        String   @id @default(cuid())

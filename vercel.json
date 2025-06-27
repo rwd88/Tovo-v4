@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/cron/publish-markets",
+      "schedule": "*/10 * * * *"
+    },
+    {
       "path": "/api/cron/import-markets",
       "schedule": "0 0 * * *"
     },
