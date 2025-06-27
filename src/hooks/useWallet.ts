@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import type { Web3Provider } from "@ethersproject/providers";
+import type { BrowserProvider } from "ethers";
 import {
   connectWallet,
   disconnectWallet,
@@ -9,7 +9,7 @@ import {
 } from "../services/wallet";
 
 export function useWallet() {
-  const [provider, setProvider] = useState<Web3Provider | null>(null);
+  const [provider, setProvider] = useState<BrowserProvider | null>(null);
   const [address, setAddress] = useState<string | null>(null);
   const [chainId, setChainId] = useState<number | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -30,7 +30,8 @@ export function useWallet() {
     try {
       const ethersProvider = await connectWallet();
       setProvider(ethersProvider);
-      const addr = await ethersProvider.getSigner().getAddress();
+      const signer = await ethersProvider.getSigner();
+      const addr = await signer.getAddress();
       const id = (await ethersProvider.getNetwork()).chainId;
       setAddress(addr);
       setChainId(id);
@@ -50,7 +51,6 @@ export function useWallet() {
 
   useEffect(() => {
     init();
-    // no event subscriptions here, handled in wallet.ts
   }, [init]);
 
   return { provider, address, chainId, isConnected, connect, disconnect };

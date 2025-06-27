@@ -1,5 +1,5 @@
 import Web3Modal from "web3modal";
-import { providers } from "ethers";
+import { BrowserProvider, Eip1193Provider, JsonRpcSigner } from "ethers";
 import WalletConnectProvider from "@walletconnect/web3-provider";
 
 // RPC URLs for EVM chains
@@ -18,8 +18,6 @@ const providerOptions = {
     package: WalletConnectProvider,
     options: {
       rpc: RPC,
-      // Example: bridge server if needed
-      // bridge: "https://bridge.walletconnect.org",
       qrcode: true,
     },
   },
@@ -28,7 +26,7 @@ const providerOptions = {
 
 // Singleton Web3Modal instance
 let web3Modal: Web3Modal;
-let cachedProvider: any;
+let cachedProvider: Eip1193Provider | null = null;
 
 function initWeb3Modal(): Web3Modal {
   if (!web3Modal) {
@@ -41,52 +39,45 @@ function initWeb3Modal(): Web3Modal {
 }
 
 // Connect wallet
-export async function connectWallet(): Promise<providers.Web3Provider> {
+export async function connectWallet(): Promise<BrowserProvider> {
   const modal = initWeb3Modal();
-  const provider = await modal.connect();
-  cachedProvider = provider;
-  const ethersProvider = new providers.Web3Provider(provider);
+  const externalProvider = (await modal.connect()) as Eip1193Provider;
+  cachedProvider = externalProvider;
+  const ethersProvider = new BrowserProvider(externalProvider);
 
   // Subscribe to provider events
-  provider.on("accountsChanged", (accounts: string[]) => {
-    window.location.reload(); // or update state
-  });
-  provider.on("chainChanged", () => {
-    window.location.reload();
-  });
-  provider.on("disconnect", () => {
-    disconnectWallet();
-  });
+  externalProvider.on?.("accountsChanged", () => window.location.reload());
+  externalProvider.on?.("chainChanged", () => window.location.reload());
+  externalProvider.on?.("disconnect", () => disconnectWallet());
 
   return ethersProvider;
 }
 
 // Disconnect wallet
 export async function disconnectWallet(): Promise<void> {
-  const modal = initWeb3Modal();
-  await modal.clearCachedProvider();
-  if (cachedProvider?.disconnect && typeof cachedProvider.disconnect === "function") {
-    await cachedProvider.disconnect();
+  initWeb3Modal().clearCachedProvider();
+  if (cachedProvider && typeof (cachedProvider as any).disconnect === "function") {
+    await (cachedProvider as any).disconnect();
   }
   cachedProvider = null;
   window.location.reload();
 }
 
 // Get ethers.js provider
-export function getEthersProvider(): providers.Web3Provider | null {
+export function getEthersProvider(): BrowserProvider | null {
   if (!cachedProvider) return null;
-  return new providers.Web3Provider(cachedProvider);
+  return new BrowserProvider(cachedProvider);
 }
 
 // Helpers
-export async function getSigner(): Promise<providers.JsonRpcSigner | null> {
+export async function getSigner(): Promise<JsonRpcSigner | null> {
   const provider = getEthersProvider();
-  return provider ? provider.getSigner() : null;
+  return provider ? (await provider.getSigner()) : null;
 }
 
 export async function getAddress(): Promise<string | null> {
   const signer = await getSigner();
-  return signer ? signer.getAddress() : null;
+  return signer ? await signer.getAddress() : null;
 }
 
 export async function getChainId(): Promise<number | null> {
