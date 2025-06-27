@@ -2,6 +2,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { Connection, PublicKey } from '@solana/web3.js'
 
+
+
 // 1. Define the shape of your Solana context
 interface SolanaContextValue {
   connection: Connection
