@@ -1,53 +1,47 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { createContext, useContext, useState, useEffect } from 'react'
+import React, {
+  createContext,
+  useContext,
+  useState,
+  PropsWithChildren,      // ← import this
+} from 'react'
 import { Connection, PublicKey } from '@solana/web3.js'
 
-// 1. Define the shape of your Solana context
-interface SolanaContextValue {
+// 1) Context shape
+interface SolanaContextType {
   connection: Connection
   walletPubkey: PublicKey | null
-  connect(): Promise<void>
+  setWalletPubkey: (pubkey: PublicKey | null) => void
 }
 
-// 2. Create it
-const SolanaContext = createContext<SolanaContextValue | null>(null)
+// 2) Create context
+const SolanaContext = createContext<SolanaContextType | undefined>(undefined)
 
-// 3. Provider component
-export const SolanaWalletProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }) => {
+// 3) Provider
+export function SolanaWalletProvider(
+  props: PropsWithChildren<{}>    // ← allows any children
+) {
+  const { children } = props
+
   const [walletPubkey, setWalletPubkey] = useState<PublicKey | null>(null)
-
-  // You can swap in your cluster / RPC endpoint here
-  const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed')
-
-  // Example connect function (phantom)
-  const connect = async () => {
-    try {
-      // @ts-ignore window.solana
-      const resp = await window.solana.connect()
-      setWalletPubkey(new PublicKey(resp.publicKey.toString()))
-    } catch (err) {
-      console.error('Solana connect error', err)
-    }
-  }
-
-  // If you want auto-reconnect on mount:
-  useEffect(() => {
-    // @ts-ignore
-    if (window.solana?.isPhantom) {
-      // Optionally, call window.solana.connect({ onlyIfTrusted: true })
-    }
-  }, [])
+  const connection = new Connection('https://api.mainnet-beta.solana.com')
 
   return (
-    <SolanaContext.Provider value={{ connection, walletPubkey, connect }}>
+    <SolanaContext.Provider
+      value={{ connection, walletPubkey, setWalletPubkey }}
+    >
       {children}
     </SolanaContext.Provider>
   )
 }
 
-// 4. Hook for consuming
-export const useSolana = () => {
+// 4) Consumer hook
+export function useSolana(): SolanaContextType {
   const ctx = useContext(SolanaContext)
-  if (!ctx) throw new Error('useSolana must be used within SolanaWalletProvider')
+  if (!ctx) {
+    throw new Error(
+      'useSolana must be used within <SolanaWalletProvider>!'
+    )
+  }
   return ctx
 }
