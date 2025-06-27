@@ -9,6 +9,10 @@
       "schedule": "0 0 * * *"
     },
     {
+      "path": "/api/cron/settle-markets?secret=${CRON_SECRET}",
+      "schedule": "59 23 * * *"
+    },
+    {
       "path": "/api/cron/import-results?secret=${CRON_SECRET}",
       "schedule": "59 23 * * *"
     }
