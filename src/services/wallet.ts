@@ -82,5 +82,8 @@ export async function getAddress(): Promise<string | null> {
 
 export async function getChainId(): Promise<number | null> {
   const provider = getEthersProvider();
-  return provider ? (await provider.getNetwork()).chainId : null;
+  if (!provider) return null;
+  const network = await provider.getNetwork();
+  // network.chainId is a bigint, convert to number
+  return Number(network.chainId);
 }

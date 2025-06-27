@@ -30,9 +30,8 @@ export function useWallet() {
     try {
       const ethersProvider = await connectWallet();
       setProvider(ethersProvider);
-      const signer = await ethersProvider.getSigner();
-      const addr = await signer.getAddress();
-      const id = (await ethersProvider.getNetwork()).chainId;
+      const addr = await ethersProvider.getSigner().getAddress();
+      const id = await getChainId();
       setAddress(addr);
       setChainId(id);
       setIsConnected(true);
