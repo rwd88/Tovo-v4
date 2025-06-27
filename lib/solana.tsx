@@ -19,7 +19,6 @@ export function SolanaWalletProvider({
   children,
 }: PropsWithChildren<{}>) {
   const [walletPubkey, setWalletPubkey] = useState<PublicKey | null>(null)
-  // swap to your RPC endpoint
   const connection = new Connection('https://api.mainnet-beta.solana.com')
 
   return (
