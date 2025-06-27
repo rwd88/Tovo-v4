@@ -1,33 +1,22 @@
 // lib/wallet.ts
-import Web3Modal from "web3modal";
-import { ethers } from "ethers";
-import WalletConnectProvider from "@walletconnect/web3-provider";
-import TronWeb from "tronweb";
 
-export async function connectEVM() {
-  const modal = new Web3Modal({
-    cacheProvider: true,
-    providerOptions: {
-      walletconnect: {
-        package: WalletConnectProvider,
-        options: {
-          rpc: {
-            1: process.env.NEXT_PUBLIC_ETH_RPC,      // Ethereum RPC URL
-            56: process.env.NEXT_PUBLIC_BSC_RPC      // BSC RPC URL
-          },
-        },
-      },
-    }
-  });
-  const provider = await modal.connect();
-  return new ethers.providers.Web3Provider(provider);
+/**
+ * Validate that a string is a Base58 Solana address (32–44 chars).
+ */
+export function isValidSolanaAddress(addr: string): boolean {
+  return /^[A-HJ-NP-Za-km-z1-9]{32,44}$/.test(addr);
 }
 
-export async function connectTron() {
-  const provider = await (window as any).tronLink?.request({ method: "tron_requestAccounts" });
-  if (!provider) throw new Error("TronLink not installed");
-  return new TronWeb({
-    fullHost: process.env.NEXT_PUBLIC_TRON_RPC!,
-    privateKey: "" // walletLink doesn’t expose privateKey; signing handled by tronLink
-  });
+/**
+ * Validate that a string is an Ethereum/BSC (0x…) address.
+ */
+export function isValidEthAddress(addr: string): boolean {
+  return /^0x[a-fA-F0-9]{40}$/.test(addr);
+}
+
+/**
+ * Validate that a string is a Tron (TRC-20) address.
+ */
+export function isValidTronAddress(addr: string): boolean {
+  return /^T[a-zA-Z0-9]{33}$/.test(addr);
 }

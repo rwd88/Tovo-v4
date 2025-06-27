@@ -1,23 +1,32 @@
 // lib/solana.ts
-import {
-  WalletAdapterNetwork
-} from "@solana/wallet-adapter-base";
-import {
-  ConnectionProvider, WalletProvider
-} from "@solana/wallet-adapter-react";
-import {
-  PhantomWalletAdapter, SolflareWalletAdapter
-} from "@solana/wallet-adapter-wallets";
+import { Connection, PublicKey } from '@solana/web3.js';
+import { Token, TOKEN_PROGRAM_ID } from '@solana/spl-token';
 
-export const SolanaWalletProvider: React.FC = ({ children }) => {
-  const network = WalletAdapterNetwork.Mainnet;
-  const endpoint = process.env.NEXT_PUBLIC_SOLANA_RPC!;
-  const wallets = [ new PhantomWalletAdapter(), new SolflareWalletAdapter() ];
-  return (
-    <ConnectionProvider endpoint={endpoint}>
-      <WalletProvider wallets={wallets} autoConnect>
-        {children}
-      </WalletProvider>
-    </ConnectionProvider>
-  );
-};
+/**
+ * Fetch SOL balance for a given address.
+ */
+export async function getSolanaBalance(
+  rpcUrl: string,
+  address: string
+): Promise<number> {
+  const conn = new Connection(rpcUrl, 'confirmed');
+  const pubkey = new PublicKey(address);
+  const lamports = await conn.getBalance(pubkey, 'confirmed');
+  return lamports / 1e9;
+}
+
+/**
+ * Fetch SPL token balance for a given mint/address pair.
+ */
+export async function getSplTokenBalance(
+  rpcUrl: string,
+  ownerAddress: string,
+  mintAddress: string
+): Promise<number> {
+  const conn = new Connection(rpcUrl, 'confirmed');
+  const ownerPubkey = new PublicKey(ownerAddress);
+  const mintPubkey = new PublicKey(mintAddress);
+  const token = new Token(conn, mintPubkey, TOKEN_PROGRAM_ID, null as any);
+  const account = await token.getOrCreateAssociatedAccountInfo(ownerPubkey);
+  return Number(account.amount);
+}
