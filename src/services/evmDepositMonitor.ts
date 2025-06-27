@@ -1,19 +1,18 @@
 import { JsonRpcProvider } from "ethers";
 import { getDepositAddresses, recordDeposit } from "../models/deposit";
 
-// RPC URLs for EVM chains
+// Load RPC URLs from env
 const RPC: Record<number, string> = {
-  1: process.env.ETH_RPC_URL!,  // Ethereum Mainnet
-  56: process.env.BSC_RPC_URL!, // BSC Mainnet
+  1: process.env.ETH_RPC_URL!,    // Ethereum Mainnet
+  56: process.env.BSC_RPC_URL!,   // BSC Mainnet
   // add additional networks here
 };
 
+// Initialize providers per chain
 interface ChainConfig {
   chainId: number;
   provider: JsonRpcProvider;
 }
-
-// Initialize providers per chain
 const chains: ChainConfig[] = Object.entries(RPC).map(([chainId, url]) => ({
   chainId: Number(chainId),
   provider: new JsonRpcProvider(url),
@@ -33,10 +32,9 @@ export async function startEvmDepositMonitor() {
       console.log(`EVM Monitor: new block ${blockNumber} on chain ${chainId}`);
 
       const addrs = await getDepositAddresses(chainId);
-
       for (const { address, lastBalance } of addrs) {
         const balance = await provider.getBalance(address);       // bigint
-        const oldBal = BigInt(lastBalance);                      // bigint
+        const oldBal = BigInt(lastBalance);                       // bigint
         if (balance > oldBal) {
           const delta = balance - oldBal;
           console.log(`Deposit detected: ${delta} Wei to ${address}`);
@@ -45,7 +43,7 @@ export async function startEvmDepositMonitor() {
             chainId,
             address,
             amount: delta.toString(),
-            txHash: "",        // optional: fill from logs if needed
+            txHash: "",           // optionally fill from logs
             blockNumber,
           });
         }

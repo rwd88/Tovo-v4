@@ -1,11 +1,10 @@
 import { JsonRpcProvider, Contract } from "ethers";
 import { getDepositAddresses, recordDeposit } from "../models/deposit";
 
-// RPC URLs for EVM chains (reuse or import from your other monitor)
-const RPC: Record<number, string> = {
+// Load RPC URLs from env (reuse your EVM RPC map)
+const RPC: Record<number,string> = {
   1: process.env.ETH_RPC_URL!,
   56: process.env.BSC_RPC_URL!,
-  // add other EVM chain RPCs here
 };
 
 // Minimal ERC-20 ABI for Transfer events
@@ -13,24 +12,22 @@ const ERC20_ABI = [
   "event Transfer(address indexed from, address indexed to, uint256 value)"
 ];
 
-// Configure which tokens to monitor per chain
+// Token contracts to monitor (set in .env.local)
 interface TokenConfig {
   chainId: number;
   tokenAddress: string;
 }
-
 const tokenConfigs: TokenConfig[] = [
-  // Example: USDT on Ethereum and BSC
   { chainId: 1,  tokenAddress: process.env.USDT_MAINNET! },
   { chainId: 56, tokenAddress: process.env.USDT_BSC! },
-  // add more tokens as needed
+  // add more tokens here
 ];
 
-// Initialize providers
+// Initialize one provider per chain
 const providers: Record<number, JsonRpcProvider> = Object.fromEntries(
   Object.entries(RPC).map(([chainId, url]) => [
     Number(chainId),
-    new JsonRpcProvider(url),
+    new JsonRpcProvider(url)
   ])
 ) as Record<number, JsonRpcProvider>;
 
@@ -61,6 +58,7 @@ export function startErc20DepositMonitor() {
       }
     });
   }
+
   console.log("ERC20 deposit monitor started");
 }
 
