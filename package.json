@@ -13,6 +13,8 @@
   "dependencies": {
     "@ethersproject/providers": "^5.8.0",
     "@prisma/client": "^6.7.0",
+    "@solana/spl-token": "^0.4.13",
+    "@solana/web3.js": "^1.98.2",
     "@walletconnect/web3-provider": "^1.8.0",
     "axios": "^1.10.0",
     "cheerio": "^1.0.0",
