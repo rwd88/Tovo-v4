@@ -1,31 +1,53 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Connection, PublicKey } from '@solana/web3.js';
-import {
-  getAssociatedTokenAddress,
-  TOKEN_PROGRAM_ID,
-} from '@solana/spl-token';
+import React, { createContext, useContext, useState, useEffect } from 'react'
+import { Connection, PublicKey } from '@solana/web3.js'
 
-/**
- * Fetches the SPL token balance (in human‐readable units) for a given mint and owner.
- */
-export async function getSplTokenBalance(
-  connection: Connection,
-  mintAddress: string,
-  ownerAddress: string
-): Promise<number> {
-  const ownerPubkey = new PublicKey(ownerAddress);
-  const mintPubkey  = new PublicKey(mintAddress);
-
-  // Derive the associated token account for this owner+mint
-  const ata = await getAssociatedTokenAddress(mintPubkey, ownerPubkey);
-
-  // Query the balance
-  const { value } = await connection.getTokenAccountBalance(ata);
-
-  return value.uiAmount || 0;
+// 1. Define the shape of your Solana context
+interface SolanaContextValue {
+  connection: Connection
+  walletPubkey: PublicKey | null
+  connect(): Promise<void>
 }
 
-/**
- * Returns the standard SPL Token program ID constant.
- */
-export const SPL_TOKEN_PROGRAM_ID = TOKEN_PROGRAM_ID;
+// 2. Create it
+const SolanaContext = createContext<SolanaContextValue | null>(null)
+
+// 3. Provider component
+export const SolanaWalletProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }) => {
+  const [walletPubkey, setWalletPubkey] = useState<PublicKey | null>(null)
+
+  // You can swap in your cluster / RPC endpoint here
+  const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed')
+
+  // Example connect function (phantom)
+  const connect = async () => {
+    try {
+      // @ts-ignore window.solana
+      const resp = await window.solana.connect()
+      setWalletPubkey(new PublicKey(resp.publicKey.toString()))
+    } catch (err) {
+      console.error('Solana connect error', err)
+    }
+  }
+
+  // If you want auto-reconnect on mount:
+  useEffect(() => {
+    // @ts-ignore
+    if (window.solana?.isPhantom) {
+      // Optionally, call window.solana.connect({ onlyIfTrusted: true })
+    }
+  }, [])
+
+  return (
+    <SolanaContext.Provider value={{ connection, walletPubkey, connect }}>
+      {children}
+    </SolanaContext.Provider>
+  )
+}
+
+// 4. Hook for consuming
+export const useSolana = () => {
+  const ctx = useContext(SolanaContext)
+  if (!ctx) throw new Error('useSolana must be used within SolanaWalletProvider')
+  return ctx
+}
