@@ -1,19 +1,11 @@
 {
   "crons": [
     {
-      "path": "/api/cron/publish-markets",
-      "schedule": "*/10 * * * *"
-    },
-    {
-      "path": "/api/cron/import-markets",
+      "path": "/api/cron/import-markets?publish=true",
       "schedule": "0 0 * * *"
     },
     {
       "path": "/api/cron/settle-markets?secret=${CRON_SECRET}",
-      "schedule": "59 23 * * *"
-    },
-    {
-      "path": "/api/cron/import-results?secret=${CRON_SECRET}",
       "schedule": "59 23 * * *"
     }
   ]
