@@ -1,7 +1,7 @@
 // pages/api/deposits/evm.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { ethers } from "ethers";
-import prisma from "../../../lib/prisma";
+import { prisma } from '../../../lib/prisma'
 
 const provider = new ethers.providers.JsonRpcProvider(process.env.ETH_RPC);
 
