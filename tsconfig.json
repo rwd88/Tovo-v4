@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "target": "es2015",                     // Changed from es5
+    "target": "es2015",
     "lib": [
       "dom",
       "dom.iterable",
@@ -29,7 +29,7 @@
     "isolatedModules": true,
     "jsx": "preserve",
 
-    // ← Add this so TS picks up your custom types
+    // ← Make sure TS picks up your custom types
     "typeRoots": ["./types", "./node_modules/@types"]
   },
   "include": [
