@@ -83,3 +83,23 @@ model Withdrawal {
   @@index([userId])
   @@map("withdrawals")
 }
+model DepositAddress {
+  id          Int      @id @default(autoincrement())
+  chainId     Int
+  address     String   @unique
+  lastBalance String
+  deposits    Deposit[]  @relation("AddressDeposits", fields: [address], references: [address])
+}
+
+model Deposit {
+  id          Int      @id @default(autoincrement())
+  chainId     Int
+  address     String
+  amount      String
+  txHash      String
+  blockNumber Int
+  createdAt   DateTime @default(now())
+  
+  // relation back to the address (optional)
+  depositAddress DepositAddress? @relation("AddressDeposits", fields: [address], references: [address])
+}
