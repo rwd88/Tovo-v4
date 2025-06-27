@@ -4,7 +4,6 @@ import { PrismaClient } from "@prisma/client";
 import {
   JsonRpcProvider,
   Wallet,
-  Contract,
   parseEther
 } from "ethers";
 import {
@@ -19,10 +18,10 @@ import TonWeb from "tonweb";
 const prisma = new PrismaClient();
 
 // — EVM setup —
-const EVM_RPC_URL      = process.env.ETH_RPC_URL!;
-const EVM_PRIVATE_KEY  = process.env.EVM_PRIVATE_KEY!;
-const evmProvider      = new JsonRpcProvider(EVM_RPC_URL);
-const evmWallet        = new Wallet(EVM_PRIVATE_KEY, evmProvider);
+const EVM_RPC_URL     = process.env.ETH_RPC_URL!;
+const EVM_PRIVATE_KEY = process.env.EVM_PRIVATE_KEY!;
+const evmProvider     = new JsonRpcProvider(EVM_RPC_URL);
+const evmWallet       = new Wallet(EVM_PRIVATE_KEY, evmProvider);
 
 // — Solana setup —
 const SOLANA_RPC_URL     = process.env.SOLANA_RPC_URL!;
@@ -36,34 +35,27 @@ const solKeypair         = Keypair.fromSecretKey(
 const TON_RPC_URL     = process.env.TON_RPC_URL!;
 const TON_PRIVATE_KEY = process.env.TON_PRIVATE_KEY!;
 const tonweb          = new TonWeb(new TonWeb.HttpProvider(TON_RPC_URL));
+// cast to any for missing TS defs on utils & wallet
 const tonKeypair = (tonweb as any).utils.KeyPair.fromSecretKey(
-Buffer.from(JSON.parse(TON_PRIVATE_KEY).secretKey, "hex")
+  Buffer.from(JSON.parse(TON_PRIVATE_KEY).secretKey, "hex")
 );
 
-/**
- * Processes pending withdrawals: signs and broadcasts transactions,
- * then updates withdrawal.status accordingly.
- */
 export async function executeWithdrawals() {
-  const pending = await prisma.withdrawal.findMany({
-    where: { status: "pending" }
-  });
+  const pending = await prisma.withdrawal.findMany({ where: { status: "pending" } });
 
   for (const w of pending) {
     try {
       let txHash: string;
 
       if (["1","56"].includes(w.chain)) {
-        // EVM native withdrawal
         const tx = await evmWallet.sendTransaction({
-          to: w.userId, 
+          to: w.userId,
           value: parseEther(w.amount.toString()),
           nonce: await evmProvider.getTransactionCount(evmWallet.address)
         });
         txHash = tx.hash;
 
       } else if (w.chain === "101") {
-        // Solana lamport transfer
         const tx = new SolanaTx().add(
           SystemProgram.transfer({
             fromPubkey: solKeypair.publicKey,
@@ -79,10 +71,8 @@ export async function executeWithdrawals() {
         txHash = await solConnection.sendRawTransaction(raw, { skipPreflight: true });
 
       } else if (w.chain === "102") {
-        // TON transfer (nanograms)
-        const walletContract = tonweb.wallet.create({
-          publicKey: tonKeypair.publicKey
-        });
+        // TON: cast wallet to any to access the .wallet API
+        const walletContract = (tonweb as any).wallet.create({ publicKey: tonKeypair.publicKey });
         const seqno = await walletContract.methods.seqno().call();
         const transfer = walletContract.methods.transfer({
           secretKey: tonKeypair.secretKey,
@@ -98,38 +88,24 @@ export async function executeWithdrawals() {
         throw new Error(`Unsupported chain: ${w.chain}`);
       }
 
-      // Mark as signed
-      await prisma.withdrawal.update({
-        where: { id: w.id },
-        data: { status: "signed" }
-      });
+      await prisma.withdrawal.update({ where: { id: w.id }, data: { status: "signed" } });
 
-      // Wait for confirmation
       if (["1","56"].includes(w.chain)) {
         await evmProvider.waitForTransaction(txHash, 1);
       } else if (w.chain === "101") {
         await solConnection.confirmTransaction(txHash);
       }
 
-      // Mark completed
-      await prisma.withdrawal.update({
-        where: { id: w.id },
-        data: { status: "completed" }
-      });
-
+      await prisma.withdrawal.update({ where: { id: w.id }, data: { status: "completed" } });
       console.log(`Withdrawal ${w.id} completed: ${txHash}`);
 
     } catch (err) {
       console.error(`Withdrawal ${w.id} failed`, err);
-      await prisma.withdrawal.update({
-        where: { id: w.id },
-        data: { status: "failed" }
-      });
+      await prisma.withdrawal.update({ where: { id: w.id }, data: { status: "failed" } });
     }
   }
 }
 
-// If run directly, execute once then exit
 if (require.main === module) {
   executeWithdrawals()
     .then(() => process.exit(0))
