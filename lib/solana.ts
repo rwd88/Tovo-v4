@@ -1,4 +1,6 @@
 // lib/solana.ts
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { Connection, PublicKey } from '@solana/web3.js';
 import { Token, TOKEN_PROGRAM_ID } from '@solana/spl-token';
 

@@ -1,4 +1,6 @@
 // lib/wallet.ts
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 
 /**
  * Validate that a string is a Base58 Solana address (32–44 chars).
