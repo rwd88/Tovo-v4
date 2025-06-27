@@ -29,14 +29,14 @@
     "isolatedModules": true,
     "jsx": "preserve",
 
-    // ← Make sure TS picks up your custom types
-    "typeRoots": ["./types", "./node_modules/@types"]
+    // ← Point at your ambient types folder in src
+    "typeRoots": ["./src/types", "./node_modules/@types"]
   },
   "include": [
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    "types/**/*.d.ts"    // ← Include your ambient-declarations folder
+    "src/types/**/*.d.ts"   // ← Include your ambient‐declarations here
   ],
   "exclude": [
     "node_modules"
