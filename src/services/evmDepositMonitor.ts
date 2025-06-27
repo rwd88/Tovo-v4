@@ -1,72 +1,63 @@
-import { ethers } from "ethers";
-import { getDepositAddresses, recordDeposit } from "../models/deposit"; // pseudo-ORM functions
+import { JsonRpcProvider } from "ethers";
+import { getDepositAddresses, recordDeposit } from "../models/deposit";
 
 // RPC URLs for EVM chains
 const RPC: Record<number, string> = {
-  1: process.env.ETH_RPC_URL!,       // Ethereum Mainnet
-  56: process.env.BSC_RPC_URL!,      // BSC Mainnet
-  // add other EVM chain RPCs here
+  1: process.env.ETH_RPC_URL!,  // Ethereum Mainnet
+  56: process.env.BSC_RPC_URL!, // BSC Mainnet
+  // add additional networks here
 };
 
 interface ChainConfig {
   chainId: number;
-  provider: ethers.providers.JsonRpcProvider;
+  provider: JsonRpcProvider;
 }
 
-// Initialize providers
+// Initialize providers per chain
 const chains: ChainConfig[] = Object.entries(RPC).map(([chainId, url]) => ({
   chainId: Number(chainId),
-  provider: new ethers.providers.JsonRpcProvider(url),
+  provider: new JsonRpcProvider(url),
 }));
 
-// Last processed block per chain (should be persisted in DB in production)
+// Track last processed block per chain (persist externally in prod)
 const lastProcessed: Record<number, number> = {};
 
-async function startEvmDepositMonitor() {
+export async function startEvmDepositMonitor() {
   for (const { chainId, provider } of chains) {
-    // Initialize last processed block
+    // Seed starting block
     lastProcessed[chainId] = await provider.getBlockNumber();
 
-    // Poll for new blocks
+    // Listen for new blocks
     provider.on("block", async (blockNumber: number) => {
       if (blockNumber <= lastProcessed[chainId]) return;
-      console.log(`New block ${blockNumber} on chain ${chainId}`);
+      console.log(`EVM Monitor: new block ${blockNumber} on chain ${chainId}`);
 
-      // Fetch deposit addresses for this chain
-      const addresses = await getDepositAddresses(chainId);
+      const addrs = await getDepositAddresses(chainId);
 
-      // For each address, check for balance changes
-      for (const addr of addresses) {
-        const balance = await provider.getBalance(addr.address);
-        const oldBalance = addr.lastBalance;
+      for (const { address, lastBalance } of addrs) {
+        const balance = await provider.getBalance(address);       // bigint
+        const oldBal = BigInt(lastBalance);                      // bigint
+        if (balance > oldBal) {
+          const delta = balance - oldBal;
+          console.log(`Deposit detected: ${delta} Wei to ${address}`);
 
-        if (balance.gt(oldBalance)) {
-          const delta = balance.sub(oldBalance);
-          console.log(`Detected deposit of ${ethers.utils.formatEther(delta)} to ${addr.address}`);
-
-          // Record deposit in DB
           await recordDeposit({
             chainId,
-            address: addr.address,
+            address,
             amount: delta.toString(),
-            txHash: "", // optional: scan blocks for txs or store separately
+            txHash: "",        // optional: fill from logs if needed
             blockNumber,
           });
-
-          // Update lastBalance in DB (not shown)
         }
       }
 
       lastProcessed[chainId] = blockNumber;
     });
   }
-
   console.log("EVM deposit monitor started");
 }
 
-// If this file is run directly
+// If run directly
 if (require.main === module) {
   startEvmDepositMonitor().catch(console.error);
 }
-
-export { startEvmDepositMonitor };
