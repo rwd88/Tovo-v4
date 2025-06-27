@@ -1,7 +1,7 @@
 // pages/api/deposits/evm.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { JsonRpcProvider }                  from 'ethers'
-import { prisma }                           from '../../../../lib/prisma'
+import { prisma }                           from '../../../lib/prisma'
 
 
 // v6 style:
