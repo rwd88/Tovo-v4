@@ -36,8 +36,8 @@ const solKeypair         = Keypair.fromSecretKey(
 const TON_RPC_URL     = process.env.TON_RPC_URL!;
 const TON_PRIVATE_KEY = process.env.TON_PRIVATE_KEY!;
 const tonweb          = new TonWeb(new TonWeb.HttpProvider(TON_RPC_URL));
-const tonKeypair      = TonWeb.utils.KeyPair.fromSecretKey(
-  Buffer.from(JSON.parse(TON_PRIVATE_KEY).secretKey, "hex")
+const tonKeypair = (tonweb as any).utils.KeyPair.fromSecretKey(
+Buffer.from(JSON.parse(TON_PRIVATE_KEY).secretKey, "hex")
 );
 
 /**
