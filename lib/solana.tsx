@@ -1,9 +1,10 @@
+// lib/solana.tsx
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, {
   createContext,
   useContext,
   useState,
-  PropsWithChildren,      // ← import this
+  PropsWithChildren,
 } from 'react'
 import { Connection, PublicKey } from '@solana/web3.js'
 
@@ -17,12 +18,11 @@ interface SolanaContextType {
 // 2) Create context
 const SolanaContext = createContext<SolanaContextType | undefined>(undefined)
 
-// 3) Provider
+// 3) Provider – note: **named** export
 export function SolanaWalletProvider(
-  props: PropsWithChildren<{}>    // ← allows any children
+  props: PropsWithChildren<{}>
 ) {
   const { children } = props
-
   const [walletPubkey, setWalletPubkey] = useState<PublicKey | null>(null)
   const connection = new Connection('https://api.mainnet-beta.solana.com')
 
@@ -39,9 +39,7 @@ export function SolanaWalletProvider(
 export function useSolana(): SolanaContextType {
   const ctx = useContext(SolanaContext)
   if (!ctx) {
-    throw new Error(
-      'useSolana must be used within <SolanaWalletProvider>!'
-    )
+    throw new Error('useSolana must be used inside <SolanaWalletProvider>')
   }
   return ctx
 }

@@ -2,7 +2,7 @@
 import '../styles/globals.css'
 import type { AppProps } from 'next/app'
 import { EthereumProvider } from '../contexts/EthereumContext'
-import { SolanaWalletProvider } from '../lib/solana'
+import { SolanaWalletProvider } from '../lib/solana'  // must match the named export
 
 export default function App({ Component, pageProps }: AppProps) {
   return (
