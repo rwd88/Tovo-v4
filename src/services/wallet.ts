@@ -1,9 +1,9 @@
 import Web3Modal from "web3modal";
-import { BrowserProvider, Eip1193Provider, JsonRpcSigner } from "ethers";
+import { BrowserProvider, JsonRpcSigner } from "ethers";
 import WalletConnectProvider from "@walletconnect/web3-provider";
 
 // RPC URLs for EVM chains
-const RPC: { [chainId: number]: string } = {
+const RPC: Record<number, string> = {
   1: process.env.REACT_APP_ETH_RPC_URL || "https://mainnet.infura.io/v3/YOUR_INFURA_ID",
   56: process.env.REACT_APP_BSC_RPC_URL || "https://bsc-dataseed.binance.org/",
   // add other EVM chain RPCs as needed
@@ -26,7 +26,7 @@ const providerOptions = {
 
 // Singleton Web3Modal instance
 let web3Modal: Web3Modal;
-let cachedProvider: Eip1193Provider | null = null;
+let cachedProvider: any = null;
 
 function initWeb3Modal(): Web3Modal {
   if (!web3Modal) {
@@ -41,14 +41,16 @@ function initWeb3Modal(): Web3Modal {
 // Connect wallet
 export async function connectWallet(): Promise<BrowserProvider> {
   const modal = initWeb3Modal();
-  const externalProvider = (await modal.connect()) as Eip1193Provider;
+  // The raw provider supports event subscriptions but isn't typed by ethers
+  const externalProviderRaw = await modal.connect();
+  const externalProvider: any = externalProviderRaw;
   cachedProvider = externalProvider;
   const ethersProvider = new BrowserProvider(externalProvider);
 
   // Subscribe to provider events
-  externalProvider.on?.("accountsChanged", () => window.location.reload());
-  externalProvider.on?.("chainChanged", () => window.location.reload());
-  externalProvider.on?.("disconnect", () => disconnectWallet());
+  externalProvider.on("accountsChanged", () => window.location.reload());
+  externalProvider.on("chainChanged", () => window.location.reload());
+  externalProvider.on("disconnect", () => disconnectWallet());
 
   return ethersProvider;
 }
@@ -56,8 +58,8 @@ export async function connectWallet(): Promise<BrowserProvider> {
 // Disconnect wallet
 export async function disconnectWallet(): Promise<void> {
   initWeb3Modal().clearCachedProvider();
-  if (cachedProvider && typeof (cachedProvider as any).disconnect === "function") {
-    await (cachedProvider as any).disconnect();
+  if (cachedProvider && typeof cachedProvider.disconnect === "function") {
+    await cachedProvider.disconnect();
   }
   cachedProvider = null;
   window.location.reload();
@@ -72,7 +74,7 @@ export function getEthersProvider(): BrowserProvider | null {
 // Helpers
 export async function getSigner(): Promise<JsonRpcSigner | null> {
   const provider = getEthersProvider();
-  return provider ? (await provider.getSigner()) : null;
+  return provider ? await provider.getSigner() : null;
 }
 
 export async function getAddress(): Promise<string | null> {
@@ -84,6 +86,5 @@ export async function getChainId(): Promise<number | null> {
   const provider = getEthersProvider();
   if (!provider) return null;
   const network = await provider.getNetwork();
-  // network.chainId is a bigint, convert to number
   return Number(network.chainId);
 }
