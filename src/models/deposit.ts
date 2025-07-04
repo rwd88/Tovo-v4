@@ -2,15 +2,23 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-// Represents a deposit address record
 export interface DepositAddress {
   id: number;
   chainId: number;
   address: string;
-  lastBalance: string; // stored as string for consistency (Wei)
+  lastBalance: string;
 }
 
-// Fetch all deposit addresses for a given chain
+export interface OnChainDeposit {
+  id: string;
+  chainId: number;
+  address: string;
+  amount: string;
+  txHash: string;
+  blockNumber: number;
+  createdAt: Date;
+}
+
 export async function getDepositAddresses(chainId: number): Promise<DepositAddress[]> {
   return prisma.depositAddress.findMany({
     where: { chainId },
@@ -18,21 +26,20 @@ export async function getDepositAddresses(chainId: number): Promise<DepositAddre
   });
 }
 
-// Record a new on-chain deposit
 export async function recordDeposit(data: {
   chainId: number;
   address: string;
-  amount: string;      // amount in Wei as string
+  amount: string;
   txHash: string;
   blockNumber: number;
-}): Promise<void> {
-  // 1. Insert the on-chain deposit record
-  await prisma.onChainDeposit.create({
+}): Promise<OnChainDeposit> {
+  // 1. Create new on-chain deposit record
+  const deposit = await prisma.onChainDeposit.create({
     data: {
-      chainId: data.chainId,
-      address:  data.address,
-      amount:   data.amount,
-      txHash:   data.txHash,
+      chainId:    data.chainId,
+      address:    data.address,
+      amount:     data.amount,
+      txHash:     data.txHash,
       blockNumber: data.blockNumber,
     },
   });
@@ -44,13 +51,15 @@ export async function recordDeposit(data: {
   });
 
   if (addrRecord) {
-    const oldBal = BigInt(addrRecord.lastBalance);
+    const oldBal    = BigInt(addrRecord.lastBalance);
     const depositAmt = BigInt(data.amount);
-    const newBal = (oldBal + depositAmt).toString();
+    const newBal    = (oldBal + depositAmt).toString();
 
     await prisma.depositAddress.update({
       where: { address: data.address },
-      data: { lastBalance: newBal },
+      data:  { lastBalance: newBal },
     });
   }
+
+  return deposit;
 }
