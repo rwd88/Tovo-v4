@@ -10,27 +10,33 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  // 1) Only PATCH is allowed
+  // Only PATCH
   if (req.method !== 'PATCH') {
     res.setHeader('Allow', ['PATCH'])
     return res.status(405).end(`Method ${req.method} Not Allowed`)
   }
 
-  // 2) Validate & parse `id`
+  // Ensure `id` is a single string
   const { id } = req.query
-  const idString = Array.isArray(id) ? id[0] : id
-  const depositId = parseInt(idString, 10)
-  if (!idString || isNaN(depositId)) {
+  if (typeof id !== 'string') {
     return res.status(400).json({ error: 'Invalid or missing deposit id' })
   }
 
-  // 3) Validate `status`
-  const { status } = req.body
-  if (typeof status !== 'string' || !ALLOWED_STATUSES.includes(status as any)) {
-    return res.status(400).json({ error: `Invalid status; must be one of ${ALLOWED_STATUSES.join(', ')}` })
+  // Parse to number & check
+  const depositId = parseInt(id, 10)
+  if (isNaN(depositId)) {
+    return res.status(400).json({ error: `Invalid deposit id: ${id}` })
   }
 
-  // 4) Perform the update
+  // Validate `status`
+  const { status } = req.body
+  if (typeof status !== 'string' || !ALLOWED_STATUSES.includes(status as any)) {
+    return res
+      .status(400)
+      .json({ error: `Invalid status; must be one of ${ALLOWED_STATUSES.join(', ')}` })
+  }
+
+  // Perform the update
   try {
     const updated = await prisma.deposit.update({
       where: { id: depositId },
@@ -39,12 +45,9 @@ export default async function handler(
     return res.status(200).json(updated)
   } catch (error: any) {
     console.error('Failed to update deposit:', error)
-
-    // Prisma error when record not found
     if (error.code === 'P2025') {
       return res.status(404).json({ error: 'Deposit not found' })
     }
-
     return res.status(500).json({ error: 'Unable to update deposit' })
   }
 }
