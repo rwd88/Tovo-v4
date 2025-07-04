@@ -10,25 +10,22 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  // Only PATCH
   if (req.method !== 'PATCH') {
     res.setHeader('Allow', ['PATCH'])
     return res.status(405).end(`Method ${req.method} Not Allowed`)
   }
 
-  // Ensure `id` is a single string
+  // 1) Extract & validate the ID
   const { id } = req.query
   if (typeof id !== 'string') {
     return res.status(400).json({ error: 'Invalid or missing deposit id' })
   }
-
-  // Parse to number & check
   const depositId = parseInt(id, 10)
   if (isNaN(depositId)) {
     return res.status(400).json({ error: `Invalid deposit id: ${id}` })
   }
 
-  // Validate `status`
+  // 2) Validate status
   const { status } = req.body
   if (typeof status !== 'string' || !ALLOWED_STATUSES.includes(status as any)) {
     return res
@@ -36,18 +33,18 @@ export default async function handler(
       .json({ error: `Invalid status; must be one of ${ALLOWED_STATUSES.join(', ')}` })
   }
 
-  // Perform the update
+  // 3) Update onChainDeposit (not deposit!)
   try {
-    const updated = await prisma.deposit.update({
+    const updated = await prisma.onChainDeposit.update({
       where: { id: depositId },
-      data: { status },
+      data:  { status },
     })
     return res.status(200).json(updated)
-  } catch (error: any) {
-    console.error('Failed to update deposit:', error)
-    if (error.code === 'P2025') {
-      return res.status(404).json({ error: 'Deposit not found' })
+  } catch (err: any) {
+    console.error('Failed to update onChainDeposit:', err)
+    if (err.code === 'P2025') {
+      return res.status(404).json({ error: 'onChainDeposit record not found' })
     }
-    return res.status(500).json({ error: 'Unable to update deposit' })
+    return res.status(500).json({ error: 'Unable to update deposit status' })
   }
 }
