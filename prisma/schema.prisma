@@ -108,6 +108,7 @@ model OnChainDeposit {
   amount          String
   txHash          String          @unique
   blockNumber     Int
+    status    String        // ← add this line
   createdAt       DateTime        @default(now())
 
   depositAddress  DepositAddress? @relation("AddressDeposits", fields: [address], references: [address])
