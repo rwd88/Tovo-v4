@@ -10,21 +10,15 @@ export default async function handler(
   res: NextApiResponse
 ) {
   try {
-    // We're expecting the TON chainId from env, not from the request body:
-    const TON_CHAIN_ID = Number(process.env.TON_CHAIN_ID || '102')
-
-    // Fetch all on-chain deposits for TON, newest first
-    const deposits = await prisma.deposit.findMany({
-      where: { chainId: TON_CHAIN_ID },
+    // we're tagging all TON deposits under network = "TON"
+    const deposits = await prisma.onChainDeposit.findMany({
+      where: { network: 'TON' },
       orderBy: { createdAt: 'desc' },
-      // only select the fields you have in your DB
       select: {
         id: true,
-        chainId: true,
-        address: true,
-        amount: true,
+        network: true,
         txHash: true,
-        blockNumber: true,
+        status: true,
         createdAt: true,
       },
     })
