@@ -62,12 +62,13 @@ model Trade {
 }
 
 model Deposit {
-  /// Your existing manual‐deposit flow
-  id        String    @id @default(cuid())
-  network   String
-  txHash    String    @unique
-  status    String    @default("pending")
-  createdAt DateTime  @default(now())
+  id          Int      @id @default(autoincrement())
+  chainId     Int
+  address     String
+  amount      String
+  txHash      String
+  blockNumber Int
+  createdAt   DateTime @default(now())
 
   @@map("deposits")
 }
