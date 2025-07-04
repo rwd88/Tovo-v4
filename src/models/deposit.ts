@@ -9,6 +9,9 @@ export interface DepositAddress {
   lastBalance: string;
 }
 
+/**
+ * Create a new on-chain deposit record and update address balance.
+ */
 export async function recordDeposit(data: {
   chainId: number;
   address: string;
@@ -16,27 +19,31 @@ export async function recordDeposit(data: {
   txHash: string;
   blockNumber: number;
 }): Promise<import('@prisma/client').Deposit> {
-  const deposit = await prisma.onChainDeposit.create({
+  // 1) insert deposit
+  const deposit = await prisma.deposit.create({
     data: {
-      chainId: data.chainId,
-      address: data.address,
-      amount: data.amount,
-      txHash: data.txHash,
+      chainId:     data.chainId,
+      address:     data.address,
+      amount:      data.amount,
+      txHash:      data.txHash,
       blockNumber: data.blockNumber,
     },
   });
 
-  const addrRec = await prisma.depositAddress.findUnique({
+  // 2) update lastBalance on DepositAddress
+  const addr = await prisma.depositAddress.findUnique({
     where: { address: data.address },
     select: { lastBalance: true },
   });
 
-  if (addrRec) {
-    const oldBal = BigInt(addrRec.lastBalance);
+  if (addr) {
+    const oldBal = BigInt(addr.lastBalance);
     const delta  = BigInt(data.amount);
+    const newBal = (oldBal + delta).toString();
+
     await prisma.depositAddress.update({
       where: { address: data.address },
-      data: { lastBalance: (oldBal + delta).toString() },
+      data:  { lastBalance: newBal },
     });
   }
 
