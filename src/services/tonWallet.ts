@@ -2,10 +2,13 @@
 
 import TonProvider from 'ton-inpage-provider';   // default export
 
-// Remove explicit type annotations; allow TS to infer
-let provider = null as any;
+// Use a loose `any` type for provider since the class signature isn't known at compile-time
+let provider: any = null;
 
-// Initialize and return the TON in-page provider instance
+/**
+ * Initialize and return the TON in-page provider instance.
+ * Ensures a singleton instance is used.
+ */
 export async function initTonProvider() {
   if (!provider) {
     provider = new TonProvider({ allowHost: true });
