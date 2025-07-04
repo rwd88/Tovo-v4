@@ -9,12 +9,8 @@
     "module": "esnext",
     "baseUrl": ".",
     "paths": {
-      "@/lib/*": [
-        "lib/*"
-      ],
-      "@prisma/client": [
-        "node_modules/@prisma/client"
-      ]
+      "@/lib/*": ["lib/*"],
+      "@prisma/client": ["node_modules/@prisma/client"]
     },
     "strict": true,
     "esModuleInterop": true,
@@ -29,14 +25,14 @@
     "isolatedModules": true,
     "jsx": "preserve",
 
-    // ← Ensure TS loads your custom type declarations
+    // Ensure TS loads your custom type declarations
     "typeRoots": ["./src/types", "./node_modules/@types"]
   },
   "include": [
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    "src/types/**/*.d.ts"    // ← Pull in your ambient .d.ts files
+    "src/types/**/*.d.ts"
   ],
   "exclude": [
     "node_modules"
