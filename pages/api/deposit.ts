@@ -1,26 +1,46 @@
+// pages/api/deposit.ts
+
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  // 1) Only allow POST
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' })
+    res.setHeader('Allow', ['POST'])
+    return res.status(405).end(`Method ${req.method} Not Allowed`)
   }
 
-  const { network, txHash } = req.body
-  if (!network || !txHash) {
-    return res.status(400).json({ error: 'Missing network or txHash' })
+  // 2) Destructure & validate body
+  const { chainId, address, amount, txHash, blockNumber } = req.body
+  if (
+    typeof chainId     !== 'number' ||
+    typeof address     !== 'string' ||
+    typeof amount      !== 'string' ||
+    typeof txHash      !== 'string' ||
+    typeof blockNumber !== 'number'
+  ) {
+    return res.status(400).json({ error: 'Missing or invalid fields' })
   }
 
+  // 3) Create the deposit record
   try {
     const deposit = await prisma.deposit.create({
-      data: { network, txHash }
+      data: {
+        chainId,
+        address,
+        amount,
+        txHash,
+        blockNumber,
+      },
     })
-    return res.status(200).json({ success: true, deposit })
-  } catch (err) {
-    const error = err as Error
-    console.error(error.message)
-    return res.status(500).json({ error: error.message })
+    return res.status(201).json(deposit)
+  } catch (error: any) {
+    console.error('Error creating deposit:', error)
+    return res.status(500).json({ error: 'Unable to create deposit' })
   }
 }
