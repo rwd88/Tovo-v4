@@ -1,6 +1,7 @@
 // src/components/TonConnectButton.tsx
 import React from 'react';
 import { useTonWallet } from '../hooks/useTonWallet';
+import { initTonProvider } from '../services/tonWallet';
 
 export const TonConnectButton: React.FC = () => {
   const { account } = useTonWallet();
