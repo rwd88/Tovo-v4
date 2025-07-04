@@ -15,8 +15,6 @@ import {
   SolflareWalletAdapter,
 } from '@solana/wallet-adapter-wallets';
 
-// TON in-page provider init (optional if needed elsewhere)
-import { TonProvider } from 'ton-inpage-provider';
 
 // Environment variables
 const solanaNetwork = WalletAdapterNetwork.Mainnet;
