@@ -1,13 +1,8 @@
 // src/services/tonWallet.ts
 
-import { TonProvider } from 'ton-inpage-provider';
-
+import TonProvider from 'ton-inpage-provider';   // if default export
 let provider: TonProvider | null = null;
 
-/**
- * Initialize and return the TON in-page provider instance.
- * Ensures only one instance is created and re-used.
- */
 export async function initTonProvider(): Promise<TonProvider> {
   if (!provider) {
     provider = new TonProvider({ allowHost: true });
