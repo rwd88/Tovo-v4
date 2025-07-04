@@ -1,51 +1,46 @@
-import { PrismaClient } from '@prisma/client';
+// pages/api/deposit.ts
 
-const prisma = new PrismaClient();
+import type { NextApiRequest, NextApiResponse } from 'next'
+import { PrismaClient } from '@prisma/client'
 
-export interface DepositAddress {
-  id: number;
-  chainId: number;
-  address: string;
-  lastBalance: string;
-}
+const prisma = new PrismaClient()
 
-/**
- * Create a new on-chain deposit record and update address balance.
- */
-export async function recordDeposit(data: {
-  chainId: number;
-  address: string;
-  amount: string;
-  txHash: string;
-  blockNumber: number;
-}): Promise<import('@prisma/client').Deposit> {
-  // 1) insert deposit
-  const deposit = await prisma.deposit.create({
-    data: {
-      chainId:     data.chainId,
-      address:     data.address,
-      amount:      data.amount,
-      txHash:      data.txHash,
-      blockNumber: data.blockNumber,
-    },
-  });
-
-  // 2) update lastBalance on DepositAddress
-  const addr = await prisma.depositAddress.findUnique({
-    where: { address: data.address },
-    select: { lastBalance: true },
-  });
-
-  if (addr) {
-    const oldBal = BigInt(addr.lastBalance);
-    const delta  = BigInt(data.amount);
-    const newBal = (oldBal + delta).toString();
-
-    await prisma.depositAddress.update({
-      where: { address: data.address },
-      data:  { lastBalance: newBal },
-    });
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  // 1) Only allow POST
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', ['POST'])
+    return res.status(405).end(`Method ${req.method} Not Allowed`)
   }
 
-  return deposit;
+  // 2) Destructure & validate body
+  const { chainId, address, amount, txHash, blockNumber } = req.body
+  if (
+    typeof chainId     !== 'number' ||
+    typeof address     !== 'string' ||
+    typeof amount      !== 'string' ||
+    typeof txHash      !== 'string' ||
+    typeof blockNumber !== 'number'
+  ) {
+    return res.status(400).json({ error: 'Missing or invalid fields' })
+  }
+
+  // 3) Create the deposit record
+  try {
+    const deposit = await prisma.deposit.create({
+      data: {
+        chainId,
+        address,
+        amount,
+        txHash,
+        blockNumber,
+      },
+    })
+    return res.status(201).json(deposit)
+  } catch (error: any) {
+    console.error('Error creating deposit:', error)
+    return res.status(500).json({ error: 'Unable to create deposit' })
+  }
 }

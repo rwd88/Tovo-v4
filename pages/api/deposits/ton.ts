@@ -1,27 +1,31 @@
+// pages/api/deposits/ton.ts
+
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { prisma } from '../../../lib/prisma'
+import { PrismaClient } from '@prisma/client'
 
-const TON_CHAIN_ID = parseInt(process.env.TON_CHAIN_ID || '', 10)
-if (!TON_CHAIN_ID) throw new Error('Missing TON_CHAIN_ID in env')
+const prisma = new PrismaClient()
+const NETWORK = 'TON'
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
   try {
-    const deposits = await prisma.deposit.findMany({
-      where:   { chainId: TON_CHAIN_ID },
+    const deposits = await prisma.onChainDeposit.findMany({
+      where:   { network: NETWORK },
       orderBy: { createdAt: 'desc' },
       select:  {
-        id:         true,
-        chainId:    true,
-        address:    true,
-        amount:     true,
-        txHash:     true,
-        blockNumber:true,
-        createdAt:  true,
+        id:        true,
+        network:   true,
+        txHash:    true,
+        status:    true,
+        createdAt: true,
       },
     })
-    res.status(200).json(deposits)
+
+    return res.status(200).json(deposits)
   } catch (err) {
     console.error(err)
-    res.status(500).json({ error: 'Unable to fetch TON deposits' })
+    return res.status(500).json({ error: 'Unable to fetch TON deposits' })
   }
 }
