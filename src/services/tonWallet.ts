@@ -1,18 +1,21 @@
 // src/services/tonWallet.ts
 
-import TonProvider from 'ton-inpage-provider';   // default export
+// No longer using TonProvider namespace—import default if available
+import hasTonProvider from 'ton-inpage-provider';
 
-// Use a loose `any` type for provider since the class signature isn't known at compile-time
+// Loose provider instance, let TS infer
 let provider: any = null;
 
 /**
- * Initialize and return the TON in-page provider instance.
- * Ensures a singleton instance is used.
+ * Initialize and return the TON in-page provider if available.
+ * Uses hasTonProvider() to verify existence.
  */
 export async function initTonProvider() {
   if (!provider) {
-    provider = new TonProvider({ allowHost: true });
-    await provider.ensureInitialized();
+    if (!hasTonProvider()) {
+      throw new Error('TON provider not found in window');
+    }
+    provider = window.ton;
   }
   return provider;
 }
