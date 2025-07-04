@@ -1,29 +1,28 @@
-// src/services/tonDepositMonitor.ts
-
 import TonWeb from 'tonweb'
 import { PrismaClient } from '@prisma/client'
+import { recordDeposit } from './recordDeposit'    // <-- adjust path if needed
 
 const prisma = new PrismaClient()
-
-// load env
 const TON_RPC_URL      = process.env.TON_RPC_URL!
-const POLL_INTERVAL_MS = parseInt(process.env.POLL_INTERVAL_MS!  || '15000', 10)
+const TON_CHAIN_ID     = parseInt(process.env.TON_CHAIN_ID  || '', 10)
+const POLL_INTERVAL_MS = parseInt(process.env.POLL_INTERVAL_MS || '15000', 10)
 
-if (!TON_RPC_URL) throw new Error('Missing TON_RPC_URL in .env.local')
+if (!TON_RPC_URL)   throw new Error('Missing TON_RPC_URL in env')
+if (!TON_CHAIN_ID)  throw new Error('Missing TON_CHAIN_ID in env')
 
 const tonweb = new TonWeb(new TonWeb.HttpProvider(TON_RPC_URL))
 const cache: Record<string, bigint> = {}
 
 export async function startTonDepositMonitor() {
-  console.log('☑️  TON monitor starting—polling every', POLL_INTERVAL_MS, 'ms')
+  console.log('☑️ TON monitor starting—polling every', POLL_INTERVAL_MS, 'ms')
 
-  // pull all known deposit‐addresses
+  // fetch all addresses tagged for TON by chainId
   const addrs = await prisma.depositAddress.findMany({
-    where: { network: 'TON' },      // assumes you tagged them with network: 'TON'
+    where: { chainId: TON_CHAIN_ID },
     select: { address: true, lastBalance: true },
   })
 
-  // seed our cache
+  // seed our in-memory cache
   for (const { address, lastBalance } of addrs) {
     cache[address] = BigInt(lastBalance)
   }
@@ -31,42 +30,36 @@ export async function startTonDepositMonitor() {
   setInterval(async () => {
     for (const { address } of addrs) {
       try {
-        const balance = BigInt(await tonweb.getBalance(address))
-        const prev    = cache[address] || 0n
+        const raw     = await tonweb.getBalance(address)
+        const balance = BigInt(raw)
+        const prev    = cache[address] ?? 0n
 
         if (balance > prev) {
-          const delta = balance - prev
+          const delta = (balance - prev).toString()
           console.log(`🔔 TON deposit ${delta} detected at ${address}`)
 
-          // write to your onChainDeposit table
-          await prisma.onChainDeposit.create({
-            data: {
-              network: 'TON',
-              txHash:  '',        // unavailable from balance query
-              status:  'pending', // or whatever you prefer
-            },
+          // use your shared helper—creates a deposit row & bumps lastBalance for you
+          await recordDeposit({
+            chainId:    TON_CHAIN_ID,
+            address,
+            amount:     delta,
+            txHash:     '',     // no txHash from plain balance check
+            blockNumber: 0,     // or supply if you have it
           })
 
-          // bump the depositAddress lastBalance
-          await prisma.depositAddress.update({
-            where: { address },
-            data: { lastBalance: balance.toString() },
-          })
-
-          // update in‐mem
           cache[address] = balance
         }
       } catch (e) {
-        console.error('❌ TON error for', address, e)
+        console.error('❌ TON monitor error for', address, e)
       }
     }
   }, POLL_INTERVAL_MS)
 }
 
-// allow standalone run
+// allow `node src/services/tonDepositMonitor.ts` as standalone
 if (require.main === module) {
-  startTonDepositMonitor().catch((e) => {
-    console.error(e)
+  startTonDepositMonitor().catch(err => {
+    console.error(err)
     process.exit(1)
   })
 }
