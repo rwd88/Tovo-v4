@@ -1,8 +1,9 @@
 // src/components/NavBar.tsx
-import React, { useMemo } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
-import Web3Modal from 'web3modal'
+// EVM modal will be loaded only on client
+// import Web3Modal from 'web3modal' <-- remove static import
 import { BrowserProvider } from 'ethers'
 
 // Solana
@@ -20,14 +21,17 @@ const TonConnectButton = dynamic(
 )
 
 export default function Navbar() {
-  // EVM Web3Modal setup
-  const web3Modal = useMemo(
-    () =>
-      new Web3Modal({
-        cacheProvider: true,
-      }),
-    []
-  )
+  // Prevent SSR errors: render only on client
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
+  if (!mounted) return null
+
+  // EVM Web3Modal setup on client only
+  const web3Modal = useMemo(() => {
+    // dynamic import inside useMemo
+    const Web3Modal = require('web3modal').default
+    return new Web3Modal({ cacheProvider: true })
+  }, [])
 
   async function connectEvm() {
     try {
@@ -41,7 +45,6 @@ export default function Navbar() {
     }
   }
 
-  // Solana wallet adapters list
   const solanaWallets = useMemo(
     () => [new PhantomWalletAdapter(), new SolflareWalletAdapter()],
     []
