@@ -1,20 +1,19 @@
 // pages/_app.tsx
+'use client'
+
 import '../styles/globals.css'
 import type { AppProps } from 'next/app'
 
-// — TonConnect UI Provider —
+// — TON CONNECT PROVIDER — client-only, must be the very first thing
 import { TonConnectUIProvider } from '@tonconnect/ui-react'
 
-// — Ethereum context provider —
+// — ETHEREUM CONTEXT (still client-side) —
 import { EthereumProvider } from '../contexts/EthereumContext'
 
-// — Solana Wallet Adapter styles & providers —
+// — SOLANA ADAPTER (still client-side) —
 import '@solana/wallet-adapter-react-ui/styles.css'
+import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react'
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base'
-import {
-  ConnectionProvider,
-  WalletProvider,
-} from '@solana/wallet-adapter-react'
 import {
   PhantomWalletAdapter,
   SolflareWalletAdapter,
@@ -27,7 +26,7 @@ const solanaWallets = [
   new SolflareWalletAdapter(),
 ]
 
-// Your TonConnect manifest URL (make sure to set NEXT_PUBLIC_TON_MANIFEST_URL in Vercel)
+// Load your TON manifest URL from env
 const tonManifestUrl = process.env.NEXT_PUBLIC_TON_MANIFEST_URL!
 
 export default function App({ Component, pageProps }: AppProps) {
