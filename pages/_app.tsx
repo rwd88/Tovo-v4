@@ -1,6 +1,7 @@
 // pages/_app.tsx
 import '../styles/globals.css'
 import type { AppProps } from 'next/app'
+import dynamic from 'next/dynamic'
 
 // EVM context
 import { EthereumProvider } from '../contexts/EthereumContext'
@@ -20,10 +21,13 @@ import {
 // TON Connect UI
 import { TonConnectUIProvider } from '@tonconnect/ui-react'
 
-// Our NavBar
-import NavBar from '../src/components/NavBar'
+// Dynamically load NavBar only on client
+const NavBar = dynamic(() => import('../src/components/NavBar'), {
+  ssr: false
+})
 
 export default function App({ Component, pageProps }: AppProps) {
+  // Solana config
   const solanaEndpoint = process.env.NEXT_PUBLIC_SOLANA_RPC_URL!
   const solanaWallets  = [
     new PhantomWalletAdapter(),
@@ -35,11 +39,10 @@ export default function App({ Component, pageProps }: AppProps) {
       <EthereumProvider>
         <ConnectionProvider endpoint={solanaEndpoint}>
           <WalletProvider wallets={solanaWallets} autoConnect>
-
-            {/* NavBar now inside all providers */}
+            {/* Only render NavBar on the client */}
             <NavBar />
 
-            {/* Your page */}
+            {/* Rest of your app */}
             <Component {...pageProps} />
           </WalletProvider>
         </ConnectionProvider>
