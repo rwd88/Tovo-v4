@@ -2,7 +2,7 @@
 import React, { useMemo } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
-import { Web3Modal } from 'web3modal'
+import Web3Modal from 'web3modal'
 import { ethers } from 'ethers'
 // Solana
 import {
