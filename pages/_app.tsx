@@ -20,14 +20,15 @@ import {
 // TON Connect UI
 import { TonConnectUIProvider } from '@tonconnect/ui-react'
 
-// Your NavBar
+// Our NavBar
 import NavBar from '../src/components/NavBar'
 
 export default function App({ Component, pageProps }: AppProps) {
-  // Solana setup
-  const solanaNetwork  = WalletAdapterNetwork.Mainnet
   const solanaEndpoint = process.env.NEXT_PUBLIC_SOLANA_RPC_URL!
-  const solanaWallets  = [ new PhantomWalletAdapter(), new SolflareWalletAdapter() ]
+  const solanaWallets  = [
+    new PhantomWalletAdapter(),
+    new SolflareWalletAdapter()
+  ]
 
   return (
     <TonConnectUIProvider>
@@ -38,6 +39,7 @@ export default function App({ Component, pageProps }: AppProps) {
             {/* NavBar now inside all providers */}
             <NavBar />
 
+            {/* Your page */}
             <Component {...pageProps} />
           </WalletProvider>
         </ConnectionProvider>
