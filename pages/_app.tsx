@@ -39,6 +39,7 @@ export default function App({ Component, pageProps }: AppProps) {
         {/* Solana Wallet providers */}
         <ConnectionProvider endpoint={solanaEndpoint}>
           <WalletProvider wallets={solanaWallets} autoConnect>
+            {/* Navigation bar with EVM, Solana, and TON buttons */}
             <NavBar />
             <Component {...pageProps} />
           </WalletProvider>
