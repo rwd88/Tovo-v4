@@ -1,17 +1,16 @@
 {
-  "manifest_version": "0.1",
-  "name": "Tovo",
-  "description": "Tovo – Predict market events with TON",
-  "url": "https://tovo-v4-nrewb04w6-rwd88s-projects.vercel.app",
+  "manifest_version": "0.1.0",
+  "name": "Tovo V4",
+  "description": "Tovo prediction platform - TON Wallet Integration",
+  "url": "https://tovo-v4-1xj2s4cha-rwd88s-projects.vercel.app",
   "icons": [
     {
-      "src": "https://tovo-v4-nrewb04w6-rwd88s-projects.vercel.app/favicon.ico",
-      "sizes": "48x48",
+      "src": "https://tovo-v4-1xj2s4cha-rwd88s-projects.vercel.app/icon192.png",
+      "sizes": "192x192",
       "type": "image/png"
     }
   ],
   "bridge": {
     "type": "ton-x"
-  },
-  "platforms": ["ios", "android", "web"]
+  }
 }
