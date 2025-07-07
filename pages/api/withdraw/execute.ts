@@ -1,7 +1,7 @@
 // pages/api/withdraw/execute.ts
 
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { prisma } from '../../lib/prisma'
+import { prisma } from '../../../lib/prisma'
 import { JsonRpcProvider, Contract, Wallet } from 'ethers'
 import {
   Connection,
