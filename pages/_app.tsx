@@ -2,7 +2,7 @@
 import '../styles/globals.css'
 import type { AppProps } from 'next/app'
 
-// Wallet & Context Providers
+// Global Providers
 import { EthereumProvider } from '../contexts/EthereumContext'
 import NavBar from '../src/components/NavBar'
 
@@ -29,10 +29,10 @@ const solanaWallets = [
 export default function App({ Component, pageProps }: AppProps) {
   return (
     <EthereumProvider>
-      <NavBar />
-
+      {/* Wrap NavBar within wallet providers so all connectors have context */}
       <ConnectionProvider endpoint={solanaEndpoint}>
         <WalletProvider wallets={solanaWallets} autoConnect>
+          <NavBar />
           <Component {...pageProps} />
         </WalletProvider>
       </ConnectionProvider>
