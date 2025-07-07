@@ -6,6 +6,9 @@ import dynamic from 'next/dynamic'
 // Global Ethereum context provider
 import { EthereumProvider } from '../contexts/EthereumContext'
 
+// TonConnect UI wrapper for TON in-page
+import { TonConnectUIProvider } from '@tonconnect/ui-react'
+
 // Dynamically import NavBar on client side to avoid SSR "window" errors
 const NavBar = dynamic(() => import('../src/components/NavBar'), { ssr: false })
 
@@ -22,7 +25,6 @@ import {
 } from '@solana/wallet-adapter-wallets'
 
 // Environment variables
-const solanaNetwork = WalletAdapterNetwork.Mainnet
 const solanaEndpoint = process.env.NEXT_PUBLIC_SOLANA_RPC_URL!
 const solanaWallets = [
   new PhantomWalletAdapter(),
@@ -32,13 +34,16 @@ const solanaWallets = [
 export default function App({ Component, pageProps }: AppProps) {
   return (
     <EthereumProvider>
-      {/* Wrap NavBar within wallet providers */}
-      <ConnectionProvider endpoint={solanaEndpoint}>
-        <WalletProvider wallets={solanaWallets} autoConnect>
-          <NavBar />
-          <Component {...pageProps} />
-        </WalletProvider>
-      </ConnectionProvider>
+      {/* TON in-page connector */}
+      <TonConnectUIProvider>
+        {/* Solana Wallet providers */}
+        <ConnectionProvider endpoint={solanaEndpoint}>
+          <WalletProvider wallets={solanaWallets} autoConnect>
+            <NavBar />
+            <Component {...pageProps} />
+          </WalletProvider>
+        </ConnectionProvider>
+      </TonConnectUIProvider>
     </EthereumProvider>
   )
 }
