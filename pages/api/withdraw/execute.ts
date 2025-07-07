@@ -1,5 +1,4 @@
 // pages/api/withdraw/execute.ts
-
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { prisma } from '../../../lib/prisma'
 import { JsonRpcProvider, Contract, Wallet } from 'ethers'
@@ -32,46 +31,45 @@ export default async function handler(
   }
 
   try {
-    // Mark withdrawal as processing
+    // 1) mark processing
     await prisma.withdrawal.update({
       where: { id: String(withdrawId) },
-      data:  { status: 'processing' }
+      data:  { status: 'processing' },
     })
 
     let txHash: string
 
-    // EVM
+    // 2a) EVM
     if (chainId === parseInt(process.env.EVM_CHAIN_ID!)) {
       const provider = new JsonRpcProvider(process.env.ETH_RPC_URL)
-      const signer   = new Wallet(
-        process.env.EVM_WITHDRAWER_KEY!,
-        provider
-      )
+      const signer   = new Wallet(process.env.EVM_WITHDRAWER_KEY!, provider)
       const token    = new Contract(asset, ERC20_ABI, signer)
       const tx       = await token.transfer(address, amount)
       txHash = tx.hash
 
-    // Solana
+    // 2b) Solana
     } else if (chainId === parseInt(process.env.SOLANA_CHAIN_ID!)) {
-      const conn    = new Connection(process.env.SOLANA_RPC_URL!)
-      const payer   = Keypair.fromSecretKey(
+      const conn  = new Connection(process.env.SOLANA_RPC_URL!)
+      const payer = Keypair.fromSecretKey(
         Buffer.from(process.env.SOLANA_WITHDRAWER_KEY!, 'base64')
       )
-      const tx      = new Transaction().add(
+      const tx    = new Transaction().add(
         SystemProgram.transfer({
           fromPubkey: payer.publicKey,
           toPubkey:   new PublicKey(address),
-          lamports:   BigInt(amount)
+          lamports:   BigInt(amount),
         })
       )
-      const sig     = await conn.sendTransaction(tx, [payer])
+      const sig   = await conn.sendTransaction(tx, [payer])
       txHash = sig
 
-    // TON
+    // 2c) TON
     } else if (chainId === parseInt(process.env.TON_CHAIN_ID!)) {
       const tonweb = new TonWeb(
         new TonWeb.HttpProvider(process.env.TON_RPC_URL!)
       )
+      // suppress TS error: TonWeb types don’t expose `wallet`
+      // @ts-ignore
       const wallet = tonweb.wallet.create({
         secretKey: Buffer.from(
           process.env.TON_WITHDRAWER_KEY!,
@@ -84,7 +82,7 @@ export default async function handler(
           toAddress: address,
           amount:    BigInt(amount),
           seqno,
-          sendMode:  0
+          sendMode:  0,
         })
         .send()
       txHash = transfer.idHash
@@ -93,20 +91,19 @@ export default async function handler(
       throw new Error(`Unsupported chainId: ${chainId}`)
     }
 
-    // Mark as sent
+    // 3) mark sent
     const updated = await prisma.withdrawal.update({
       where: { id: String(withdrawId) },
-      data:  { status: 'sent', txHash }
+      data:  { status: 'sent', txHash },
     })
 
     return res.status(200).json({ success: true, withdrawal: updated })
-
   } catch (err: any) {
     console.error('withdraw execute error:', err)
-    // Mark as failed
+    // mark failed
     await prisma.withdrawal.update({
       where: { id: String(withdrawId) },
-      data:  { status: 'failed' }
+      data:  { status: 'failed' },
     })
     return res.status(500).json({ success: false, error: err.message })
   }
