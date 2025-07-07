@@ -1,6 +1,6 @@
 // pages/api/withdraw/execute.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { prisma } from '../../lib/prisma'
+import { prisma } from '../../../lib/prisma';
 import { JsonRpcProvider, Wallet } from 'ethers'
 import { Connection, Keypair, Transaction, SystemProgram } from '@solana/web3.js'
 import TonWeb from 'tonweb'
