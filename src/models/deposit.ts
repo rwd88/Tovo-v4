@@ -1,5 +1,5 @@
 // src/models/deposit.ts
-import { prisma } from '../lib/prisma'
+import { prisma } from '../../lib/prisma'
 
 export interface DepositAddress {
   address:    string
