@@ -1,5 +1,6 @@
 // pages/_app.tsx
-import '../styles/globals.css'
+import '../styles/globals.css'           // your other global CSS
+import '@tonconnect/ui-react/styles.css' // ← TonConnect’s widget CSS
 import type { AppProps } from 'next/app'
 
 // 1) Ethereum Context
