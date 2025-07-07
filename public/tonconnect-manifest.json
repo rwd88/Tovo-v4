@@ -1,7 +1,17 @@
 {
-  "url": "https://tovo-v4.vercel.app",
-  "name": "Tovo Trade",
-  "iconUrl": "https://tovo-v4.vercel.app/icon.png",
-  "termsOfUseUrl": "https://tovo-v4.vercel.app/terms",
-  "privacyPolicyUrl": "https://tovo-v4.vercel.app/privacy"
+  "manifest_version": "0.1",
+  "name": "Tovo",
+  "description": "Tovo – Predict market events with TON",
+  "url": "https://tovo-v4-nrewb04w6-rwd88s-projects.vercel.app",
+  "icons": [
+    {
+      "src": "https://tovo-v4-nrewb04w6-rwd88s-projects.vercel.app/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/png"
+    }
+  ],
+  "bridge": {
+    "type": "ton-x"
+  },
+  "platforms": ["ios", "android", "web"]
 }
