@@ -74,15 +74,15 @@ model Deposit {
 }
 
 model Withdrawal {
-  id          Int      @id @default(autoincrement())
-  chainId     Int
-  address     String   // the recipient
-  asset       String   // e.g. "USDC"
-  amount      String
-  txHash      String?  // filled in after broadcast
-  status      String   @default("pending") // pending | sent | failed
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String    @id @default(cuid())
+  userId     String
+  chain      String
+  amount     Float
+  nonce      String    @unique
+  expiresAt  DateTime
+  status     String    // pending | signed | completed | cancelled
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   @@index([userId])
   @@map("withdrawals")
