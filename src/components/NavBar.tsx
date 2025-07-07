@@ -33,9 +33,7 @@ export default function Navbar() {
     try {
       const instance = await web3Modal.connect()
       const provider = new BrowserProvider(instance)
-      // Get the signer instance
       const signer = await provider.getSigner()
-      // Then get the address from the signer
       const address = await signer.getAddress()
       console.log('EVM wallet connected', address)
     } catch (err) {
@@ -74,10 +72,9 @@ export default function Navbar() {
         </ConnectionProvider>
 
         {/* TON Wallet via TonConnect */}
-        <TonConnectButton
-          className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-500"
-          buttonText="Connect TON Wallet"
-        />
+        <div className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-500">
+          <TonConnectButton />
+        </div>
       </div>
     </nav>
   )
