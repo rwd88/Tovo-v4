@@ -1,10 +1,9 @@
-// src/components/Navbar.tsx
+// src/components/NavBar.tsx
 import React, { useMemo } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import Web3Modal from 'web3modal'
-import { ethers } from 'ethers'
-import('@tonconnect/ui-react')
+import { BrowserProvider } from 'ethers'
 
 // Solana
 import {
@@ -13,7 +12,8 @@ import {
 } from '@solana/wallet-adapter-react'
 import { WalletModalProvider, WalletMultiButton } from '@solana/wallet-adapter-react-ui'
 import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets'
-// TON
+
+// TON (disable SSR)
 const TonConnectButton = dynamic(
   () => import('@tonconnect/ui-react').then(mod => mod.TonConnectButton),
   { ssr: false }
@@ -21,15 +21,20 @@ const TonConnectButton = dynamic(
 
 export default function Navbar() {
   // EVM Web3Modal setup
-  const web3Modal = useMemo(() => new Web3Modal({
-    cacheProvider: true,
-  }), [])
+  const web3Modal = useMemo(
+    () =>
+      new Web3Modal({
+        cacheProvider: true,
+      }),
+    []
+  )
 
   async function connectEvm() {
     try {
       const instance = await web3Modal.connect()
-      const provider = new ethers.providers.Web3Provider(instance)
-      // you can now use provider.getSigner() to sign/transact
+      const provider = new BrowserProvider(instance)
+      // Ready to use signer: await provider.getSigner()
+      console.log('EVM wallet connected', await provider.getSigner().getAddress())
     } catch (err) {
       console.error('EVM connect error', err)
     }
