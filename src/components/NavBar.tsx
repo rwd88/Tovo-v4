@@ -33,8 +33,11 @@ export default function Navbar() {
     try {
       const instance = await web3Modal.connect()
       const provider = new BrowserProvider(instance)
-      // Ready to use signer: await provider.getSigner()
-      console.log('EVM wallet connected', await provider.getSigner().getAddress())
+      // Get the signer instance
+      const signer = await provider.getSigner()
+      // Then get the address from the signer
+      const address = await signer.getAddress()
+      console.log('EVM wallet connected', address)
     } catch (err) {
       console.error('EVM connect error', err)
     }
