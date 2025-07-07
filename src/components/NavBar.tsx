@@ -4,6 +4,8 @@ import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import Web3Modal from 'web3modal'
 import { ethers } from 'ethers'
+import('@tonconnect/ui-react')
+
 // Solana
 import {
   ConnectionProvider,
