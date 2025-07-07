@@ -81,6 +81,7 @@ model Withdrawal {
   nonce      String    @unique
   expiresAt  DateTime
   status     String    // pending | signed | completed | cancelled
+  txHash     String?   // ← optional field for the broadcast hash
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
