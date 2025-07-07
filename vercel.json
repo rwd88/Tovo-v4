@@ -8,5 +8,10 @@
       "path": "/api/cron/settle-markets?secret=${CRON_SECRET}",
       "schedule": "59 23 * * *"
     }
+{
+      // Calls our “master” cron endpoint once per day at 03:00 UTC
+      "path": "/api/cron/daily-monitor?secret=${CRON_SECRET}",
+      "schedule": "0 3 * * *"
+    }
   ]
 }
