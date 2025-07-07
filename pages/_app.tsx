@@ -1,8 +1,8 @@
-// pages/_app.tsx
 'use client'
 
 import '../styles/globals.css'
 import type { AppProps } from 'next/app'
+import dynamic from 'next/dynamic'
 
 // — TON CONNECT PROVIDER — client-only, must be the very first thing
 import { TonConnectUIProvider } from '@tonconnect/ui-react'
@@ -12,19 +12,14 @@ import { EthereumProvider } from '../contexts/EthereumContext'
 
 // — SOLANA ADAPTER (still client-side) —
 import '@solana/wallet-adapter-react-ui/styles.css'
-import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react'
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base'
-import {
-  PhantomWalletAdapter,
-  SolflareWalletAdapter,
-} from '@solana/wallet-adapter-wallets'
+import { WalletModalProvider } from '@solana/wallet-adapter-react-ui'
 
-const solanaNetwork = WalletAdapterNetwork.Mainnet
-const solanaEndpoint = process.env.NEXT_PUBLIC_SOLANA_RPC_URL!
-const solanaWallets = [
-  new PhantomWalletAdapter(),
-  new SolflareWalletAdapter(),
-]
+// Dynamic import for Solana providers to ensure client-side only
+const SolanaProviders = dynamic(
+  () => import('../components/SolanaProviders').then(mod => mod.default),
+  { ssr: false }
+)
 
 // Load your TON manifest URL from env
 const tonManifestUrl = process.env.NEXT_PUBLIC_TON_MANIFEST_URL!
@@ -33,11 +28,9 @@ export default function App({ Component, pageProps }: AppProps) {
   return (
     <TonConnectUIProvider manifestUrl={tonManifestUrl}>
       <EthereumProvider>
-        <ConnectionProvider endpoint={solanaEndpoint}>
-          <WalletProvider wallets={solanaWallets} autoConnect>
-            <Component {...pageProps} />
-          </WalletProvider>
-        </ConnectionProvider>
+        <SolanaProviders>
+          <Component {...pageProps} />
+        </SolanaProviders>
       </EthereumProvider>
     </TonConnectUIProvider>
   )
