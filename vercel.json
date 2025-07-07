@@ -7,10 +7,6 @@
     {
       "path": "/api/cron/settle-markets?secret=${CRON_SECRET}",
       "schedule": "59 23 * * *"
-    },
-{
-      "path": "/api/cron/daily-monitor?secret=${CRON_SECRET}",
-      "schedule": "0 3 * * *"
     }
   ]
 }
