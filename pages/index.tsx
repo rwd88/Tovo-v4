@@ -30,9 +30,8 @@ export default function Home() {
   const USDT_ADDRESS = "0xdAC17F958D2ee523a2206206994597C13D831ec7"
   const USDC_ADDRESS = "0xA0b86991C6218B36c1d19D4a2e9Eb0cE3606EB48"
 
-  // Only fetch balances client-side
-  const usdtBalance = isClient ? useTokenBalance(USDT_ADDRESS) : null
-  const usdcBalance = isClient ? useTokenBalance(USDC_ADDRESS) : null
+  const usdtBalance = isClient && address ? useTokenBalance(USDT_ADDRESS) : null
+  const usdcBalance = isClient && address ? useTokenBalance(USDC_ADDRESS) : null
 
   if (!isClient) return null // prevent SSR crash
 
@@ -52,21 +51,22 @@ export default function Home() {
             <ConnectWalletButton />
           </div>
 
-          {/* Show balances */}
+          {/* Balances */}
           {address && (
             <div className="mb-6">
-              <p>USDT Balance: {usdtBalance}</p>
-              <p>USDC Balance: {usdcBalance}</p>
+              <p>USDT Balance: {usdtBalance ?? "Loading..."}</p>
+              <p>USDC Balance: {usdcBalance ?? "Loading..."}</p>
             </div>
           )}
 
-          {/* Trade form */}
+          {/* Trade Form */}
           {address && (
             <div className="mb-8">
               <TradeForm />
             </div>
           )}
 
+          {/* Branding */}
           <Image
             className={styles.logo}
             src="/next.svg"
@@ -81,6 +81,7 @@ export default function Home() {
             <li>Save and see your changes instantly.</li>
           </ol>
 
+          {/* CTAs */}
           <div className={styles.ctas}>
             <a className={styles.primary} href="https://vercel.com/new" target="_blank" rel="noopener noreferrer">
               <Image src="/vercel.svg" alt="Vercel" width={20} height={20} />
@@ -92,6 +93,7 @@ export default function Home() {
           </div>
         </main>
 
+        {/* Footer */}
         <footer className={styles.footer}>
           <a href="https://nextjs.org/learn" target="_blank" rel="noopener noreferrer">
             <Image src="/file.svg" alt="File" width={16} height={16} />
