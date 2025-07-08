@@ -4,6 +4,8 @@
 import '../styles/globals.css';
 import type { AppProps } from 'next/app';
 import { TonConnectUIProvider } from '@tonconnect/ui-react';
+import { TonProvider } from "../contexts/TonContext"
+
 
 // Add other providers below if needed
 import { EthereumProvider } from '../contexts/EthereumContext';
@@ -32,6 +34,9 @@ export default function App({ Component, pageProps }: AppProps) {
             <Component {...pageProps} />
           </WalletProvider>
         </ConnectionProvider>
+         <TonProvider>
+      <Component {...pageProps} />
+    </TonProvider>
       </EthereumProvider>
     </TonConnectUIProvider>
   );
