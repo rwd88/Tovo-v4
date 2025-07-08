@@ -5,6 +5,8 @@ import '../styles/globals.css';
 import type { AppProps } from 'next/app';
 import { TonConnectUIProvider } from '@tonconnect/ui-react';
 import { TonProvider } from "../contexts/TonContext"
+import { SolanaProvider } from "../contexts/SolanaContext" // ✅ Add this
+
 
 
 // Add other providers below if needed
@@ -37,6 +39,9 @@ export default function App({ Component, pageProps }: AppProps) {
          <TonProvider>
       <Component {...pageProps} />
     </TonProvider>
+    <SolanaProvider> {/* ✅ Wrap the app with Solana provider */}
+          <Component {...pageProps} />
+        </SolanaProvider>
       </EthereumProvider>
     </TonConnectUIProvider>
   );
