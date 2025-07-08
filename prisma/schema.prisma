@@ -29,6 +29,7 @@ model User {
    question     String
    description  String?
    eventTime    DateTime  @default(now())
+     published  Boolean  @default(false) // ✅ Add this line
    forecast     Float?
    outcome      String?
    poolYes      Float     @default(0)
