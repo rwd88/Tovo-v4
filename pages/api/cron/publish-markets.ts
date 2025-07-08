@@ -26,8 +26,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     return res.status(200).json({ success: true, results })
-  } catch (err) {
-    console.error("publish-markets error:", err)
-    return res.status(500).json({ success: false, error: err.message })
-  }
+  } catch (err: any) {
+  console.error("publish-markets error:", err)
+  return res.status(500).json({ success: false, error: err.message })
+}
 }
