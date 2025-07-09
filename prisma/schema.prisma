@@ -46,7 +46,8 @@ model Outcome {
   id       String  @id @default(cuid())
   marketId String
   market   Market  @relation(fields: [marketId], references: [id])
-  trades   Trade[] @relation("OutcomeTrades")
+  trades   Trade[] @relation("OutcomeTrades") // ← name the relation
+  name     String
 }
 
 model Trade {
@@ -55,16 +56,15 @@ model Trade {
   marketId  String
   user      User     @relation(fields: [userId], references: [id])
   userId    String
-  type      String // 'yes' or 'no'
+  outcome   Outcome? @relation("OutcomeTrades", fields: [outcomeId], references: [id]) // ← match the name
+  outcomeId String? // ← optional in case outcome is null before settlement
+  type      String
   amount    Float
   fee       Float
   payout    Float
   shares    Float
   settled   Boolean  @default(false)
   createdAt DateTime @default(now())
-
-  outcome   Outcome? @relation("OutcomeTrades", fields: [outcomeId], references: [id])
-  outcomeId String?
 
   @@index([marketId])
   @@index([userId])
