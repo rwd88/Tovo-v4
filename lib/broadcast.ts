@@ -31,7 +31,7 @@ export async function broadcastMarket(
           {
             parse_mode: options?.parse_mode || "Markdown",
             disable_notification: options?.disable_notification,
-            disable_web_page_preview: true
+            disable_web_page_preview: true as any
           }
         );
         results.success++;
