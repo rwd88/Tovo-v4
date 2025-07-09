@@ -56,14 +56,15 @@ model Trade {
   marketId  String
   user      User     @relation(fields: [userId], references: [id])
   userId    String
-  outcome   Outcome? @relation("OutcomeTrades", fields: [outcomeId], references: [id]) // ← match the name
-  outcomeId String? // ← optional in case outcome is null before settlement
+  outcome   Outcome? @relation("OutcomeTrades", fields: [outcomeId], references: [id])
+  outcomeId String?
   type      String
   amount    Float
   fee       Float
   payout    Float
   shares    Float
   settled   Boolean  @default(false)
+  won       Boolean? // ✅ ADD THIS LINE
   createdAt DateTime @default(now())
 
   @@index([marketId])
