@@ -1,5 +1,3 @@
-// prisma/schema.prisma
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,52 +8,62 @@ datasource db {
 }
 
 model User {
-  id            String    @id
-  telegramId    String    @unique
-  username      String?
-  balance       Float     @default(0)
-  createdAt     DateTime  @default(now())
-  solanaWallet  String?
-  bscWallet     String?
-  trades        Trade[]
+  id           String   @id
+  telegramId   String   @unique
+  username     String?
+  balance      Float    @default(0)
+  createdAt    DateTime @default(now())
+  solanaWallet String?
+  bscWallet    String?
+  trades       Trade[]
 
   @@map("users")
 }
 
-// prisma/schema.prisma
- model Market {
-   id           String    @id @default(cuid())
-   externalId   String?   @unique(map: "Market_externalId_key")
-   question     String
-   description  String?
-   eventTime    DateTime  @default(now())
-     published  Boolean  @default(false) // ✅ Add this line
-   forecast     Float?
-   outcome      String?
-   poolYes      Float     @default(0)
-   poolNo       Float     @default(0)
-   status       String    @default("open")
-   feeCollected Float     @default(0)
-   trades       Trade[]
-   createdAt    DateTime  @default(now())
-  notified     Boolean   @default(false)   // ← new field
-   @@map("markets")
- }
+model Market {
+  id           String    @id @default(cuid())
+  externalId   String?   @unique(map: "Market_externalId_key")
+  question     String
+  description  String?
+  eventTime    DateTime  @default(now())
+  published    Boolean   @default(false)
+  forecast     Float?
+  outcome      String?
+  poolYes      Float     @default(0)
+  poolNo       Float     @default(0)
+  status       String    @default("open")
+  feeCollected Float     @default(0)
+  trades       Trade[]
+  outcomes     Outcome[] // ✅ fixed position
+  createdAt    DateTime  @default(now())
+  notified     Boolean   @default(false)
 
+  @@map("markets")
+}
+
+model Outcome {
+  id       String  @id @default(cuid())
+  marketId String
+  market   Market  @relation(fields: [marketId], references: [id])
+  trades   Trade[] @relation("OutcomeTrades")
+}
 
 model Trade {
   id        String   @id @default(cuid())
   market    Market   @relation(fields: [marketId], references: [id])
   marketId  String
-  user      User     @relation(fields: [userId],   references: [id])
+  user      User     @relation(fields: [userId], references: [id])
   userId    String
-  type      String   // 'yes' or 'no'
+  type      String // 'yes' or 'no'
   amount    Float
   fee       Float
   payout    Float
   shares    Float
   settled   Boolean  @default(false)
   createdAt DateTime @default(now())
+
+  outcome   Outcome? @relation("OutcomeTrades", fields: [outcomeId], references: [id])
+  outcomeId String?
 
   @@index([marketId])
   @@index([userId])
@@ -75,50 +83,49 @@ model Deposit {
 }
 
 model Withdrawal {
-  id         String    @id @default(cuid())
-  userId     String
-  chain      String
-  amount     Float
-  nonce      String    @unique
-  expiresAt  DateTime
-  status     String    // pending | signed | completed | cancelled
-  txHash     String?   // ← optional field for the broadcast hash
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  id        String   @id @default(cuid())
+  userId    String
+  chain     String
+  amount    Float
+  nonce     String   @unique
+  expiresAt DateTime
+  status    String
+  txHash    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId])
   @@map("withdrawals")
 }
 
-///––– On-chain deposit monitoring models –––
-
 model DepositAddress {
-  id             Int              @id @default(autoincrement())
-  chainId        Int
-  address        String           @unique
-  lastBalance    String
+  id              Int              @id @default(autoincrement())
+  chainId         Int
+  address         String           @unique
+  lastBalance     String
   onChainDeposits OnChainDeposit[] @relation("AddressDeposits")
 
   @@map("deposit_addresses")
 }
 
-/// Records each detected on-chain deposit
 model OnChainDeposit {
-  id              Int             @id @default(autoincrement())
-  chainId         Int
-  address         String
-  amount          String
-  txHash          String          @unique
-  blockNumber     Int
-    status    String        // ← add this line
-  createdAt       DateTime        @default(now())
-
-  depositAddress  DepositAddress? @relation("AddressDeposits", fields: [address], references: [address])
+  id             Int             @id @default(autoincrement())
+  chainId        Int
+  address        String
+  amount         String
+  txHash         String          @unique
+  blockNumber    Int
+  status         String
+  createdAt      DateTime        @default(now())
+  depositAddress DepositAddress? @relation("AddressDeposits", fields: [address], references: [address])
 
   @@map("onchain_deposits")
 }
+
 model Subscriber {
   id        String   @id @default(cuid())
   chatId    String   @unique
   createdAt DateTime @default(now())
+
+  @@map("subscribers") // ✅ optional for DB clarity
 }
