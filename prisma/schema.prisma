@@ -33,10 +33,11 @@ model Market {
   poolNo       Float     @default(0)
   status       String    @default("open")
   feeCollected Float     @default(0)
+  settledAt    DateTime? // ← add this line
   trades       Trade[]
-  outcomes     Outcome[] // ✅ fixed position
   createdAt    DateTime  @default(now())
   notified     Boolean   @default(false)
+  outcomes     Outcome[]
 
   @@map("markets")
 }
