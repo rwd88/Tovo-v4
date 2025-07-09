@@ -126,8 +126,8 @@ model OnChainDeposit {
 }
 
 model Subscriber {
-  id        String @id @default(cuid())
-  chatId    String @unique
-  subscribed Boolean @default(true)
+  id        String   @id
+  chatId    String   @unique
+  subscribed Boolean
   createdAt DateTime @default(now())
 }
