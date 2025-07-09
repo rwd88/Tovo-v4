@@ -13,16 +13,15 @@ export default async function handler(
   }
 
   try {
-    await prisma.market.update({
-  where: { id: m.id },
-  data: {
-    status: "settled",
-    outcome: winningOutcome.name, // 🟢 Keep this
-    // 🔴 Remove `settledAt: new Date(),`
-  },
-});
-
-
+for (const market of markets) {
+  await prisma.market.update({
+    where: { id: market.id },
+    data: {
+      status: "settled",
+      outcome: winningOutcome.name,
+    },
+  });
+}
     const results = [];
 
     for (const market of expiredMarkets) {
