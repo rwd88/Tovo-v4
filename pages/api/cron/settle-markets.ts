@@ -11,6 +11,10 @@ export default async function handler(
     res.setHeader("Allow", ["GET"]);
     return res.status(405).end("Method Not Allowed");
   }
+  if (req.headers.authorization !== `Bearer ${process.env.ADMIN_SECRET}`) {
+  return res.status(403).json({ error: "Unauthorized" });
+}
+
 
   try {
     // 1. Get all expired markets (status = open, eventTime < now)

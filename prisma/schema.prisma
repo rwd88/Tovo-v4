@@ -32,7 +32,7 @@ model Market {
   poolYes      Float     @default(0)
   poolNo       Float     @default(0)
   status       String    @default("open")
-  feeCollected Float     @default(0)
+  feeCollected Float     @default(0)  
   settledAt    DateTime? // ← add this line
   trades       Trade[]
   createdAt    DateTime  @default(now())
