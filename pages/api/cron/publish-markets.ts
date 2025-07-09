@@ -1,9 +1,7 @@
 // pages/api/cron/publish-markets.ts
 import type { NextApiRequest, NextApiResponse } from "next"
 import { prisma } from "../../../lib/prisma"
-import TelegramBot from "node-telegram-bot-api"
-
-const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN!, { polling: false })
+import { bot } from "../../../src/bot/bot" // Using Telegraf
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -12,34 +10,68 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const openMarkets = await prisma.market.findMany({
-      where: { status: "open", published: false },
-      orderBy: { createdAt: "desc" },
+      where: { 
+        status: "open", 
+        published: false,
+        question: { not: null } 
+      },
+      orderBy: { eventTime: "asc" }, // Sort by soonest first
     })
 
     const subscribers = await prisma.subscriber.findMany({
       where: { subscribed: true }
     })
 
+    console.log(`📢 Publishing ${openMarkets.length} markets to ${subscribers.length} subscribers`)
+
     const results = []
+    const failedSends = []
 
     for (const market of openMarkets) {
-      const message = `🧠 *New Prediction Market!*\n\n*${market.question}*\n\nChoose your prediction below 👇`
+      if (!market.question?.trim()) {
+        console.error('Skipping market with empty question:', market.id)
+        continue
+      }
+
+      const message = `📊 *New Prediction Market!*\n\n*${market.question}*` + 
+        (market.eventTime ? `\n⏰ ${new Date(market.eventTime).toLocaleString()}` : '') +
+        `\n\nMake your prediction:`
 
       const buttons = {
         reply_markup: {
           inline_keyboard: [[
-            { text: "✅ Buy YES", url: `https://tovo.link/trade/${market.id}?side=yes` },
-            { text: "❌ Buy NO", url: `https://tovo.link/trade/${market.id}?side=no` }
+            { 
+              text: "✅ YES", 
+              url: `${process.env.BOT_WEB_URL}/trade/${market.id}?side=yes` 
+            },
+            { 
+              text: "❌ NO", 
+              url: `${process.env.BOT_WEB_URL}/trade/${market.id}?side=no` 
+            }
           ]]
         },
-        parse_mode: "Markdown"
+        parse_mode: "Markdown" as const
       }
+
+      let sentCount = 0
+      let failedCount = 0
 
       for (const sub of subscribers) {
         try {
-          await bot.sendMessage(sub.chatId, message, buttons)
+          await sendWithRetry(sub.chatId, message, buttons)
+          sentCount++
         } catch (err) {
-          console.error("❌ Failed to send to", sub.chatId, err)
+          console.error(`Failed to send to ${sub.chatId}:`, err.message)
+          failedCount++
+          failedSends.push({ chatId: sub.chatId, error: err.message })
+          
+          // Unsubscribe if user blocked bot
+          if (err.description?.includes('blocked') || err.code === 403) {
+            await prisma.subscriber.update({
+              where: { chatId: sub.chatId },
+              data: { subscribed: false }
+            })
+          }
         }
       }
 
@@ -48,12 +80,36 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         data: { published: true }
       })
 
-      results.push({ id: market.id, sent: true })
+      results.push({
+        id: market.id,
+        question: market.question,
+        sentCount,
+        failedCount
+      })
     }
 
-    return res.status(200).json({ success: true, results })
+    return res.status(200).json({ 
+      success: true, 
+      results,
+      failedSends: failedSends.length > 0 ? failedSends : undefined
+    })
   } catch (err: any) {
     console.error("❌ publish-markets error:", err)
-    return res.status(500).json({ success: false, error: err.message })
+    return res.status(500).json({ 
+      success: false, 
+      error: err.message 
+    })
+  }
+}
+
+async function sendWithRetry(chatId: string, message: string, buttons: any, retries = 2) {
+  try {
+    await bot.telegram.sendMessage(chatId, message, buttons)
+  } catch (err) {
+    if (retries > 0) {
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      return sendWithRetry(chatId, message, buttons, retries - 1)
+    }
+    throw err
   }
 }
