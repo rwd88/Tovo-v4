@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Telegraf, Markup } from 'telegraf';
 import type { Message } from 'telegraf/typings/core/types/typegram';
 import { PrismaClient } from '@prisma/client';
@@ -15,13 +14,11 @@ function calculateShares(poolSize: number, amount: number): number {
   return poolSize === 0 ? amount : (amount * poolSize) / (amount + poolSize);
 }
 
-// Simple Solana address check (Base58, 32–44 chars)
 function isValidSolanaAddress(addr: string): boolean {
   return /^[A-HJ-NP-Za-km-z1-9]{32,44}$/.test(addr);
 }
 
 // --- Telegram Commands ---
-// /start
 bot.start((ctx) => {
   ctx.reply(
     `👋 Welcome to *Tovo*, the prediction market bot!\n\n` +
@@ -30,7 +27,6 @@ bot.start((ctx) => {
   );
 });
 
-// /listpools
 bot.command('listpools', async (ctx) => {
   const markets = await prisma.market.findMany({
     where: { status: 'open' },
@@ -54,7 +50,6 @@ bot.command('listpools', async (ctx) => {
   }
 });
 
-// /balance
 bot.command('balance', async (ctx) => {
   const user = await prisma.user.findUnique({
     where: { telegramId: ctx.from.id.toString() },
@@ -62,13 +57,46 @@ bot.command('balance', async (ctx) => {
   ctx.reply(`💰 Your balance: $${user?.balance.toFixed(2) || '0.00'}`);
 });
 
+bot.command('subscribe', async (ctx) => {
+  try {
+    await prisma.subscriber.upsert({
+      where: { chatId: ctx.chat.id.toString() },
+      create: {
+        chatId: ctx.chat.id.toString(),
+        subscribed: true
+      },
+      update: {
+        subscribed: true
+      }
+    });
+    ctx.reply('✅ Successfully subscribed to market updates!');
+  } catch (err) {
+    console.error('Subscription error:', err);
+    ctx.reply('❌ Failed to subscribe. Please try again later.');
+  }
+});
+
+bot.command('unsubscribe', async (ctx) => {
+  try {
+    await prisma.subscriber.update({
+      where: { chatId: ctx.chat.id.toString() },
+      data: { subscribed: false }
+    });
+    ctx.reply('🔕 You have unsubscribed from market updates.');
+  } catch (err) {
+    console.error('Unsubscription error:', err);
+    ctx.reply('❌ Failed to unsubscribe. Please try again later.');
+  }
+});
+
+
 // /link_solana
 bot.command('link_solana', async (ctx) => {
   const parts = (ctx.message as any).text.split(' ').slice(1);
   const address = parts[0]?.trim();
   if (!address) return ctx.reply('Usage: /link_solana <Solana address>');
   if (!isValidSolanaAddress(address)) {
-    return ctx.reply('❌ That doesn't look like a valid Solana address.');
+    return ctx.reply('❌ That doesn’t look like a valid Solana address.');
   }
   try {
     await prisma.user.upsert({
@@ -81,10 +109,10 @@ bot.command('link_solana', async (ctx) => {
         solanaWallet: address,
       },
     });
-    return ctx.reply(`✅ Linked your Solana wallet: \`${address}\``, { parse_mode: 'Markdown' });
+    return ctx.reply(`✅ Linked your Solana wallet: \`${address}\``);
   } catch (err) {
     console.error('Link Solana error:', err);
-    return ctx.reply('❌ Couldn't link your Solana wallet. Please try again later.');
+    return ctx.reply('❌ Couldn’t link your Solana wallet. Please try again later.');
   }
 });
 
@@ -94,7 +122,7 @@ bot.command('link_bsc', async (ctx) => {
   const address = parts[0]?.trim();
   if (!address) return ctx.reply('Usage: /link_bsc <BSC (BEP-20) address>');
   if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
-    return ctx.reply('❌ That doesn't look like a valid BSC/ETH address.');
+    return ctx.reply('❌ That doesn’t look like a valid BSC/ETH address.');
   }
   try {
     await prisma.user.upsert({
@@ -107,10 +135,10 @@ bot.command('link_bsc', async (ctx) => {
         bscWallet:  address,
       },
     });
-    return ctx.reply(`✅ Linked your BSC wallet: \`${address}\``, { parse_mode: 'Markdown' });
+    return ctx.reply(`✅ Linked your BSC wallet: \`${address}\``);
   } catch (err) {
     console.error('Link BSC error:', err);
-    return ctx.reply('❌ Couldn't link your BSC wallet. Please try again later.');
+    return ctx.reply('❌ Couldn’t link your BSC wallet. Please try again later.');
   }
 });
 
@@ -177,57 +205,13 @@ bot.action(/bet_(yes|no)_(.+)/, async (ctx) => {
   await ctx.editMessageText(
     `${original?.text ?? ''}\n\n` +
     `✅ @${ctx.from.username} bet $${betAmount} on ${side.toUpperCase()}!` +
-    ` (Shares: ${shares.toFixed(2)}, Fee: $${fee.toFixed(2)})`,
-    { parse_mode: 'Markdown' }
+    ` (Shares: ${shares.toFixed(2)}, Fee: $${fee.toFixed(2)})`
   );
 });
 
-// --- Subscription Management ---
-bot.command('subscribe', async (ctx) => {
-  try {
-    await prisma.subscriber.upsert({
-      where: { chatId: ctx.chat.id.toString() },
-      create: {
-        chatId: ctx.chat.id.toString(),
-        subscribed: true
-      },
-      update: {
-        subscribed: true
-      }
-    });
-    ctx.reply('✅ Successfully subscribed to market updates!');
-  } catch (err) {
-    console.error('Subscription error:', err);
-    ctx.reply('❌ Failed to subscribe. Please try again later.');
-  }
-});
-
-bot.command('unsubscribe', async (ctx) => {
-  try {
-    await prisma.subscriber.update({
-      where: { chatId: ctx.chat.id.toString() },
-      data: { subscribed: false }
-    });
-    ctx.reply('🔕 You have unsubscribed from market updates.');
-  } catch (err) {
-    console.error('Unsubscription error:', err);
-    ctx.reply('❌ Failed to unsubscribe. Please try again later.');
-  }
-});
-
 // --- Launch & Shutdown ---
-if (process.env.NODE_ENV === 'production') {
-  bot.launch({
-    webhook: {
-      domain: process.env.BOT_WEBHOOK_URL,
-      port: Number(process.env.PORT) || 3000
-    }
-  });
-} else {
-  bot.launch();
-}
-
-process.once('SIGINT', () => bot.stop('SIGINT'));
+bot.launch();
+process.once('SIGINT',  () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
 
 export default bot;
