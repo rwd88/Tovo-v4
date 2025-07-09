@@ -39,7 +39,7 @@ outcome: winningOutcome,
           },
         });
 
-        results.push({ id: market.id, settled: true, outcome: winningOutcome.name });
+results.push({ id: market.id, settled: true, outcome: winningOutcome });
       } catch (err: any) {
         results.push({ id: market.id, settled: false, error: err.message });
       }
