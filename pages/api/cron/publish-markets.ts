@@ -1,7 +1,7 @@
 // pages/api/cron/publish-markets.ts
 import type { NextApiRequest, NextApiResponse } from "next"
 import { prisma } from "../../../lib/prisma"
-import { bot } from "../../../src/bot/bot" // Using Telegraf
+import bot from '../../../src/bot/bot'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {

@@ -1,5 +1,5 @@
 import { prisma } from "./prisma"
-import { bot } from "../bot/telegram"
+import bot from '../src/bot/bot'
 
 export async function broadcastMarket(message: string, options?: {
   parse_mode?: "Markdown" | "HTML"
