@@ -36,6 +36,7 @@ model Market {
   settledAt    DateTime? // ← add this line
   trades       Trade[]
   createdAt    DateTime  @default(now())
+  expiresAt    DateTime? // ✅ Optional if needed
   notified     Boolean   @default(false)
   outcomes     Outcome[]
 
