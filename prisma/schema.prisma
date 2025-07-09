@@ -117,3 +117,8 @@ model OnChainDeposit {
 
   @@map("onchain_deposits")
 }
+model Subscriber {
+  id        String   @id @default(cuid())
+  chatId    String   @unique
+  createdAt DateTime @default(now())
+}
