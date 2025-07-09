@@ -35,7 +35,7 @@ export default async function handler(
           where: { id: market.id },
           data: {
             status: "settled",
-            outcome: winningOutcome.name,
+outcome: winningOutcome,
           },
         });
 
