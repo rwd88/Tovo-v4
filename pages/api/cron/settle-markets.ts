@@ -13,13 +13,15 @@ export default async function handler(
   }
 
   try {
-    const expiredMarkets = await prisma.market.findMany({
-      where: {
-        status: "open",
-        expiresAt: { lte: new Date() },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    await prisma.market.update({
+  where: { id: market.id },
+  data: {
+    status: "settled",
+    outcome: winningOutcome.name, // 🟢 Keep this
+    // 🔴 Remove `settledAt: new Date(),`
+  },
+});
+
 
     const results = [];
 
