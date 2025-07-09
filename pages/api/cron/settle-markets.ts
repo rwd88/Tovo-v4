@@ -1,7 +1,7 @@
 // pages/api/cron/settle-markets.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "../../../lib/prisma";
-import { settleMarket } from "../../../lib/settlement"; // assumed to exist
+import { settleMarket } from "../../../lib/settlement";
 
 export default async function handler(
   req: NextApiRequest,
@@ -13,21 +13,33 @@ export default async function handler(
   }
 
   try {
-for (const market of markets) {
-  await prisma.market.update({
-    where: { id: market.id },
-    data: {
-      status: "settled",
-      outcome: winningOutcome.name,
-    },
-  });
-}
+    // 1. Get all expired markets (status = open, eventTime < now)
+    const expiredMarkets = await prisma.market.findMany({
+      where: {
+        status: "open",
+        eventTime: {
+          lt: new Date(),
+        },
+      },
+    });
+
     const results = [];
 
     for (const market of expiredMarkets) {
       try {
-        const settlement = await settleMarket(market.id);
-        results.push({ id: market.id, settled: true, outcome: settlement });
+        // 2. Run settlement logic
+        const winningOutcome = await settleMarket(market.id);
+
+        // 3. Update market as settled
+        await prisma.market.update({
+          where: { id: market.id },
+          data: {
+            status: "settled",
+            outcome: winningOutcome.name,
+          },
+        });
+
+        results.push({ id: market.id, settled: true, outcome: winningOutcome.name });
       } catch (err: any) {
         results.push({ id: market.id, settled: false, error: err.message });
       }
