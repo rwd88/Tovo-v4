@@ -1,37 +1,76 @@
-import { useEffect, useState } from "react"
+import { GetStaticProps } from 'next';
+import { prisma } from '../../lib/prisma';
 
-export default function ActiveMarkets() {
-  const [markets, setMarkets] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+type Market = {
+  id: string;
+  externalId: string;
+  question: string;
+  eventTime: string;
+  poolYes: number;
+  poolNo: number;
+};
 
-  useEffect(() => {
-    async function fetchMarkets() {
-      try {
-        const res = await fetch("/api/markets")
-        const data = await res.json()
-        setMarkets(data)
-      } catch (err) {
-        console.error("Error loading markets:", err)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchMarkets()
-  }, [])
+type Props = {
+  markets: Market[];
+};
 
-  if (loading) return <div>Loading...</div>
-  if (!markets || markets.length === 0) return <div>No active markets</div>
+export const getStaticProps: GetStaticProps<Props> = async () => {
+  try {
+    const now = new Date();
 
+    const markets = await prisma.market.findMany({
+      where: {
+        status: 'open',
+        eventTime: { gt: now },
+      },
+      orderBy: { eventTime: 'asc' },
+      select: {
+        id: true,
+        externalId: true,
+        question: true,
+        eventTime: true,
+        poolYes: true,
+        poolNo: true,
+      },
+    });
+
+    return {
+      props: {
+        markets: markets ?? [],
+      },
+      revalidate: 60,
+    };
+  } catch (error) {
+    console.error('[getStaticProps] error:', error);
+    return {
+      props: {
+        markets: [],
+      },
+    };
+  }
+};
+
+const ActiveMarketPage = ({ markets }: Props) => {
   return (
-    <div>
+    <div style={{ padding: '2rem' }}>
       <h1>Active Markets</h1>
-      <ul>
-        {markets.map((market) => (
-          <li key={market.id}>
-            {market.question} – {market.status || 'Unknown status'}
-          </li>
-        ))}
-      </ul>
+      {markets.length === 0 ? (
+        <p>No active markets found.</p>
+      ) : (
+        <ul>
+          {markets.map((market) => (
+            <li key={market.id}>
+              <strong>{market.question}</strong>
+              <br />
+              Event Time: {new Date(market.eventTime).toLocaleString()}
+              <br />
+              Pool Yes: {market.poolYes} | Pool No: {market.poolNo}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
-  )
-}
+  );
+};
+
+export default ActiveMarketPage;
