@@ -2,7 +2,7 @@
 import { Market } from "@prisma/client"
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!
-const CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID! // should be "@tovotrade"
+const CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID!;
 
 export async function sendMarketToTelegram(market: Market) {
   const question = `📊 *New Prediction Market!*\n\n${market.question}\n🕓 ${market.eventTime.toUTCString()}\n\nMake your prediction:`
