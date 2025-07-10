@@ -1,6 +1,8 @@
   // pages/api/create-market.ts
   import type { NextApiRequest, NextApiResponse } from "next"
   import { prisma } from "../../lib/prisma"
+  import { sendMarketToTelegram } from "@/lib/telegram/sendMarket";
+
 
   interface CreateMarketRequest {
     externalId: string
