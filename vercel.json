@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/cron/settle-markets?secret=${CRON_SECRET}",
-      "schedule": "*/5 * * * *"  // every 5 minutes for real-time results
+      "schedule": "*/10 * * * *"
     },
     {
       "path": "/api/cron/publish-markets?secret=${CRON_SECRET}",
