@@ -21,26 +21,29 @@ model User {
 }
 
 model Market {
-  id           String     @id @default(uuid())
-  question     String
-  eventTime    DateTime
-  poolYes      Float
-  poolNo       Float
-  status       String     @default("open")
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-  feeCollected Float      @default(0)
-  settledAt    DateTime?
-  expiresAt    DateTime?
-  notified     Boolean    @default(false)
-  outcomes Outcome[] // ✅ correct plural relation
-  houseProfit  Float?
-  tag          String?
-  resolved     Boolean    @default(false)
-  trades       Trade[]
-resolvedOutcome String?
+  id             String     @id @default(uuid())
+  question       String
+  eventTime      DateTime
+  poolYes        Float
+  poolNo         Float
+  status         String     @default("open")
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  feeCollected   Float      @default(0)  
+  settledAt      DateTime?  // ← used when settled
+  expiresAt      DateTime?  // optional expiration
+  notified       Boolean    @default(false)
+  outcomes       Outcome[]
+  houseProfit    Float?
+  tag            String?    // optional tagging
+  resolved       Boolean    @default(false)
+  resolvedOutcome String?   // ✅ NEW field to store name of winning outcome
+
+  trades         Trade[]
+
   @@map("markets")
 }
+
 
 model Outcome {
   id       String  @id @default(cuid())

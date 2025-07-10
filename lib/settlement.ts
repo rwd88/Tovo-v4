@@ -38,7 +38,7 @@ export async function settleMarket(marketId: string) {
     data: {
       status: 'settled',
       settledAt: new Date(),
-      outcome: winningOutcome.name,
+    resolvedOutcome: winningOutcome.name // ✅ correct key
     },
   })
 
