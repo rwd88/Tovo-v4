@@ -28,6 +28,7 @@ export default async function handler(
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(403).json({ success: false, error: 'Unauthorized' });
   }
+
   if (req.method !== 'GET') {
     return res.status(405).json({ success: false, error: 'Only GET allowed' });
   }
@@ -59,7 +60,7 @@ export default async function handler(
       }
 
       const dateStr = ev.date?.trim();
-      const rawTimeStr = ev.time?.trim().toLowerCase();  // rename and const
+      const rawTimeStr = ev.time?.trim().toLowerCase();
       if (!dateStr || !rawTimeStr) {
         skipped++;
         continue;
@@ -71,6 +72,7 @@ export default async function handler(
         skipped++;
         continue;
       }
+
       let hour = parseInt(m[1], 10);
       const minute = m[2];
       const ampm = m[3];
