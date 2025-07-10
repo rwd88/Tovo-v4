@@ -46,7 +46,7 @@ model Outcome {
   id       String  @id @default(cuid())
   marketId String
   market   Market  @relation(fields: [marketId], references: [id])
-  trades   Trade[] @relation("OutcomeTrades")
+  trades   Trade[] @relation("OutcomeTrades") // ← name the relation
   name     String
 }
 
@@ -64,7 +64,7 @@ model Trade {
   payout    Float
   shares    Float
   settled   Boolean  @default(false)
-  won       Boolean?
+  won       Boolean? // ✅ ADD THIS LINE
   createdAt DateTime @default(now())
 
   @@index([marketId])
@@ -125,8 +125,8 @@ model OnChainDeposit {
 }
 
 model Subscriber {
-  id         String   @id @default(cuid())
-  chatId     String   @unique
+id String @id @default(cuid())
+  chatId    String   @unique
   subscribed Boolean
-  createdAt  DateTime @default(now())
+  createdAt DateTime @default(now())
 }
