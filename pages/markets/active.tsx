@@ -4,7 +4,7 @@ type Market = {
   id: string;
   externalId: string | null;
   question: string;
-  eventTime: string;
+  eventTime: string; // Note: now string (not Date)
   poolYes: number;
   poolNo: number;
 };
@@ -45,7 +45,7 @@ export const getStaticProps: GetStaticProps<Props> = async () => {
       props: {
         markets,
       },
-      revalidate: 10, // ISR - revalidate every 10 seconds
+      revalidate: 10,
     };
   } catch (error) {
     console.error('[getStaticProps] error:', error);
