@@ -88,7 +88,9 @@ export default async function handler(
         continue;
       }
 
-      const externalId = ev.url?.trim() || `ff-${ev.title}-${dateStr}-${timeFormatted}`;
+      const externalId =
+        ev.url?.trim() || `ff-${ev.title}-${dateStr}-${timeFormatted}`;
+
       try {
         await prisma.market.upsert({
           where: { externalId },
@@ -97,11 +99,10 @@ export default async function handler(
             question: ev.title?.trim() || 'Unnamed Event',
             status: 'open',
             eventTime,
-            forecast: ev.forecast ? parseFloat(ev.forecast) : null,
             poolYes: 0,
             poolNo: 0,
           },
-          update: {},
+          update: {}, // no-op update
         });
         added++;
       } catch (dbErr) {
