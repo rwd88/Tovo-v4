@@ -1,30 +1,22 @@
 // /pages/api/markets/active.ts
-import { NextApiRequest, NextApiResponse } from 'next';
-import { prisma } from '@/lib/prisma';
+import { prisma } from "@/lib/prisma";
+import type { NextApiRequest, NextApiResponse } from "next";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const markets = await prisma.market.findMany({
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        externalId: true,
-        question: true,
-        eventTime: true,
-        poolYes: true,
-        poolNo: true,
-      },
+      where: { resolved: false },
     });
 
-    // Fix serialization (convert Date to string)
+    // Convert `eventTime: Date` to string to avoid serialization errors
     const safeMarkets = markets.map((m) => ({
       ...m,
       eventTime: m.eventTime.toISOString(),
     }));
 
-    return res.status(200).json(safeMarkets);
+    res.status(200).json(safeMarkets);
   } catch (error) {
-    console.error('/api/markets/active error:', error);
-    return res.status(500).json({ message: 'Internal server error' });
+    console.error("[/api/markets/active] error:", error);
+    res.status(500).json({ error: "Internal server error", markets: [] }); // <-- fallback
   }
 }

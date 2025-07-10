@@ -1,11 +1,11 @@
 // /pages/markets/active.tsx
-import { GetStaticProps } from 'next';
+import { GetStaticProps } from "next";
 
 type Market = {
   id: string;
   externalId: string | null;
   question: string;
-  eventTime: string; // serialized as ISO string
+  eventTime: string;
   poolYes: number;
   poolNo: number;
 };
@@ -15,18 +15,20 @@ type Props = {
 };
 
 export const getStaticProps: GetStaticProps<Props> = async () => {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/markets/active`);
-  const data = await res.json();
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/markets/active`);
+    const data = await res.json();
 
-  if (!Array.isArray(data)) {
-    console.error("Markets API returned non-array:", data);
-    return { props: { markets: [] } };
+    if (!Array.isArray(data)) {
+      console.error("API did not return array:", data);
+      return { props: { markets: [] }, revalidate: 60 };
+    }
+
+    return { props: { markets: data }, revalidate: 60 };
+  } catch (e) {
+    console.error("Fetch failed", e);
+    return { props: { markets: [] }, revalidate: 60 };
   }
-
-  return {
-    props: { markets: data },
-    revalidate: 60,
-  };
 };
 
 export default function ActiveMarketsPage({ markets }: Props) {
