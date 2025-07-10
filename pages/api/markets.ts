@@ -28,6 +28,8 @@ export default async function handler(
         eventTime: true,
         poolYes: true,
         poolNo: true,
+        status: true,  // ✅ Required by frontend
+        tag: true,     // ✅ Optional: only keep if it exists in your Prisma schema
       },
     });
 
