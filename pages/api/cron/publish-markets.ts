@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next"
 import { prisma } from "../../../lib/prisma"
+import { sendMarketToTelegram } from "@/lib/telegram/sendMarket"
 import bot from "../../../src/bot/bot"
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -12,7 +13,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       where: {
         status: "open",
         published: false,
-        question: { not: undefined } // ✅ FIXED: allow Prisma filter
+        question: { not: undefined }
       },
       orderBy: { eventTime: "asc" }
     })
@@ -21,7 +22,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       where: { subscribed: true }
     })
 
-    console.log(`📢 Publishing ${openMarkets.length} markets to ${subscribers.length} subscribers`)
+    console.log(`📢 Publishing ${openMarkets.length} markets to channel + ${subscribers.length} subscribers`)
 
     const results = []
     const failedSends = []
@@ -32,6 +33,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         continue
       }
 
+      // ✅ Send to Telegram channel
+      await sendMarketToTelegram(market)
+
+      // ✅ Build the same message for DMs
       const message = `📊 *New Prediction Market!*\n\n*${market.question}*` +
         (market.eventTime ? `\n⏰ ${new Date(market.eventTime).toLocaleString()}` : "") +
         `\n\nMake your prediction:`
@@ -60,11 +65,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           await sendWithRetry(sub.chatId, message, buttons)
           sentCount++
         } catch (err: any) {
-          console.error(`Failed to send to ${sub.chatId}:`, err.message)
+          console.error(`❌ Failed to send to ${sub.chatId}:`, err.message)
           failedCount++
           failedSends.push({ chatId: sub.chatId, error: err.message })
 
-          // Unsubscribe if user blocked bot
           if (err.description?.includes("blocked") || err.code === 403) {
             await prisma.subscriber.update({
               where: { chatId: sub.chatId },
