@@ -1,6 +1,6 @@
-// pages/api/markets.ts
+// pages/api/markets/active.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { prisma } from '../../lib/prisma';
+import { prisma } from '../../lib/prisma'; // updated relative path
 
 export default async function handler(
   req: NextApiRequest,
@@ -11,10 +11,8 @@ export default async function handler(
   }
 
   try {
-    // current UTC time
     const now = new Date();
 
-    // only open markets with eventTime in the future
     const markets = await prisma.market.findMany({
       where: {
         status: 'open',
@@ -33,7 +31,7 @@ export default async function handler(
 
     return res.status(200).json(markets);
   } catch (err) {
-    console.error('[/api/markets] error:', err);
+    console.error('[/api/markets/active] error:', err);
     return res.status(500).json({ error: 'Server error' });
   }
 }
