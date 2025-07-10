@@ -33,12 +33,12 @@ model Market {
   settledAt    DateTime?
   expiresAt    DateTime?
   notified     Boolean    @default(false)
-  outcomes     Outcome[]
+  outcomes Outcome[] // ✅ correct plural relation
   houseProfit  Float?
   tag          String?
   resolved     Boolean    @default(false)
   trades       Trade[]
-
+resolvedOutcome String?
   @@map("markets")
 }
 
