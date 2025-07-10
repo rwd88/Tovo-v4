@@ -39,6 +39,8 @@ model Market {
   expiresAt    DateTime? // ✅ Optional if needed
   notified     Boolean   @default(false)
   outcomes     Outcome[]
+  houseProfit Float?
+
 
   @@map("markets")
 }
