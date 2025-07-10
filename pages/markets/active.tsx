@@ -3,9 +3,9 @@ import { prisma } from '../../lib/prisma';
 
 type Market = {
   id: string;
-  externalId: string;
+  externalId: string | null;
   question: string;
-  eventTime: string;
+  eventTime: Date;
   poolYes: number;
   poolNo: number;
 };
@@ -36,7 +36,7 @@ export const getStaticProps: GetStaticProps<Props> = async () => {
 
     return {
       props: {
-        markets: markets ?? [],
+        markets,
       },
       revalidate: 60,
     };
