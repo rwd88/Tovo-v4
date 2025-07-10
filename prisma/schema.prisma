@@ -41,6 +41,7 @@ model Market {
   outcomes     Outcome[]
   houseProfit Float?
   tag         String? // <--- ADD THIS LINE
+  resolved    Boolean  @default(false) // 👈 add this
 
   @@map("markets")
 }
