@@ -24,11 +24,9 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ApiResponse>
 ) {
-  const auth = req.headers.authorization;
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(403).json({ success: false, error: 'Unauthorized' });
   }
-
   if (req.method !== 'GET') {
     return res.status(405).json({ success: false, error: 'Only GET allowed' });
   }
@@ -46,8 +44,6 @@ export default async function handler(
         ? parsed.weeklyevents.event
         : [parsed.weeklyevents.event]
       : [];
-
-    console.log(`📅 Fetched ${events.length} total events`);
 
     let added = 0;
     let skipped = 0;
@@ -68,7 +64,6 @@ export default async function handler(
 
       const m = rawTimeStr.match(/^(\d{1,2}):(\d{2})(am|pm)$/);
       if (!m) {
-        console.warn(`⚠ Bad time "${rawTimeStr}" for "${ev.title}"`);
         skipped++;
         continue;
       }
@@ -81,8 +76,7 @@ export default async function handler(
       const timeFormatted = `${hour.toString().padStart(2, '0')}:${minute}:00`;
 
       const [mm, dd, yyyy] = dateStr.split('-');
-      const isoDate = `${yyyy}-${mm}-${dd}T${timeFormatted}Z`;
-      const eventTime = new Date(isoDate);
+      const eventTime = new Date(`${yyyy}-${mm}-${dd}T${timeFormatted}Z`);
       if (isNaN(eventTime.getTime()) || eventTime < now) {
         skipped++;
         continue;
@@ -90,7 +84,6 @@ export default async function handler(
 
       const externalId =
         ev.url?.trim() || `ff-${ev.title}-${dateStr}-${timeFormatted}`;
-
       try {
         await prisma.market.upsert({
           where: { externalId },
@@ -99,23 +92,20 @@ export default async function handler(
             question: ev.title?.trim() || 'Unnamed Event',
             status: 'open',
             eventTime,
+            forecast: ev.forecast ? parseFloat(ev.forecast) : null,
             poolYes: 0,
             poolNo: 0,
           },
-          update: {}, // no-op update
+          update: {},
         });
         added++;
       } catch (dbErr) {
-        console.error(`❌ DB upsert failed for "${ev.title}":`, dbErr);
         skipped++;
       }
     }
 
     return res.status(200).json({ success: true, added, skipped });
-  } catch (err) {
-    console.error('❌ Import-markets error:', err);
-    return res
-      .status(500)
-      .json({ success: false, error: (err as Error).message });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
   }
 }
