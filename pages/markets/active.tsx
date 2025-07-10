@@ -5,7 +5,7 @@ type Market = {
   id: string;
   externalId: string | null;
   question: string;
-  eventTime: Date;
+  eventTime: string; // updated from Date
   poolYes: number;
   poolNo: number;
 };
@@ -36,8 +36,11 @@ export const getStaticProps: GetStaticProps<Props> = async () => {
 
     return {
       props: {
-        markets,
-      },
+  markets: markets.map((m) => ({
+    ...m,
+    eventTime: m.eventTime.toISOString(),
+  })),
+}
       revalidate: 60,
     };
   } catch (error) {
