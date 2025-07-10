@@ -1,10 +1,10 @@
-import { GetStaticProps } from 'next';
+import React from 'react';
 
 type Market = {
   id: string;
   externalId: string | null;
   question: string;
-  eventTime: string; // serialized as ISO string
+  eventTime: string;
   poolYes: number;
   poolNo: number;
 };
@@ -23,8 +23,7 @@ const ActiveMarketsPage = ({ markets }: Props) => {
         <ul>
           {markets.map((market) => (
             <li key={market.id}>
-              <strong>{market.question}</strong>
-              <br />
+              <strong>{market.question}</strong> <br />
               Event Time:{' '}
               {new Date(market.eventTime).toLocaleString()}
               <br />
@@ -37,29 +36,26 @@ const ActiveMarketsPage = ({ markets }: Props) => {
   );
 };
 
-export const getStaticProps: GetStaticProps<Props> = async () => {
+export const getStaticProps = async () => {
   try {
-    const now = new Date();
-
     const res = await fetch(
-      `${process.env.NEXT_PUBLIC_BASE_URL}/api/markets`
+      `${process.env.NEXT_PUBLIC_SITE_URL}/api/markets`
     );
-    const data = await res.json();
 
-    // Ensure all eventTime values are serialized
-    const markets: Market[] = data.map((market: any) => ({
-      ...market,
-      eventTime: new Date(market.eventTime).toISOString(),
-    }));
+    const markets = await res.json();
 
     return {
-      props: { markets },
-      revalidate: 60, // ISR every 60 seconds
+      props: {
+        markets,
+      },
+      revalidate: 30, // optional ISR
     };
   } catch (error) {
     console.error('[getStaticProps] error:', error);
     return {
-      props: { markets: [] },
+      props: {
+        markets: [],
+      },
     };
   }
 };
