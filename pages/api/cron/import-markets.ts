@@ -1,21 +1,22 @@
-// pages/api/cron/import-markets.ts
-import type { NextApiRequest, NextApiResponse } from 'next';
-import axios from 'axios';
-import { parseStringPromise } from 'xml2js';
-import { prisma } from '../../../lib/prisma';
+// pages/api/cron/import-results.ts
+import type { NextApiRequest, NextApiResponse } from "next";
+import axios from "axios";
+import { parseStringPromise } from "xml2js";
+import { prisma } from "../../../lib/prisma";
 
-interface CalendarEvent {
+interface CalendarResult {
   url?: string;
   title?: string;
   date?: string;
   time?: string;
   impact?: string;
   forecast?: string;
+  actual?: string;
 }
 
 interface ApiResponse {
   success: boolean;
-  added?: number;
+  settled?: number;
   skipped?: number;
   error?: string;
 }
@@ -24,88 +25,115 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ApiResponse>
 ) {
+  // 🔐 Auth
   if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
-    return res.status(403).json({ success: false, error: 'Unauthorized' });
+    return res.status(403).json({ success: false, error: "Unauthorized" });
   }
-  if (req.method !== 'GET') {
-    return res.status(405).json({ success: false, error: 'Only GET allowed' });
+  if (req.method !== "GET") {
+    return res
+      .status(405)
+      .json({ success: false, error: "Only GET allowed" });
   }
 
   try {
-    const CAL_URL = 'https://nfs.faireconomy.media/ff_calendar_thisweek.xml';
+    const CAL_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.xml";
     const { data: xml } = await axios.get<string>(CAL_URL);
     const parsed = await parseStringPromise(xml, {
       explicitArray: false,
       trim: true,
     });
 
-    const events: CalendarEvent[] = parsed?.weeklyevents?.event
+    const events: CalendarResult[] = parsed?.weeklyevents?.event
       ? Array.isArray(parsed.weeklyevents.event)
         ? parsed.weeklyevents.event
         : [parsed.weeklyevents.event]
       : [];
 
-    let added = 0;
+    let settled = 0;
     let skipped = 0;
     const now = new Date();
 
     for (const ev of events) {
-      if (ev.impact?.trim().toLowerCase() !== 'high') {
+      // only high-impact
+      if (ev.impact?.trim().toLowerCase() !== "high") {
         skipped++;
         continue;
       }
 
+      // parse date & time exactly like import-markets
       const dateStr = ev.date?.trim();
-      const rawTimeStr = ev.time?.trim().toLowerCase();
-      if (!dateStr || !rawTimeStr) {
+      const rawTime = ev.time?.trim().toLowerCase();
+      if (!dateStr || !rawTime) {
         skipped++;
         continue;
       }
-
-      const m = rawTimeStr.match(/^(\d{1,2}):(\d{2})(am|pm)$/);
+      const m = rawTime.match(/^(\d{1,2}):(\d{2})(am|pm)$/);
       if (!m) {
         skipped++;
         continue;
       }
-
       let hour = parseInt(m[1], 10);
       const minute = m[2];
       const ampm = m[3];
-      if (ampm === 'pm' && hour < 12) hour += 12;
-      if (ampm === 'am' && hour === 12) hour = 0;
-      const timeFormatted = `${hour.toString().padStart(2, '0')}:${minute}:00`;
-
-      const [mm, dd, yyyy] = dateStr.split('-');
+      if (ampm === "pm" && hour < 12) hour += 12;
+      if (ampm === "am" && hour === 12) hour = 0;
+      const timeFormatted = `${hour.toString().padStart(2, "0")}:${minute}:00`;
+      const [mm, dd, yyyy] = dateStr.split("-");
       const eventTime = new Date(`${yyyy}-${mm}-${dd}T${timeFormatted}Z`);
-      if (isNaN(eventTime.getTime()) || eventTime < now) {
+      if (isNaN(eventTime.getTime()) || eventTime > now) {
         skipped++;
         continue;
       }
 
+      // build the same externalId you used on import
       const externalId =
-        ev.url?.trim() || `ff-${ev.title}-${dateStr}-${timeFormatted}`;
+        ev.url?.trim() ||
+        `ff-${ev.title}-${dateStr}-${timeFormatted}`;
+
+      // parse numbers
+      const actualVal = ev.actual ? parseFloat(ev.actual) : NaN;
+      const forecastVal = ev.forecast ? parseFloat(ev.forecast) : NaN;
+      if (isNaN(actualVal)) {
+        skipped++;
+        continue;
+      }
+
+      // decide yes/no
+      const outcome =
+        !isNaN(forecastVal) && actualVal > forecastVal ? "yes" : "no";
+
+      // update only unresolved, past‐due markets
       try {
-        await prisma.market.upsert({
-          where: { externalId },
-          create: {
+        const { count } = await prisma.market.updateMany({
+          where: {
             externalId,
-            question: ev.title?.trim() || 'Unnamed Event',
-            status: 'open',
-            eventTime,
-            forecast: ev.forecast ? parseFloat(ev.forecast) : null,
-            poolYes: 0,
-            poolNo: 0,
+            resolved: false,
+            eventTime: { lte: now },
           },
-          update: {},
+          data: {
+            resolvedOutcome: outcome,
+            resolved: true,
+            settledAt: new Date(),
+          },
         });
-        added++;
-      } catch (dbErr) {
+
+        if (count > 0) {
+          settled++;
+        } else {
+          skipped++;
+        }
+      } catch {
         skipped++;
       }
     }
 
-    return res.status(200).json({ success: true, added, skipped });
+    return res
+      .status(200)
+      .json({ success: true, settled, skipped });
   } catch (err: any) {
-    return res.status(500).json({ success: false, error: err.message });
+    console.error("❌ import-results error:", err);
+    return res
+      .status(500)
+      .json({ success: false, error: err.message });
   }
 }
