@@ -1,6 +1,6 @@
-// pages/api/markets.ts
+// pages/api/markets/active.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { prisma } from '../../lib/prisma';
+import { prisma } from '../../../lib/prisma';
 
 export default async function handler(
   req: NextApiRequest,
@@ -11,10 +11,8 @@ export default async function handler(
   }
 
   try {
-    // current UTC time
     const now = new Date();
 
-    // only open markets with eventTime in the future
     const markets = await prisma.market.findMany({
       where: {
         status: 'open',
@@ -28,12 +26,27 @@ export default async function handler(
         eventTime: true,
         poolYes: true,
         poolNo: true,
+        tag: true,
       },
     });
 
-    return res.status(200).json(markets);
+    const formatted = markets.map((market) => {
+      const timeDiffMs = new Date(market.eventTime).getTime() - now.getTime();
+      const timeDiffSec = Math.floor(timeDiffMs / 1000);
+
+      const days = Math.floor(timeDiffSec / (3600 * 24));
+      const hours = Math.floor((timeDiffSec % (3600 * 24)) / 3600);
+      const endsIn = `⏳ Ends in ${days} day${days !== 1 ? 's' : ''} ${hours} hour${hours !== 1 ? 's' : ''}`;
+
+      return {
+        ...market,
+        endsIn,
+      };
+    });
+
+    return res.status(200).json({ success: true, markets: formatted });
   } catch (err) {
-    console.error('[/api/markets] error:', err);
+    console.error('[/api/markets/active] error:', err);
     return res.status(500).json({ error: 'Server error' });
   }
 }
