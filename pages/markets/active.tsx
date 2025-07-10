@@ -1,52 +1,54 @@
-// /pages/markets/active.tsx
-import { GetStaticProps } from "next";
+// pages/markets/active.tsx
+import React, { useEffect, useState } from 'react';
 
 type Market = {
   id: string;
-  externalId: string | null;
   question: string;
   eventTime: string;
   poolYes: number;
   poolNo: number;
+  // Add more fields if needed
 };
 
-type Props = {
-  markets: Market[];
-};
+export default function ActiveMarkets() {
+  const [markets, setMarkets] = useState<Market[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
-export const getStaticProps: GetStaticProps<Props> = async () => {
-  try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/markets/active`);
-    const data = await res.json();
+  useEffect(() => {
+    fetch('/api/markets/active')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.error) {
+          setError(data.error);
+        } else {
+          setMarkets(data.markets);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to fetch markets:', err);
+        setError('Failed to load markets');
+      });
+  }, []);
 
-    if (!Array.isArray(data)) {
-      console.error("API did not return array:", data);
-      return { props: { markets: [] }, revalidate: 60 };
-    }
-
-    return { props: { markets: data }, revalidate: 60 };
-  } catch (e) {
-    console.error("Fetch failed", e);
-    return { props: { markets: [] }, revalidate: 60 };
+  if (error) {
+    return <p className="text-red-500 text-center">{error}</p>;
   }
-};
 
-export default function ActiveMarketsPage({ markets }: Props) {
+  if (!markets.length) {
+    return <p className="text-center">No active markets available.</p>;
+  }
+
   return (
-    <div>
-      <h1>Active Markets</h1>
-      {markets.length === 0 ? (
-        <p>No active markets.</p>
-      ) : (
-        markets.map((m) => (
-          <div key={m.id}>
-            <h3>{m.question}</h3>
-            <p>Yes: {m.poolYes}</p>
-            <p>No: {m.poolNo}</p>
-            <p>Event Time: {new Date(m.eventTime).toLocaleString()}</p>
-          </div>
-        ))
-      )}
+    <div className="p-4">
+      <h1 className="text-xl font-semibold mb-4">Active Markets</h1>
+      <ul className="space-y-4">
+        {markets.map((market) => (
+          <li key={market.id} className="border p-4 rounded-md">
+            <p className="font-medium">{market.question}</p>
+            <p className="text-sm text-gray-500">Event Time: {new Date(market.eventTime).toLocaleString()}</p>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

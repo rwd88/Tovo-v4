@@ -21,27 +21,23 @@ model User {
 }
 
 model Market {
-  id           String    @id @default(cuid())
-  externalId   String?   @unique(map: "Market_externalId_key")
+  id           String     @id @default(uuid())
   question     String
-  description  String?
-  eventTime    DateTime  @default(now())
-  published    Boolean   @default(false)
-  forecast     Float?
-  outcome      String?
-  poolYes      Float     @default(0)
-  poolNo       Float     @default(0)
-  status       String    @default("open")
-  feeCollected Float     @default(0)  
-  settledAt    DateTime? // ← add this line
-  trades       Trade[]
-  createdAt    DateTime  @default(now())
-  expiresAt    DateTime? // ✅ Optional if needed
-  notified     Boolean   @default(false)
+  eventTime    DateTime
+  poolYes      Float
+  poolNo       Float
+  status       String     @default("open")
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  feeCollected Float      @default(0)
+  settledAt    DateTime?
+  expiresAt    DateTime?
+  notified     Boolean    @default(false)
   outcomes     Outcome[]
-  houseProfit Float?
-  tag         String? // <--- ADD THIS LINE
-  resolved    Boolean  @default(false) // 👈 add this
+  houseProfit  Float?
+  tag          String?
+  resolved     Boolean    @default(false)
+  trades       Trade[]
 
   @@map("markets")
 }
@@ -50,7 +46,7 @@ model Outcome {
   id       String  @id @default(cuid())
   marketId String
   market   Market  @relation(fields: [marketId], references: [id])
-  trades   Trade[] @relation("OutcomeTrades") // ← name the relation
+  trades   Trade[] @relation("OutcomeTrades")
   name     String
 }
 
@@ -68,7 +64,7 @@ model Trade {
   payout    Float
   shares    Float
   settled   Boolean  @default(false)
-  won       Boolean? // ✅ ADD THIS LINE
+  won       Boolean?
   createdAt DateTime @default(now())
 
   @@index([marketId])
@@ -129,8 +125,8 @@ model OnChainDeposit {
 }
 
 model Subscriber {
-id String @id @default(cuid())
-  chatId    String   @unique
+  id         String   @id @default(cuid())
+  chatId     String   @unique
   subscribed Boolean
-  createdAt DateTime @default(now())
+  createdAt  DateTime @default(now())
 }
