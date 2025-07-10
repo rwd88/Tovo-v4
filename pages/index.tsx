@@ -19,6 +19,34 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 })
 
+// ⏳ Time Remaining Helper
+function getTimeRemainingText(eventTime: string): string {
+  const now = new Date()
+  const end = new Date(eventTime)
+  const diff = end.getTime() - now.getTime()
+
+  if (diff <= 0) return "Expired"
+
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+  const hours = Math.floor((diff / (1000 * 60 * 60)) % 24)
+
+  if (days > 0 && hours > 0) return `Ends in ${days} day${days > 1 ? "s" : ""} ${hours} hour${hours > 1 ? "s" : ""}`
+  if (days > 0) return `Ends in ${days} day${days > 1 ? "s" : ""}`
+  return `Ends in ${hours} hour${hours > 1 ? "s" : ""}`
+}
+
+// Dummy Market Data (Replace with actual data from API)
+const dummyMarkets = [
+  {
+    question: "Will US CPI exceed 3.5% in July 2025?",
+    eventTime: "2025-07-12T23:00:00Z",
+  },
+  {
+    question: "Will unemployment fall below 4%?",
+    eventTime: "2025-07-15T12:00:00Z",
+  },
+]
+
 export default function Home() {
   const [isClient, setIsClient] = useState(false)
   const { address } = useEthereum()
@@ -46,12 +74,10 @@ export default function Home() {
 
       <div className={`${styles.page} ${geistSans.variable} ${geistMono.variable}`}>
         <main className={styles.main}>
-          {/* Wallet Connect */}
           <div className="mb-6">
             <ConnectWalletButton />
           </div>
 
-          {/* Balances */}
           {address && (
             <div className="mb-6">
               <p>USDT Balance: {usdtBalance ?? "Loading..."}</p>
@@ -59,12 +85,25 @@ export default function Home() {
             </div>
           )}
 
-          {/* Trade Form */}
           {address && (
             <div className="mb-8">
               <TradeForm />
             </div>
           )}
+
+          {/* 🔥 Markets Section */}
+          <div className="w-full">
+            <h2 className="text-xl font-bold mb-4">Prediction Markets Today</h2>
+            {dummyMarkets.map((market, i) => (
+              <div
+                key={i}
+                className="bg-[#00423b] text-white rounded-xl p-4 mb-4"
+              >
+                <p className="text-lg font-semibold">{market.question}</p>
+                <p className="text-sm mt-1">⏳ {getTimeRemainingText(market.eventTime)}</p>
+              </div>
+            ))}
+          </div>
 
           {/* Branding */}
           <Image
@@ -75,25 +114,8 @@ export default function Home() {
             height={38}
             priority
           />
-
-          <ol className="mt-4">
-            <li>Get started by editing <code>pages/index.tsx</code>.</li>
-            <li>Save and see your changes instantly.</li>
-          </ol>
-
-          {/* CTAs */}
-          <div className={styles.ctas}>
-            <a className={styles.primary} href="https://vercel.com/new" target="_blank" rel="noopener noreferrer">
-              <Image src="/vercel.svg" alt="Vercel" width={20} height={20} />
-              Deploy now
-            </a>
-            <a className={styles.secondary} href="https://nextjs.org/docs" target="_blank" rel="noopener noreferrer">
-              Read our docs
-            </a>
-          </div>
         </main>
 
-        {/* Footer */}
         <footer className={styles.footer}>
           <a href="https://nextjs.org/learn" target="_blank" rel="noopener noreferrer">
             <Image src="/file.svg" alt="File" width={16} height={16} />
