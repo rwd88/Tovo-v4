@@ -1,11 +1,10 @@
 import { GetStaticProps } from 'next';
-import { prisma } from '../../lib/prisma';
 
 type Market = {
   id: string;
   externalId: string | null;
   question: string;
-  eventTime: string; // updated from Date
+  eventTime: string; // serialized as ISO string
   poolYes: number;
   poolNo: number;
 };
@@ -14,46 +13,7 @@ type Props = {
   markets: Market[];
 };
 
-export const getStaticProps: GetStaticProps<Props> = async () => {
-  try {
-    const now = new Date();
-
-    const markets = await prisma.market.findMany({
-      where: {
-        status: 'open',
-        eventTime: { gt: now },
-      },
-      orderBy: { eventTime: 'asc' },
-      select: {
-        id: true,
-        externalId: true,
-        question: true,
-        eventTime: true,
-        poolYes: true,
-        poolNo: true,
-      },
-    });
-
-    return {
-      props: {
-  markets: markets.map((m) => ({
-    ...m,
-    eventTime: m.eventTime.toISOString(),
-  })),
-}
-      revalidate: 60,
-    };
-  } catch (error) {
-    console.error('[getStaticProps] error:', error);
-    return {
-      props: {
-        markets: [],
-      },
-    };
-  }
-};
-
-const ActiveMarketPage = ({ markets }: Props) => {
+const ActiveMarketsPage = ({ markets }: Props) => {
   return (
     <div style={{ padding: '2rem' }}>
       <h1>Active Markets</h1>
@@ -65,7 +25,8 @@ const ActiveMarketPage = ({ markets }: Props) => {
             <li key={market.id}>
               <strong>{market.question}</strong>
               <br />
-              Event Time: {new Date(market.eventTime).toLocaleString()}
+              Event Time:{' '}
+              {new Date(market.eventTime).toLocaleString()}
               <br />
               Pool Yes: {market.poolYes} | Pool No: {market.poolNo}
             </li>
@@ -76,4 +37,31 @@ const ActiveMarketPage = ({ markets }: Props) => {
   );
 };
 
-export default ActiveMarketPage;
+export const getStaticProps: GetStaticProps<Props> = async () => {
+  try {
+    const now = new Date();
+
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_BASE_URL}/api/markets`
+    );
+    const data = await res.json();
+
+    // Ensure all eventTime values are serialized
+    const markets: Market[] = data.map((market: any) => ({
+      ...market,
+      eventTime: new Date(market.eventTime).toISOString(),
+    }));
+
+    return {
+      props: { markets },
+      revalidate: 60, // ISR every 60 seconds
+    };
+  } catch (error) {
+    console.error('[getStaticProps] error:', error);
+    return {
+      props: { markets: [] },
+    };
+  }
+};
+
+export default ActiveMarketsPage;
