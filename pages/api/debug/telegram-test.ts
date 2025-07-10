@@ -1,6 +1,8 @@
 // pages/api/debug/telegram-test.ts
 
-export default async function handler(req, res) {
+import type { NextApiRequest, NextApiResponse } from 'next';
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
     const TELEGRAM_CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID!;
