@@ -38,6 +38,7 @@ model Market {
   tag            String?    // optional tagging
   resolved       Boolean    @default(false)
   resolvedOutcome String?   // ✅ NEW field to store name of winning outcome
+  externalId     String?    // ✅ Add this line if you want to use externalId
 
   trades         Trade[]
 
