@@ -11,7 +11,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         status: 'open',
         eventTime: new Date(Date.now() + 86400000), // tomorrow
         forecast: 0,
-        outcome: null,
+resolvedOutcome: { not: null },
         externalId: 'manual-test-001',
         poolYes: 0,
         poolNo: 0,
