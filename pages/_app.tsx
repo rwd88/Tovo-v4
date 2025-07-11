@@ -5,14 +5,14 @@ import '../styles/globals.css'
 import type { AppProps } from 'next/app'
 
 // ─── Wagmi v2 / Ethereum ───────────────────────────────────────────────────────
-// Pull core functions from the “config” entrypoint:
+// Core config functions and component come from @wagmi/core
 import {
   configureChains,
   createConfig,
   WagmiConfig,
-} from 'wagmi/config'
+} from '@wagmi/core'
 
-// Pull connectors, providers, and chains from their own entrypoints:
+// Connectors, providers and chains come from the wagmi package
 import { InjectedConnector } from 'wagmi/connectors/injected'
 import { publicProvider }    from 'wagmi/providers/public'
 import { mainnet }           from 'wagmi/chains'
@@ -37,22 +37,30 @@ import '@solana/wallet-adapter-react-ui/styles.css'
 import { EthereumProvider } from '../contexts/EthereumContext'
 
 // ────────────────────────────────────────────────────────────────────────────────
+// 1) Configure which chains and providers you want to use.
+//    configureChains returns both an HTTP “publicClient” and a WS client.
 const { publicClient, webSocketPublicClient } = configureChains(
   [mainnet],
   [publicProvider()]
 )
 
+// 2) Build your wagmi configuration object
 const wagmiConfig = createConfig({
   autoConnect: true,
-  connectors: [ new InjectedConnector({ chains: [mainnet] }) ],
+  connectors: [
+    new InjectedConnector({ chains: [mainnet] }),
+  ],
   publicClient,
   webSocketPublicClient,
 })
 // ────────────────────────────────────────────────────────────────────────────────
 
+// Environment‐based endpoints
 const tonManifestUrl = process.env.NEXT_PUBLIC_TON_MANIFEST_URL!
 const solanaEndpoint = process.env.NEXT_PUBLIC_SOLANA_RPC_URL!
-const solanaWallets  = [
+
+// The wallet adapters you want available
+const solanaWallets = [
   new PhantomWalletAdapter(),
   new SolflareWalletAdapter(),
 ]

@@ -21,6 +21,7 @@
     "@solana/web3.js": "^1.98.2",
     "@tonconnect/sdk": "^3.2.0",
     "@tonconnect/ui-react": "^2.2.0",
+    "@wagmi/core": "^2.17.3",
     "@walletconnect/web3-provider": "^1.8.0",
     "axios": "^1.10.0",
     "cheerio": "^1.0.0",
@@ -40,7 +41,7 @@
     "tronweb": "^6.0.3",
     "uuid": "^11.1.0",
     "viem": "^2.31.7",
-"wagmi": "2.15.6",
+    "wagmi": "2.15.6",
     "web3modal": "^1.9.12",
     "xml2js": "^0.6.2"
   },
