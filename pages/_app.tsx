@@ -4,22 +4,12 @@
 import '../styles/globals.css'
 import type { AppProps } from 'next/app'
 
-// ─── Wagmi v2 / Ethereum ───────────────────────────────────────────────────────
-// Core API from @wagmi/core
-import {
-  configureChains,
-  createConfig,
-  WagmiConfig,
-} from '@wagmi/core'
-
-// Connectors and providers from Wagmi’s flattened entry-points
-import { InjectedConnector } from 'wagmi/connectors'
-import { publicProvider }    from 'wagmi/providers'
-import { mainnet }           from 'wagmi/chains'
-
 // ─── TON ────────────────────────────────────────────────────────────────────────
 import { TonConnectUIProvider } from '@tonconnect/ui-react'
 import { TonProvider }          from '../contexts/TonContext'
+
+// ─── Your own Ethereum context using Viem ──────────────────────────────────────
+import { EthereumProvider } from '../contexts/EthereumContext'
 
 // ─── Solana ─────────────────────────────────────────────────────────────────────
 import { SolanaProvider } from '../contexts/SolanaContext'
@@ -33,48 +23,26 @@ import {
 } from '@solana/wallet-adapter-wallets'
 import '@solana/wallet-adapter-react-ui/styles.css'
 
-// ─── (Optional) Your own Ethereum context ───────────────────────────────────────
-import { EthereumProvider } from '../contexts/EthereumContext'
-
-// ────────────────────────────────────────────────────────────────────────────────
-// 1) configureChains returns the HTTP + WS clients
-const { publicClient, webSocketPublicClient } = configureChains(
-  [mainnet],
-  [publicProvider()]
-)
-
-// 2) Create the Wagmi configuration
-const wagmiConfig = createConfig({
-  autoConnect: true,
-  connectors: [
-    new InjectedConnector({ chains: [mainnet] }),
-  ],
-  publicClient,
-  webSocketPublicClient,
-})
-// ────────────────────────────────────────────────────────────────────────────────
-
-const tonManifestUrl = process.env.NEXT_PUBLIC_TON_MANIFEST_URL!
-const solanaEndpoint = process.env.NEXT_PUBLIC_SOLANA_RPC_URL!
-const solanaWallets  = [
-  new PhantomWalletAdapter(),
-  new SolflareWalletAdapter(),
-]
-
 export default function App({ Component, pageProps }: AppProps) {
+  const tonManifestUrl = process.env.NEXT_PUBLIC_TON_MANIFEST_URL!
+  const solanaEndpoint = process.env.NEXT_PUBLIC_SOLANA_RPC_URL!
+
+  const solanaWallets = [
+    new PhantomWalletAdapter(),
+    new SolflareWalletAdapter(),
+  ]
+
   return (
-    <WagmiConfig config={wagmiConfig}>
-      <TonConnectUIProvider manifestUrl={tonManifestUrl}>
-        <EthereumProvider>
-          <SolanaConnectionProvider endpoint={solanaEndpoint}>
-            <SolanaWalletProvider wallets={solanaWallets} autoConnect>
-              <SolanaProvider>
-                <Component {...pageProps} />
-              </SolanaProvider>
-            </SolanaWalletProvider>
-          </SolanaConnectionProvider>
-        </EthereumProvider>
-      </TonConnectUIProvider>
-    </WagmiConfig>
+    <TonConnectUIProvider manifestUrl={tonManifestUrl}>
+      <EthereumProvider>
+        <SolanaConnectionProvider endpoint={solanaEndpoint}>
+          <SolanaWalletProvider wallets={solanaWallets} autoConnect>
+            <SolanaProvider>
+              <Component {...pageProps} />
+            </SolanaProvider>
+          </SolanaWalletProvider>
+        </SolanaConnectionProvider>
+      </EthereumProvider>
+    </TonConnectUIProvider>
   )
 }

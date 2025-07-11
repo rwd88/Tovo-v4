@@ -4,12 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "npx prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
     "test": "jest"
   },
-  "postinstall": "prisma generate",
   "dependencies": {
     "@ethersproject/providers": "^5.8.0",
     "@prisma/client": "^6.7.0",
@@ -21,7 +20,6 @@
     "@solana/web3.js": "^1.98.2",
     "@tonconnect/sdk": "^3.2.0",
     "@tonconnect/ui-react": "^2.2.0",
-    "@wagmi/core": "^2.17.3",
     "@walletconnect/web3-provider": "^1.8.0",
     "axios": "^1.10.0",
     "cheerio": "^1.0.0",
@@ -30,8 +28,6 @@
     "ethers": "^6.15.0",
     "luxon": "^3.6.1",
     "next": "15.3.2",
-    "node-telegram-bot-api": "^0.66.0",
-    "raw-body": "^3.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-qr-code": "^2.0.16",
@@ -41,7 +37,6 @@
     "tronweb": "^6.0.3",
     "uuid": "^11.1.0",
     "viem": "^2.31.7",
-    "wagmi": "2.15.6",
     "web3modal": "^1.9.12",
     "xml2js": "^0.6.2"
   },
