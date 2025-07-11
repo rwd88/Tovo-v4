@@ -9,10 +9,10 @@ import {
   WagmiConfig,
   createConfig,
   configureChains,
+  InjectedConnector,
+  publicProvider,
+  mainnet,
 } from 'wagmi'
-import { InjectedConnector }      from 'wagmi/connectors/injected'
-import { publicProvider }         from 'wagmi/providers/public'
-import { mainnet }                from 'wagmi/chains'
 
 // ─── TON ────────────────────────────────────────────────────────────────────────
 import { TonConnectUIProvider } from '@tonconnect/ui-react'
@@ -36,14 +36,14 @@ import { EthereumProvider } from '../contexts/EthereumContext'
 // ────────────────────────────────────────────────────────────────────────────────
 // configureChains gives you both an HTTP “publicClient” and a WS client
 const { publicClient, webSocketPublicClient } = configureChains(
-  [ mainnet ],
-  [ publicProvider() ]
+  [mainnet],
+  [publicProvider()]
 )
 
 const wagmiConfig = createConfig({
   autoConnect: true,
   connectors: [
-    new InjectedConnector({ chains: [ mainnet ] }),
+    new InjectedConnector({ chains: [mainnet] }),
   ],
   publicClient,
   webSocketPublicClient,

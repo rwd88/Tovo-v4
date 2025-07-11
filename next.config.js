@@ -1,14 +1,14 @@
 // next.config.js
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Skip TS type‐check errors
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  // Skip ESLint errors during build
+  // Skip ESLint errors during production builds
   eslint: {
     ignoreDuringBuilds: true,
   },
-}
+  // Skip TypeScript type‐check errors during production builds
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+};
 
-module.exports = nextConfig
+module.exports = nextConfig;
