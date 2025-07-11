@@ -49,7 +49,7 @@ export default async function handler(
 
       const results = await Promise.allSettled(
         markets.map(async (market) => {
-          const winning = (market.outcome ?? '').toUpperCase()
+          const winning = (market.resolvedOutcome ?? '').toUpperCase()
           if (!['YES', 'NO'].includes(winning)) {
             await prisma.market.update({
               where: { id: market.id },
