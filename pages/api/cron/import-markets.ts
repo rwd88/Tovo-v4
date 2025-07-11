@@ -25,14 +25,12 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ApiResponse>
 ) {
-  // 🔐 Auth
+  // 🔐 Verify our cron secret
   if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(403).json({ success: false, error: "Unauthorized" });
   }
   if (req.method !== "GET") {
-    return res
-      .status(405)
-      .json({ success: false, error: "Only GET allowed" });
+    return res.status(405).json({ success: false, error: "Only GET allowed" });
   }
 
   try {
@@ -60,7 +58,7 @@ export default async function handler(
         continue;
       }
 
-      // parse date & time exactly like import-markets
+      // parse date + time
       const dateStr = ev.date?.trim();
       const rawTime = ev.time?.trim().toLowerCase();
       if (!dateStr || !rawTime) {
@@ -73,10 +71,9 @@ export default async function handler(
         continue;
       }
       let hour = parseInt(m[1], 10);
+      if (m[3] === "pm" && hour < 12) hour += 12;
+      if (m[3] === "am" && hour === 12) hour = 0;
       const minute = m[2];
-      const ampm = m[3];
-      if (ampm === "pm" && hour < 12) hour += 12;
-      if (ampm === "am" && hour === 12) hour = 0;
       const timeFormatted = `${hour.toString().padStart(2, "0")}:${minute}:00`;
       const [mm, dd, yyyy] = dateStr.split("-");
       const eventTime = new Date(`${yyyy}-${mm}-${dd}T${timeFormatted}Z`);
@@ -85,51 +82,38 @@ export default async function handler(
         continue;
       }
 
-      // build the same externalId you used on import
       const externalId =
-        ev.url?.trim() ||
-        `ff-${ev.title}-${dateStr}-${timeFormatted}`;
+        ev.url?.trim() || `ff-${ev.title}-${dateStr}-${timeFormatted}`;
 
-      // parse numbers
-      const actualVal = ev.actual ? parseFloat(ev.actual) : NaN;
+      // need forecast + actual to decide outcome
       const forecastVal = ev.forecast ? parseFloat(ev.forecast) : NaN;
+      const actualVal = ev.actual ? parseFloat(ev.actual) : NaN;
       if (isNaN(actualVal)) {
         skipped++;
         continue;
       }
-
-      // decide yes/no
       const outcome =
         !isNaN(forecastVal) && actualVal > forecastVal ? "yes" : "no";
 
-      // update only unresolved, past‐due markets
-      try {
-        const { count } = await prisma.market.updateMany({
-          where: {
-            externalId,
-            resolved: false,
-            eventTime: { lte: now },
-          },
-          data: {
-            resolvedOutcome: outcome,
-            resolved: true,
-            settledAt: new Date(),
-          },
-        });
+      // update only unresolved markets whose time has passed
+      const { count } = await prisma.market.updateMany({
+        where: {
+          externalId,
+          resolved: false,
+          eventTime: { lte: now },
+        },
+        data: {
+          resolvedOutcome: outcome,
+          resolved: true,
+          settledAt: new Date(),
+        },
+      });
 
-        if (count > 0) {
-          settled++;
-        } else {
-          skipped++;
-        }
-      } catch {
-        skipped++;
-      }
+      if (count > 0) settled++;
+      else skipped++;
     }
 
-    return res
-      .status(200)
-      .json({ success: true, settled, skipped });
+    return res.status(200).json({ success: true, settled, skipped });
   } catch (err: any) {
     console.error("❌ import-results error:", err);
     return res
