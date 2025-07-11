@@ -1,52 +1,41 @@
-import React from 'react';
-import { useWallet } from '../hooks/useWallet';
+// src/components/ConnectWalletButton.tsx
+'use client'
 
-// Utility to truncate an Ethereum address
-const truncateAddress = (address: string): string =>
-  `${address.slice(0, 6)}...${address.slice(-4)}`;
+import { useEffect } from 'react'
+import { useAccount, useConnect } from 'wagmi'
+import { InjectedConnector } from 'wagmi/connectors/injected'
 
-// Supported chain IDs (add your networks here)
-const SUPPORTED_CHAINS = [1, 56, 137];
+export function ConnectWalletButton() {
+  const { connect } = useConnect({
+    connector: new InjectedConnector(),
+  })
+  const { address, isConnecting } = useAccount()
 
-export const ConnectWalletButton: React.FC = () => {
-  const { address, chainId, isConnected, connect, disconnect } = useWallet();
+  useEffect(() => {
+    if (address) {
+      console.log('✅ Connected as', address)
+    }
+  }, [address])
 
-  const handleConnect = () => {
-    connect();
-  };
-
-  const handleDisconnect = () => {
-    disconnect();
-  };
-
-  // If connected but on unsupported chain
-  if (isConnected && chainId && !SUPPORTED_CHAINS.includes(chainId)) {
+  if (address) {
     return (
       <button
-        onClick={handleDisconnect}
-        className="px-4 py-2 bg-red-500 text-white rounded"
+        type="button"
+        className="btn"
       >
-        Wrong network (chain {chainId}). Disconnect
+        ✅ {address.slice(0, 6)}…
       </button>
-    );
+    )
   }
 
-  return isConnected ? (
-    <div className="flex items-center space-x-2">
-      <span className="font-mono">{truncateAddress(address!)}</span>
-      <button
-        onClick={handleDisconnect}
-        className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
-      >
-        Disconnect
-      </button>
-    </div>
-  ) : (
+  return (
     <button
-      onClick={handleConnect}
-      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+      type="button"                         // ← explicit non‐submit button
+      className="btn bg-blue-500 text-white px-4 py-2 rounded"
+      onClick={() => connect()}
+      disabled={isConnecting}
     >
-      Connect Wallet
+      {isConnecting ? 'Connecting…' : 'Connect Wallet'}
     </button>
-  );
-};
+  )
+}
