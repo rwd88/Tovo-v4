@@ -20,12 +20,15 @@
     "moduleResolution": "node",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "jsx": "preserve"
+    "jsx": "preserve",
+   // Look first in our top-level types/ folder, then any @types packages
+   "typeRoots": ["types", "node_modules/@types"]
   },
   "include": [
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
+    // your own additional declarations, if any
     "src/types/**/*.d.ts"
   ],
   "exclude": ["node_modules"]
