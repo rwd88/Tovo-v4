@@ -88,7 +88,6 @@ export default async function handler(
         const result = await prisma.market.updateMany({
           where: {
             externalId: eventId,
-            outcome: null,
             eventTime: { lte: new Date() },    // ← only resolve past events
           },
           data: {
