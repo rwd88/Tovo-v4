@@ -24,7 +24,7 @@ model Market {
   id              String    @id @default(uuid())
   externalId      String    @unique
   question        String
-  description   String?    // ← add this
+  description     String?    
   eventTime       DateTime
   poolYes         Float
   poolNo          Float
