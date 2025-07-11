@@ -1,38 +1,30 @@
-// File: pages/api/markets/active.ts
-
+// pages/api/markets/active.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { prisma } from '../../../lib/prisma'
+import { prisma } from '@/lib/prisma'
 
 export type ActiveMarket = {
   id: string
   question: string
-  eventTime: Date
+  eventTime: string  // ISO timestamp
   poolYes: number
   poolNo: number
   houseProfit: number | null
   tag: string | null
 }
 
-interface ActiveResponse {
-  success: boolean
-  markets?: ActiveMarket[]
-  error?: string
-}
-
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse<ActiveResponse>
+  res: NextApiResponse<ActiveMarket[] | { error: string }>
 ) {
-  if (req.method !== 'GET') {
-    return res
-      .status(405)
-      .json({ success: false, error: 'Only GET allowed' })
-  }
-
   try {
+    const skip = parseInt((req.query.skip as string) || '0', 10)
+    const take = 10
+
     const markets = await prisma.market.findMany({
       where: { status: 'open' },
       orderBy: { createdAt: 'desc' },
+      skip,
+      take,
       select: {
         id: true,
         question: true,
@@ -42,15 +34,22 @@ export default async function handler(
         houseProfit: true,
         tag: true,
       },
-      take: 20,    // page size
-      skip: 0,     // for pagination, bump this by 20 for page 2, etc.
     })
 
-    return res.status(200).json({ success: true, markets })
+    // Serialize the dates
+    const payload: ActiveMarket[] = markets.map((m) => ({
+      id: m.id,
+      question: m.question,
+      eventTime: m.eventTime.toISOString(),
+      poolYes: m.poolYes,
+      poolNo: m.poolNo,
+      houseProfit: m.houseProfit,
+      tag: m.tag,
+    }))
+
+    return res.status(200).json(payload)
   } catch (err) {
-    console.error('❌ /api/markets/active error:', err)
-    return res
-      .status(500)
-      .json({ success: false, error: 'Unable to load markets' })
+    console.error('[/api/markets/active] Error:', err)
+    return res.status(500).json({ error: 'Failed to load active markets' })
   }
 }
