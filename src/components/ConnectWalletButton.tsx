@@ -3,7 +3,7 @@
 
 import { useEffect } from 'react'
 import { useAccount, useConnect } from 'wagmi'
-import { InjectedConnector } from '@wagmi/core/connectors/injected'
+import { InjectedConnector } from 'wagmi/connectors/injected'
 
 export function ConnectWalletButton() {
   const { connect } = useConnect({
