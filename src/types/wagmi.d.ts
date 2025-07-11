@@ -1,28 +1,52 @@
 // src/types/wagmi.d.ts
-import * as React from 'react';
 
+import * as React from 'react'
+
+//
+// 1) Top-level “wagmi” exports
+//
 declare module 'wagmi' {
-  // the core setup functions you use
   export function configureChains(
     chains: any[],
     providers: any[]
   ): {
-    publicClient: any;
-    webSocketPublicClient: any;
-  };
+    publicClient: any
+    webSocketPublicClient: any
+  }
 
   export interface CreateConfigArgs {
-    autoConnect?: boolean;
-    connectors?: any[];
-    publicClient: any;
-    webSocketPublicClient?: any;
+    autoConnect?: boolean
+    connectors?: any[]
+    publicClient: any
+    webSocketPublicClient?: any
   }
-  export function createConfig(args: CreateConfigArgs): any;
+  export function createConfig(args: CreateConfigArgs): any
 
-  export const WagmiConfig: React.FC<{ config: any }>;
+  export const WagmiConfig: React.FC<{ config: any }>
+}
 
-  // re-export whatever else you import directly
-  export * from 'wagmi/chains';
-  export * from 'wagmi/connectors/injected';
-  export * from 'wagmi/providers/public';
+//
+// 2) The injected-connector sub-module
+//
+declare module 'wagmi/connectors/injected' {
+  export interface InjectedConnectorOptions {
+    chains?: any[]
+  }
+  export class InjectedConnector {
+    constructor(options?: InjectedConnectorOptions)
+  }
+}
+
+//
+// 3) The public-provider sub-module
+//
+declare module 'wagmi/providers/public' {
+  export function publicProvider(): any
+}
+
+//
+// 4) The chains sub-module (at least “mainnet”)
+//
+declare module 'wagmi/chains' {
+  export const mainnet: any
 }
