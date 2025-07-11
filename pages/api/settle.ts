@@ -1,10 +1,11 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
-import { prisma } from '@/lib/prisma';
+// pages/api/settle-markets.ts
+import type { NextApiRequest, NextApiResponse } from 'next'
+import { prisma } from '@/lib/prisma'
 
 interface SettlementResult {
-  success: boolean;
-  settledMarkets?: number;
-  error?: string;
+  success: boolean
+  settledMarkets?: number
+  error?: string
 }
 
 export default async function handler(
@@ -16,78 +17,83 @@ export default async function handler(
     const marketsToSettle = await prisma.market.findMany({
       where: {
         status: 'open',
-        eventTime: { lt: new Date() } // Past their event time
+        eventTime: { lt: new Date() }, // already passed
       },
-      include: {
-        trades: true
-      }
-    });
+      include: { trades: true },
+    })
 
     // 2. Process each market
     for (const market of marketsToSettle) {
-      const outcome = determineOutcome(market); // Your logic here
-      const updatePromises = market.trades.map(trade => 
-        updateTradeSettlement(trade, outcome, market)
-      );
+      // Determine YES/NO outcome however you wish
+      const outcome = determineOutcome(market) // 'YES' or 'NO'
 
+      // Build all trade‐updates
+      const updateTrades = market.trades.map((trade) =>
+        prisma.trade.update({
+          where: { id: trade.id },
+          data: {
+            settled: true,
+            // mark winning trades' payout, losers get zero
+            payout:
+              trade.type.toUpperCase() === outcome
+                ? calculatePayout(trade, market)
+                : 0,
+          },
+        })
+      )
+
+      // 3. In one transaction: update market + all its trades
       await prisma.$transaction([
         prisma.market.update({
           where: { id: market.id },
-          data: { status: 'settled', outcome }
+          data: {
+            status:          'settled',        // mark it settled
+            resolved:        true,             // optional boolean
+            resolvedOutcome: outcome,          // your YES/NO
+          },
         }),
-        ...updatePromises
-      ]);
+        ...updateTrades,
+      ])
     }
 
     return res.status(200).json({
-      success: true,
-      settledMarkets: marketsToSettle.length
-    });
-
+      success:        true,
+      settledMarkets: marketsToSettle.length,
+    })
   } catch (err) {
-    console.error('Settlement failed:', err);
+    console.error('Settlement failed:', err)
     return res.status(500).json({
       success: false,
-      error: 'Internal server error'
-    });
+      error:   'Internal server error',
+    })
   }
 }
 
-// Helper functions
+// your outcome logic
 function determineOutcome(market: MarketWithTrades): 'YES' | 'NO' {
-  // Implement your actual outcome logic
-  return market.poolYes > market.poolNo ? 'YES' : 'NO';
+  return market.poolYes > market.poolNo ? 'YES' : 'NO'
 }
 
-function updateTradeSettlement(trade: Trade, outcome: string, market: Market) {
-  const isWinningTrade = trade.type === outcome;
-  return prisma.trade.update({
-    where: { id: trade.id },
-    data: {
-      settled: true,
-      payout: isWinningTrade ? calculatePayout(trade, market) : 0
-    }
-  });
+// example payout calculation
+function calculatePayout(
+  trade: Trade,
+  market: MarketWithTrades
+): number {
+  const winPool      = market.poolYes
+  const losePool     = market.poolNo
+  const totalPool    = winPool + losePool
+  const shareFactor  = winPool > 0 ? totalPool / winPool : 0
+  // simple: return trade.amount * shareFactor
+  return trade.amount * shareFactor
 }
 
-function calculatePayout(trade: Trade, market: Market): number {
-  // Implement your payout calculation
-  const pool = trade.type === 'YES' ? market.poolYes : market.poolNo;
-  const oppositePool = trade.type === 'YES' ? market.poolNo : market.poolYes;
-  return trade.amount * (1 + (oppositePool / pool));
+// Types (you can import these instead)
+type MarketWithTrades = {
+  id:        string
+  poolYes:   number
+  poolNo:    number
+  status:    string
+  eventTime: Date
+  trades:    Trade[]
 }
-
-// Types
-type MarketWithTrades = Market & { trades: Trade[] };
-type Trade = {
-  id: string;
-  type: string;
-  amount: number;
-  // ... other trade fields
-};
-type Market = {
-  id: string;
-  poolYes: number;
-  poolNo: number;
-  // ... other market fields
-};
+type Trade = { id: string; type: string; amount: number }
