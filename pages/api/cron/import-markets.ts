@@ -25,7 +25,7 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ApiResponse>
 ) {
-  // 🔐 Verify our cron secret
+  // verify our cron secret
   if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(403).json({ success: false, error: "Unauthorized" });
   }
@@ -77,6 +77,8 @@ export default async function handler(
       const timeFormatted = `${hour.toString().padStart(2, "0")}:${minute}:00`;
       const [mm, dd, yyyy] = dateStr.split("-");
       const eventTime = new Date(`${yyyy}-${mm}-${dd}T${timeFormatted}Z`);
+
+      // only settle past events
       if (isNaN(eventTime.getTime()) || eventTime > now) {
         skipped++;
         continue;
@@ -92,32 +94,32 @@ export default async function handler(
         skipped++;
         continue;
       }
-      const outcome =
-        !isNaN(forecastVal) && actualVal > forecastVal ? "yes" : "no";
+      const outcome = !isNaN(forecastVal) && actualVal > forecastVal ? "yes" : "no";
 
-      // update only unresolved markets whose time has passed
-      const { count } = await prisma.market.updateMany({
+      // update all matching open & unresolved markets
+      const result = await prisma.market.updateMany({
         where: {
           externalId,
+          status: "open",
           resolved: false,
-          eventTime: { lte: now },
         },
         data: {
-          resolvedOutcome: outcome,
+          outcome,
           resolved: true,
-          settledAt: new Date(),
+          settledAt: now,
         },
       });
 
-      if (count > 0) settled++;
-      else skipped++;
+      if (result.count > 0) {
+        settled += result.count;
+      } else {
+        skipped++;
+      }
     }
 
     return res.status(200).json({ success: true, settled, skipped });
   } catch (err: any) {
     console.error("❌ import-results error:", err);
-    return res
-      .status(500)
-      .json({ success: false, error: err.message });
+    return res.status(500).json({ success: false, error: err.message });
   }
 }
