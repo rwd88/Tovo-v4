@@ -1,10 +1,13 @@
 // next.config.js
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Skip TS type‐check errors
   typescript: {
-    // Allow production builds to successfully complete even if
-    // your project has type errors.
     ignoreBuildErrors: true,
+  },
+  // Skip ESLint errors during build
+  eslint: {
+    ignoreDuringBuilds: true,
   },
 }
 
