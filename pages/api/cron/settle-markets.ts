@@ -33,7 +33,7 @@ export default async function handler(
       const markets = await prisma.market.findMany({
         where: {
           eventTime: { lt: new Date() },
-          outcome: { not: null },
+      resolvedOutcome: { not: null },
           status: 'open',
         },
         include: { trades: true },
