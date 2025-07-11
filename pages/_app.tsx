@@ -5,14 +5,17 @@ import '../styles/globals.css'
 import type { AppProps } from 'next/app'
 
 // ─── Wagmi v2 / Ethereum ───────────────────────────────────────────────────────
+// Pull core functions from the “config” entrypoint:
 import {
-  WagmiConfig,
-  createConfig,
   configureChains,
-  InjectedConnector,
-  publicProvider,
-  mainnet,
-} from 'wagmi'
+  createConfig,
+  WagmiConfig,
+} from 'wagmi/config'
+
+// Pull connectors, providers, and chains from their own entrypoints:
+import { InjectedConnector } from 'wagmi/connectors/injected'
+import { publicProvider }    from 'wagmi/providers/public'
+import { mainnet }           from 'wagmi/chains'
 
 // ─── TON ────────────────────────────────────────────────────────────────────────
 import { TonConnectUIProvider } from '@tonconnect/ui-react'
@@ -34,7 +37,6 @@ import '@solana/wallet-adapter-react-ui/styles.css'
 import { EthereumProvider } from '../contexts/EthereumContext'
 
 // ────────────────────────────────────────────────────────────────────────────────
-// configureChains gives you both an HTTP “publicClient” and a WS client
 const { publicClient, webSocketPublicClient } = configureChains(
   [mainnet],
   [publicProvider()]
@@ -42,9 +44,7 @@ const { publicClient, webSocketPublicClient } = configureChains(
 
 const wagmiConfig = createConfig({
   autoConnect: true,
-  connectors: [
-    new InjectedConnector({ chains: [mainnet] }),
-  ],
+  connectors: [ new InjectedConnector({ chains: [mainnet] }) ],
   publicClient,
   webSocketPublicClient,
 })
