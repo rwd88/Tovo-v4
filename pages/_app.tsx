@@ -33,7 +33,8 @@ import '@solana/wallet-adapter-react-ui/styles.css'
 // ─── (Optional) Your own Ethereum context ───────────────────────────────────────
 import { EthereumProvider } from '../contexts/EthereumContext'
 
-// configureChains returns both an HTTP “publicClient” and a WS “webSocketPublicClient”
+// ────────────────────────────────────────────────────────────────────────────────
+// configureChains gives you both an HTTP “publicClient” and a WS client
 const { publicClient, webSocketPublicClient } = configureChains(
   [ mainnet ],
   [ publicProvider() ]
@@ -49,10 +50,9 @@ const wagmiConfig = createConfig({
 })
 // ────────────────────────────────────────────────────────────────────────────────
 
-// your on-chain endpoints & wallets
-const tonManifestUrl  = process.env.NEXT_PUBLIC_TON_MANIFEST_URL!
-const solanaEndpoint  = process.env.NEXT_PUBLIC_SOLANA_RPC_URL!
-const solanaWallets   = [
+const tonManifestUrl = process.env.NEXT_PUBLIC_TON_MANIFEST_URL!
+const solanaEndpoint = process.env.NEXT_PUBLIC_SOLANA_RPC_URL!
+const solanaWallets  = [
   new PhantomWalletAdapter(),
   new SolflareWalletAdapter(),
 ]

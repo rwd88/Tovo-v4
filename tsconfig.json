@@ -1,11 +1,7 @@
 {
   "compilerOptions": {
     "target": "es2015",
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "esnext"
-    ],
+    "lib": ["dom","dom.iterable","esnext"],
     "module": "esnext",
     "baseUrl": ".",
     "paths": {
@@ -23,10 +19,9 @@
     "moduleResolution": "node",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "jsx": "preserve",
-
-    // Ensure TS loads your custom type declarations
-    "typeRoots": ["./src/types", "./node_modules/@types"]
+    "jsx": "preserve"
+-   // Ensure TS loads your custom type declarations
+-  ,"typeRoots": ["./src/types", "./node_modules/@types"]
   },
   "include": [
     "next-env.d.ts",
@@ -34,7 +29,5 @@
     "**/*.tsx",
     "src/types/**/*.d.ts"
   ],
-  "exclude": [
-    "node_modules"
-  ]
+  "exclude": ["node_modules"]
 }
