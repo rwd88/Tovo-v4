@@ -4,15 +4,15 @@
 import '../styles/globals.css'
 import type { AppProps } from 'next/app'
 
-// TON
-import { TonConnectUIProvider } from '@tonconnect/ui-react'
-import { TonProvider }          from '../contexts/TonContext'
+// TonConnect
+import {
+  TonConnectUIProvider,
+  AdapterInpage,           // 👈 only the in-page adapter
+} from '@tonconnect/ui-react'
 
-// Your Viem/Ethereum context
+// your other providers…
 import { EthereumProvider } from '../contexts/EthereumContext'
-
-// Solana
-import { SolanaProvider } from '../contexts/SolanaContext'
+import { SolanaProvider }  from '../contexts/SolanaContext'
 import {
   ConnectionProvider as SolanaConnectionProvider,
   WalletProvider     as SolanaWalletProvider,
@@ -23,24 +23,9 @@ import {
 } from '@solana/wallet-adapter-wallets'
 import '@solana/wallet-adapter-react-ui/styles.css'
 
-import type { WalletAdapterError, WalletAdapter } from '@solana/wallet-adapter-base'
-
-// ─── Proper Solana‐adapter error handler ────────────────────────────────────────
-function handleWalletError(
-  error: WalletAdapterError,
-  adapter?: WalletAdapter
-) {
-  console.warn(
-    `[SolanaAdapterError]`,
-    adapter?.name ?? 'unknown adapter',
-    error.message
-  )
-}
-
-// ─── App ───────────────────────────────────────────────────────────────────────
 export default function App({ Component, pageProps }: AppProps) {
   const tonManifestUrl = process.env.NEXT_PUBLIC_TON_MANIFEST_URL!
-  const solanaEndpoint = process.env.NEXT_PUBLIC_SOLANA_RPC_URL!
+  const solanaEndpoint  = process.env.NEXT_PUBLIC_SOLANA_RPC_URL!
 
   const solanaWallets = [
     new PhantomWalletAdapter(),
@@ -48,14 +33,14 @@ export default function App({ Component, pageProps }: AppProps) {
   ]
 
   return (
-    <TonConnectUIProvider manifestUrl={tonManifestUrl}>
+    // Only the in-page adapter, so no Binance deep-link
+    <TonConnectUIProvider
+      manifestUrl={tonManifestUrl}
+      adapters={[ new AdapterInpage() ]}
+    >
       <EthereumProvider>
         <SolanaConnectionProvider endpoint={solanaEndpoint}>
-          <SolanaWalletProvider
-            wallets={solanaWallets}
-            autoConnect
-            onError={handleWalletError}    // ← use correct signature
-          >
+          <SolanaWalletProvider wallets={solanaWallets} autoConnect>
             <SolanaProvider>
               <Component {...pageProps} />
             </SolanaProvider>
