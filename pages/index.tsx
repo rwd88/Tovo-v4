@@ -4,7 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google"
 import styles from "../styles/Home.module.css"
 
 import { useEthereum } from "../contexts/EthereumContext"
-import ConnectWalletButton from "../components/ConnectWalletButton"
+//import ConnectWalletButton from "../components/ConnectWalletButton"//
 import TradeForm from "../components/TradeForm"
 import { useTokenBalance } from "../hooks/useTokenBalance"
 import { useEffect, useState } from "react"
