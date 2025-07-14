@@ -4,31 +4,49 @@
 import "../styles/globals.css"
 import type { AppProps } from "next/app"
 
-// 1️⃣ Wagmi + RainbowKit
+// ─── wagmi & rainbowkit ───────────────────────────────────────────────
 import {
   WagmiConfig,
   createConfig,
   configureChains,
   mainnet,
 } from "wagmi"
-import { publicProvider } from "wagmi/providers/public"
-import { InjectedConnector } from "wagmi/connectors/injected"
+import { publicProvider } from "@wagmi/core/providers/public"
 
-import {
-  getDefaultWallets,
-  RainbowKitProvider,
-  darkTheme,
-} from "@rainbow-me/rainbowkit"
+import { getDefaultWallets, RainbowKitProvider, darkTheme } from "@rainbow-me/rainbowkit"
 import "@rainbow-me/rainbowkit/styles.css"
 
-// 2️⃣ TON
+// 1) configureChains gives you publicClient + webSocketPublicClient
+const { chains, publicClient, webSocketPublicClient } = configureChains(
+  [mainnet],
+  [
+    // note the import from @wagmi/core above, _not_ from "wagmi/providers/…"
+    publicProvider(),
+  ]
+)
+
+// 2) getDefaultWallets gives you a set of connectors (Metamask, WalletConnect, etc)
+const { connectors } = getDefaultWallets({
+  appName: "Tovo Prediction Markets",
+  chains,
+})
+
+// 3) createConfig to pass into WagmiConfig
+const wagmiConfig = createConfig({
+  autoConnect: true,
+  connectors,
+  publicClient,
+  webSocketPublicClient,
+})
+
+// ─── TON ────────────────────────────────────────────────────────────────
 import { TonConnectUIProvider } from "@tonconnect/ui-react"
 import { TonProvider } from "../contexts/TonContext"
 
-// 3️⃣ Your custom Ethereum (viem) context
+// ─── your custom Ethereum (viem) context ───────────────────────────────
 import { EthereumProvider } from "../contexts/EthereumContext"
 
-// 4️⃣ Solana
+// ─── Solana ─────────────────────────────────────────────────────────────
 import { SolanaProvider } from "../contexts/SolanaContext"
 import {
   ConnectionProvider as SolanaConnectionProvider,
@@ -40,27 +58,7 @@ import {
 } from "@solana/wallet-adapter-wallets"
 import "@solana/wallet-adapter-react-ui/styles.css"
 
-// ────────────────────────────────────────────────────────────────────────────────
-// 1) configureChains gives you "publicClient" + "webSocketPublicClient"
-const { chains, publicClient, webSocketPublicClient } = configureChains(
-  [mainnet],
-  [publicProvider()]
-)
-
-// 2) getDefaultWallets wires up rainbow-kit’s connectors for you
-const { connectors } = getDefaultWallets({
-  appName: "Tovo Prediction Markets",
-  chains,
-})
-
-// 3) createConfig creates your wagmi client
-const wagmiConfig = createConfig({
-  autoConnect: true,
-  connectors,
-  publicClient,
-  webSocketPublicClient,
-})
-// ────────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────
 
 export default function App({ Component, pageProps }: AppProps) {
   const tonManifestUrl = process.env.NEXT_PUBLIC_TON_MANIFEST_URL!
