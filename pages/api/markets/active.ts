@@ -16,6 +16,12 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ActiveMarket[] | { error: string }>
 ) {
+  // Only allow GET
+  if (req.method !== 'GET') {
+    res.setHeader('Allow', ['GET'])
+    return res.status(405).json({ error: `Method ${req.method} Not Allowed` })
+  }
+
   try {
     const skip = parseInt((req.query.skip as string) || '0', 10)
     const take = 10
@@ -36,7 +42,7 @@ export default async function handler(
       },
     })
 
-    // Serialize the dates
+    // Serialize the dates for JSON
     const payload: ActiveMarket[] = markets.map((m) => ({
       id: m.id,
       question: m.question,
@@ -49,7 +55,9 @@ export default async function handler(
 
     return res.status(200).json(payload)
   } catch (err) {
-    console.error('[/api/markets/active] Error:', err)
-    return res.status(500).json({ error: 'Failed to load active markets' })
+    console.error('[/api/markets/active] Error loading active markets:', err)
+    return res
+      .status(500)
+      .json({ error: 'Failed to load active markets' })
   }
 }
