@@ -16,6 +16,7 @@ import { SolanaProvider } from '../contexts/SolanaContext'
 import {
   ConnectionProvider as SolanaConnectionProvider,
   WalletProvider     as SolanaWalletProvider,
+  WalletContextState,
 } from '@solana/wallet-adapter-react'
 import {
   PhantomWalletAdapter,
@@ -23,10 +24,20 @@ import {
 } from '@solana/wallet-adapter-wallets'
 import '@solana/wallet-adapter-react-ui/styles.css'
 
+// ─── Catch Solana adapter errors so they don’t unmount your app ─────────────────
+function handleSolanaError(error: Error, walletContext: WalletContextState) {
+  console.error(
+    `Solana wallet adapter error [${walletContext.wallet?.adapter.name}]:`,
+    error
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────────────────
 export default function App({ Component, pageProps }: AppProps) {
   const tonManifestUrl = process.env.NEXT_PUBLIC_TON_MANIFEST_URL!
   const solanaEndpoint = process.env.NEXT_PUBLIC_SOLANA_RPC_URL!
 
+  // Only construct these once per app lifecycle
   const solanaWallets = [
     new PhantomWalletAdapter(),
     new SolflareWalletAdapter(),
@@ -36,7 +47,11 @@ export default function App({ Component, pageProps }: AppProps) {
     <TonConnectUIProvider manifestUrl={tonManifestUrl}>
       <EthereumProvider>
         <SolanaConnectionProvider endpoint={solanaEndpoint}>
-          <SolanaWalletProvider wallets={solanaWallets} autoConnect>
+          <SolanaWalletProvider
+            wallets={solanaWallets}
+            autoConnect
+            onError={handleSolanaError}   // ← catch & log adapter errors
+          >
             <SolanaProvider>
               <Component {...pageProps} />
             </SolanaProvider>
