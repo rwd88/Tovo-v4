@@ -1,5 +1,7 @@
+// components/SolanaProviders.tsx
 'use client'
 
+import { useMemo } from 'react'
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react'
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base'
 import {
@@ -8,17 +10,21 @@ import {
 } from '@solana/wallet-adapter-wallets'
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui'
 
-const solanaNetwork = WalletAdapterNetwork.Mainnet
-const solanaEndpoint = process.env.NEXT_PUBLIC_SOLANA_RPC_URL!
-const solanaWallets = [
-  new PhantomWalletAdapter(),
-  new SolflareWalletAdapter(),
-]
-
 export default function SolanaProviders({ children }: { children: React.ReactNode }) {
+  // Use environment variable with fallback
+  const endpoint = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com'
+  
+  const wallets = useMemo(
+    () => [
+      new PhantomWalletAdapter(),
+      new SolflareWalletAdapter(),
+    ],
+    []
+  )
+
   return (
-    <ConnectionProvider endpoint={solanaEndpoint}>
-      <WalletProvider wallets={solanaWallets} autoConnect>
+    <ConnectionProvider endpoint={endpoint}>
+      <WalletProvider wallets={wallets} autoConnect>
         <WalletModalProvider>
           {children}
         </WalletModalProvider>
