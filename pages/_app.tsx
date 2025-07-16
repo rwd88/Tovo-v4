@@ -1,33 +1,28 @@
 // pages/_app.tsx
+'use client'
+
 import '../styles/globals.css'
 import type { AppProps } from 'next/app'
-import ClientOnly from '../components/client-only'
+import dynamic from 'next/dynamic' // <-- THIS MUST BE PRESENT
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
-// Non-wallet providers can stay as regular imports
-import { TonProvider } from '../contexts/TonContext'
-import { SolanaProvider } from '../contexts/SolanaContext'
+// Client-side only dynamic imports
+const Web3Providers = dynamic(
+  () => import('../components/Web3Providers').then((mod) => mod.default),
+  { 
+    ssr: false,
+    loading: () => <div>Loading web3 providers...</div>
+  }
+)
 
 const queryClient = new QueryClient()
 
-// Wallet providers as dynamic imports
-const Web3Providers = dynamic(
-  () => import('../components/web3-providers').then((mod) => mod.default),
-  { ssr: false }
-)
-
 export default function App({ Component, pageProps }: AppProps) {
   return (
-    <ClientOnly>
-      <QueryClientProvider client={queryClient}>
-        <Web3Providers>
-          <TonProvider>
-            <SolanaProvider>
-              <Component {...pageProps} />
-            </SolanaProvider>
-          </TonProvider>
-        </Web3Providers>
-      </QueryClientProvider>
-    </ClientOnly>
+    <QueryClientProvider client={queryClient}>
+      <Web3Providers>
+        <Component {...pageProps} />
+      </Web3Providers>
+    </QueryClientProvider>
   )
 }
