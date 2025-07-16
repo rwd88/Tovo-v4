@@ -1,12 +1,12 @@
+// pages/_app.tsx
 'use client'
 
 import '../styles/globals.css'
 import type { AppProps } from 'next/app'
-import { useEffect, useState } from 'react'
-import ErrorBoundary from '../components/ErrorBoundary'
+import dynamic from 'next/dynamic' // <-- Add this import
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
-// Wagmi Config
+// ─── Wagmi Configuration ───────────────────────────────────────────────────────
 import { WagmiProvider, createConfig } from 'wagmi'
 import { mainnet } from 'wagmi/chains'
 import { http } from 'viem'
@@ -18,39 +18,35 @@ const wagmiConfig = createConfig({
   },
 })
 
-// Dynamic imports for client-side only components
+// Dynamic imports
 const TonConnectUIProvider = dynamic(
   () => import('@tonconnect/ui-react').then((mod) => mod.TonConnectUIProvider),
-  { ssr: false }
+  { 
+    ssr: false,
+    loading: () => <div>Loading TON Connect...</div>
+  }
 )
 
 const SolanaProviders = dynamic(
   () => import('../components/SolanaProviders').then((mod) => mod.default),
-  { ssr: false }
+  { 
+    ssr: false,
+    loading: () => <div>Loading Wallets...</div>
+  }
 )
 
 const queryClient = new QueryClient()
 
 export default function App({ Component, pageProps }: AppProps) {
-  const [mounted, setMounted] = useState(false)
-  
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (!mounted) return <div>Loading...</div>
-
   return (
-    <ErrorBoundary fallback={<div>Something went wrong</div>}>
-      <WagmiProvider config={wagmiConfig}>
-        <QueryClientProvider client={queryClient}>
-          <TonConnectUIProvider manifestUrl={process.env.NEXT_PUBLIC_TON_MANIFEST_URL!}>
-            <SolanaProviders>
-              <Component {...pageProps} />
-            </SolanaProviders>
-          </TonConnectUIProvider>
-        </QueryClientProvider>
-      </WagmiProvider>
-    </ErrorBoundary>
+    <WagmiProvider config={wagmiConfig}>
+      <QueryClientProvider client={queryClient}>
+        <TonConnectUIProvider manifestUrl={process.env.NEXT_PUBLIC_TON_MANIFEST_URL!}>
+          <SolanaProviders>
+            <Component {...pageProps} />
+          </SolanaProviders>
+        </TonConnectUIProvider>
+      </QueryClientProvider>
+    </WagmiProvider>
   )
 }
