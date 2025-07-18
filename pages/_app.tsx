@@ -3,16 +3,13 @@
 
 import '../styles/globals.css'
 import type { AppProps } from 'next/app'
-import dynamic from 'next/dynamic' // <-- THIS MUST BE PRESENT
+import dynamic from 'next/dynamic'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
-// Client-side only dynamic imports
+// Client-only wrapper for all Web3 providers
 const Web3Providers = dynamic(
-  () => import('../components/Web3Providers').then((mod) => mod.default),
-  { 
-    ssr: false,
-    loading: () => <div>Loading web3 providers...</div>
-  }
+  () => import('../components/Web3Providers').then((m) => m.default),
+  { ssr: false }
 )
 
 const queryClient = new QueryClient()

@@ -1,33 +1,39 @@
-// components/web3-providers.tsx
+// components/Web3Providers.tsx
 'use client'
 
-import { WagmiProvider, createConfig } from 'wagmi'
-import { mainnet } from 'wagmi/chains'
-import { http } from 'viem'
-import { TonConnectUIProvider } from '@tonconnect/ui-react'
+import React, { ReactNode } from 'react'
 import dynamic from 'next/dynamic'
 
-// Corrected import path - match your actual file name
+// TON
+import { TonConnectUIProvider } from '@tonconnect/ui-react'
+import { TonProvider } from '../contexts/TonContext'
+
+// EVM (MetaMask)
+import { EthereumProvider } from '../contexts/EthereumContext'
+
+// Solana (client-only)
 const SolanaProviders = dynamic(
   () => import('./SolanaProviders').then((mod) => mod.default),
   { ssr: false }
 )
 
-const wagmiConfig = createConfig({
-  chains: [mainnet],
-  transports: {
-    [mainnet.id]: http(),
-  },
-})
+interface Web3ProvidersProps {
+  children: ReactNode
+}
 
-export default function Web3Providers({ children }: { children: React.ReactNode }) {
+export default function Web3Providers({ children }: Web3ProvidersProps) {
+  // your TON manifest URL
+  const tonManifestUrl = process.env.NEXT_PUBLIC_TON_MANIFEST_URL!
+
   return (
-    <WagmiProvider config={wagmiConfig}>
-      <TonConnectUIProvider manifestUrl={process.env.NEXT_PUBLIC_TON_MANIFEST_URL!}>
-        <SolanaProviders>
-          {children}
-        </SolanaProviders>
-      </TonConnectUIProvider>
-    </WagmiProvider>
+    <TonConnectUIProvider manifestUrl={tonManifestUrl}>
+      <TonProvider>
+        <EthereumProvider>
+          <SolanaProviders>
+            {children}
+          </SolanaProviders>
+        </EthereumProvider>
+      </TonProvider>
+    </TonConnectUIProvider>
   )
 }
