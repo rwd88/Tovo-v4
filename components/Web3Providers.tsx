@@ -1,39 +1,76 @@
 // components/Web3Providers.tsx
 'use client'
 
-import React, { ReactNode } from 'react'
-import dynamic from 'next/dynamic'
+import React, { ReactNode, useMemo } from 'react'
+import { WagmiConfig, createConfig, configureChains } from 'wagmi'
+import { mainnet } from 'wagmi/chains'
+import { publicProvider } from 'wagmi/providers/public'
+import { InjectedConnector } from 'wagmi/connectors/injected'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 // TON
 import { TonConnectUIProvider } from '@tonconnect/ui-react'
 import { TonProvider } from '../contexts/TonContext'
 
-// EVM (MetaMask)
+// SOLANA
+import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react'
+import { WalletModalProvider } from '@solana/wallet-adapter-react-ui'
+import {
+  PhantomWalletAdapter,
+  SolflareWalletAdapter,
+} from '@solana/wallet-adapter-wallets'
+
+// YOUR ETHEREUM (optional) context
 import { EthereumProvider } from '../contexts/EthereumContext'
 
-// Solana (client-only)
-const SolanaProviders = dynamic(
-  () => import('./SolanaProviders').then((mod) => mod.default),
-  { ssr: false }
-)
-
-interface Web3ProvidersProps {
+interface Props {
   children: ReactNode
 }
+export default function Web3Providers({ children }: Props) {
+  // ─── wagmi configuration ───────────────────────────────────
+  const { publicClient, webSocketPublicClient } = configureChains(
+    [mainnet],
+    [publicProvider()],
+  )
+  const wagmiConfig = createConfig({
+    autoConnect: true,
+    publicClient,
+    webSocketPublicClient,
+    connectors: [
+      new InjectedConnector({ chains: [mainnet] }),
+    ],
+  })
 
-export default function Web3Providers({ children }: Web3ProvidersProps) {
-  // your TON manifest URL
+  // ─── react-query ────────────────────────────────────────────
+  const queryClient = useMemo(() => new QueryClient(), [])
+
+  // ─── solana ────────────────────────────────────────────────
+  const solanaEndpoint = process.env.NEXT_PUBLIC_SOLANA_RPC_URL!
+  const solanaWallets = useMemo(
+    () => [new PhantomWalletAdapter(), new SolflareWalletAdapter()],
+    []
+  )
+
+  // ─── ton ────────────────────────────────────────────────────
   const tonManifestUrl = process.env.NEXT_PUBLIC_TON_MANIFEST_URL!
 
   return (
-    <TonConnectUIProvider manifestUrl={tonManifestUrl}>
-      <TonProvider>
-        <EthereumProvider>
-          <SolanaProviders>
-            {children}
-          </SolanaProviders>
-        </EthereumProvider>
-      </TonProvider>
-    </TonConnectUIProvider>
+    <WagmiConfig config={wagmiConfig}>
+      <QueryClientProvider client={queryClient}>
+        <TonConnectUIProvider manifestUrl={tonManifestUrl}>
+          <EthereumProvider>
+            <ConnectionProvider endpoint={solanaEndpoint}>
+              <WalletProvider wallets={solanaWallets} autoConnect>
+                <WalletModalProvider>
+                  <TonProvider>
+                    {children}
+                  </TonProvider>
+                </WalletModalProvider>
+              </WalletProvider>
+            </ConnectionProvider>
+          </EthereumProvider>
+        </TonConnectUIProvider>
+      </QueryClientProvider>
+    </WagmiConfig>
   )
 }
