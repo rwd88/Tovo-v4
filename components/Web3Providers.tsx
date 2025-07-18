@@ -4,8 +4,8 @@
 import React, { ReactNode, useMemo } from 'react'
 import { WagmiConfig, createConfig, configureChains } from 'wagmi'
 import { mainnet } from 'wagmi/chains'
-import { publicProvider } from 'wagmi/providers/public'
-import { InjectedConnector } from 'wagmi/connectors/injected'
+import { InjectedConnector }  from 'wagmi/connectors'
+import { publicProvider }     from 'wagmi/providers'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 // TON
