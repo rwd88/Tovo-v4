@@ -1,19 +1,19 @@
 // pages/_app.tsx
 'use client'
 
-import '../styles/globals.css'
+import { WagmiProvider } from 'wagmi'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { config } from '../lib/wagmi'
 import type { AppProps } from 'next/app'
-import dynamic from 'next/dynamic'
 
-const Web3Providers = dynamic(
-  () => import('../components/Web3Providers').then(mod => mod.default),
-  { ssr: false }
-)
+const queryClient = new QueryClient()
 
 export default function App({ Component, pageProps }: AppProps) {
   return (
-    <Web3Providers>
-      <Component {...pageProps} />
-    </Web3Providers>
+    <WagmiProvider config={config}>
+      <QueryClientProvider client={queryClient}>
+        <Component {...pageProps} />
+      </QueryClientProvider>
+    </WagmiProvider>
   )
 }
