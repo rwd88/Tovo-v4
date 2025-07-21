@@ -8,8 +8,8 @@ import dynamic from 'next/dynamic'
 // ─── Wagmi v1 / Ethereum ───────────────────────────────────────────────────────
 import { WagmiConfig, createClient, configureChains } from 'wagmi'
 import { mainnet }      from 'wagmi/chains'
-import { publicProvider }        from 'wagmi/providers/public'
-import { InjectedConnector }     from 'wagmi/connectors/injected'
+import { publicProvider }    from 'wagmi/providers/public'
+import { InjectedConnector } from 'wagmi/connectors/injected'
 
 // configureChains gives you both an HTTP publicClient and a WS client
 const { chains, provider, webSocketProvider } = configureChains(
@@ -29,14 +29,14 @@ const wagmiClient = createClient({
 
 // ─── TON Connect (browser-only) ────────────────────────────────────────────────
 const TonConnectUIProvider = dynamic(
-  () => import('@tonconnect/ui-react').then(m => m.TonConnectUIProvider),
+  () => import('@tonconnect/ui-react').then(mod => mod.TonConnectUIProvider),
   { ssr: false }
 )
 // ────────────────────────────────────────────────────────────────────────────────
 
 // ─── Solana Wallets (browser-only) ─────────────────────────────────────────────
 const SolanaProviders = dynamic(
-  () => import('../components/SolanaProviders'),
+  () => import('../components/SolanaProviders').then(mod => mod.default),
   { ssr: false }
 )
 // ────────────────────────────────────────────────────────────────────────────────
