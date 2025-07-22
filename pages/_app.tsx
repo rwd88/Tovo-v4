@@ -4,49 +4,45 @@
 import '../styles/globals.css'
 import type { AppProps } from 'next/app'
 import dynamic from 'next/dynamic'
+import { WagmiConfig, createConfig, configureChains } from 'wagmi'
+import { mainnet } from 'wagmi/chains'
 
-// ─── Wagmi v1 / Ethereum ───────────────────────────────────────────────────────
-import { WagmiConfig, createClient, configureChains } from 'wagmi'
-import { mainnet }      from 'wagmi/chains'
-import { publicProvider }    from 'wagmi/providers/public'
-import { InjectedConnector } from 'wagmi/connectors/injected'
+// ↙️ these two moved into separate packages:
+import { publicProvider } from '@wagmi/core/providers/public'
+import { InjectedConnector } from '@wagmi/connectors/injected'
 
-// configureChains gives you both an HTTP publicClient and a WS client
-const { chains, provider, webSocketProvider } = configureChains(
+// 1) configureChains gives you both an HTTP “publicClient” and a WS “webSocketPublicClient”
+const { publicClient, webSocketPublicClient } = configureChains(
   [mainnet],
-  [publicProvider()],
+  [
+    publicProvider(),
+  ]
 )
 
-const wagmiClient = createClient({
+// 2) createConfig replaces the old createClient in Wagmi v2
+const wagmiConfig = createConfig({
   autoConnect: true,
-  connectors: [
-    new InjectedConnector({ chains }),
-  ],
-  provider,
-  webSocketProvider,
+  connectors: [ new InjectedConnector({ chains: [mainnet] }) ],
+  publicClient,
+  webSocketPublicClient,
 })
-// ────────────────────────────────────────────────────────────────────────────────
 
-// ─── TON Connect (browser-only) ────────────────────────────────────────────────
+// TON (browser-only)
 const TonConnectUIProvider = dynamic(
   () => import('@tonconnect/ui-react').then(mod => mod.TonConnectUIProvider),
   { ssr: false }
 )
-// ────────────────────────────────────────────────────────────────────────────────
 
-// ─── Solana Wallets (browser-only) ─────────────────────────────────────────────
+// Solana (browser-only)
 const SolanaProviders = dynamic(
   () => import('../components/SolanaProviders').then(mod => mod.default),
   { ssr: false }
 )
-// ────────────────────────────────────────────────────────────────────────────────
 
 export default function App({ Component, pageProps }: AppProps) {
-  const tonManifest = process.env.NEXT_PUBLIC_TON_MANIFEST_URL!
-
   return (
-    <WagmiConfig client={wagmiClient}>
-      <TonConnectUIProvider manifestUrl={tonManifest}>
+    <WagmiConfig config={wagmiConfig}>
+      <TonConnectUIProvider manifestUrl={process.env.NEXT_PUBLIC_TON_MANIFEST_URL!}>
         <SolanaProviders>
           <Component {...pageProps} />
         </SolanaProviders>
