@@ -1,39 +1,67 @@
 // components/Web3Providers.tsx
 'use client'
 
-import { WagmiConfig, createConfig, http } from 'wagmi'
+import React, { useMemo } from 'react'
+import { WagmiConfig, createConfig, configureChains } from 'wagmi'
 import { mainnet } from 'wagmi/chains'
+import { publicProvider } from '@wagmi/core/providers/public'
+import { InjectedConnector } from '@wagmi/connectors/injected'
+import { http } from 'viem'
+
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { TonConnectUIProvider } from '@tonconnect/ui-react'
+
 import {
-  ConnectionProvider,
-  WalletProvider,
+  ConnectionProvider as SolanaConnectionProvider,
+  WalletProvider as SolanaWalletProvider,
 } from '@solana/wallet-adapter-react'
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui'
-import { PhantomWalletAdapter } from '@solana/wallet-adapter-wallets'
+import {
+  PhantomWalletAdapter,
+  SolflareWalletAdapter,
+} from '@solana/wallet-adapter-wallets'
 
 const queryClient = new QueryClient()
 
+// 1️⃣ Configure your Ethereum chains & providers
+const { publicClient, webSocketPublicClient } = configureChains(
+  [mainnet],
+  [
+    publicProvider(),             // JSON-RPC fallback
+  ],
+)
+
+// 2️⃣ Create your Wagmi config
 const wagmiConfig = createConfig({
   autoConnect: true,
-  connectors: [],        // ← add your connectors here
-  publicClient: http(mainnet),
+  connectors: [
+    new InjectedConnector({ chains: [mainnet] }),
+  ],
+  publicClient,
+  webSocketPublicClient,
 })
 
-const solanaWallets = [new PhantomWalletAdapter()]
-
 export default function Web3Providers({ children }: { children: React.ReactNode }) {
+  const tonManifestUrl = process.env.NEXT_PUBLIC_TON_MANIFEST_URL!
+  const solanaEndpoint   = process.env.NEXT_PUBLIC_SOLANA_RPC_URL!
+
+  // memoize your Solana adapters so they don’t re-init on every render
+  const solanaWallets = useMemo(
+    () => [ new PhantomWalletAdapter(), new SolflareWalletAdapter() ],
+    []
+  )
+
   return (
     <WagmiConfig config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
-        <TonConnectUIProvider manifestUrl={process.env.NEXT_PUBLIC_TON_MANIFEST_URL!}>
-          <ConnectionProvider endpoint={process.env.NEXT_PUBLIC_SOLANA_RPC_URL!}>
-            <WalletProvider wallets={solanaWallets} autoConnect>
+        <TonConnectUIProvider manifestUrl={tonManifestUrl}>
+          <SolanaConnectionProvider endpoint={solanaEndpoint}>
+            <SolanaWalletProvider wallets={solanaWallets} autoConnect>
               <WalletModalProvider>
                 {children}
               </WalletModalProvider>
-            </WalletProvider>
-          </ConnectionProvider>
+            </SolanaWalletProvider>
+          </SolanaConnectionProvider>
         </TonConnectUIProvider>
       </QueryClientProvider>
     </WagmiConfig>

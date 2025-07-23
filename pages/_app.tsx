@@ -4,39 +4,37 @@
 import '../styles/globals.css'
 import type { AppProps } from 'next/app'
 import dynamic from 'next/dynamic'
+
 import { WagmiConfig, createConfig, configureChains } from 'wagmi'
 import { mainnet } from 'wagmi/chains'
-
-// ↙️ these two moved into separate packages:
 import { publicProvider } from '@wagmi/core/providers/public'
 import { InjectedConnector } from '@wagmi/connectors/injected'
 
-// 1) configureChains gives you both an HTTP “publicClient” and a WS “webSocketPublicClient”
+// ← this is the only correct import for HTTP transport
+import { http } from 'viem'
+
 const { publicClient, webSocketPublicClient } = configureChains(
   [mainnet],
-  [
-    publicProvider(),
-  ]
+  [publicProvider()],
 )
 
-// 2) createConfig replaces the old createClient in Wagmi v2
 const wagmiConfig = createConfig({
   autoConnect: true,
-  connectors: [ new InjectedConnector({ chains: [mainnet] }) ],
+  connectors: [
+    new InjectedConnector({ chains: [mainnet] }),
+  ],
   publicClient,
   webSocketPublicClient,
 })
 
-// TON (browser-only)
 const TonConnectUIProvider = dynamic(
-  () => import('@tonconnect/ui-react').then(mod => mod.TonConnectUIProvider),
-  { ssr: false }
+  () => import('@tonconnect/ui-react').then((m) => m.TonConnectUIProvider),
+  { ssr: false },
 )
 
-// Solana (browser-only)
 const SolanaProviders = dynamic(
-  () => import('../components/SolanaProviders').then(mod => mod.default),
-  { ssr: false }
+  () => import('../components/SolanaProviders').then((m) => m.default),
+  { ssr: false },
 )
 
 export default function App({ Component, pageProps }: AppProps) {
