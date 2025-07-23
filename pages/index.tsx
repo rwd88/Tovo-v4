@@ -7,8 +7,7 @@ import styles from "../styles/Home.module.css"
 import TradeForm from "../components/TradeForm"
 import { useTokenBalance } from "../hooks/useTokenBalance"
 import { useEffect, useState } from "react"
-import { ConnectButton } from "@rainbow-me/rainbowkit"
-import { useEthereum } from "../contexts/EthereumContext"
+import { useConnect, useAccount } from "wagmi"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -38,28 +37,25 @@ function getTimeRemainingText(eventTime: string): string {
 
 export default function Home() {
   const [isClient, setIsClient] = useState(false)
-  const { address } = useEthereum()
-  const [markets, setMarkets] = useState<any[]>([])
+  const { data: account } = useAccount()
+  const { connect, connectors, error: connectError, isLoading: isConnecting } = useConnect()
+  const address = account?.address
 
+  // Load markets after hydration
+  const [markets, setMarkets] = useState<any[]>([])
   useEffect(() => {
     setIsClient(true)
-
-    // ✅ Fetch active markets
     fetch("/api/markets/active")
       .then((res) => res.json())
-      .then((data) => {
-        setMarkets(data.markets || [])
-      })
+      .then((data) => setMarkets(data.markets || []))
       .catch(console.error)
   }, [])
 
-  // Only read balances on the client, once we know we have an address
+  // Balances
   const USDT_ADDRESS = "0xdAC17F958D2ee523a2206206994597C13D831ec7"
   const USDC_ADDRESS = "0xA0b86991C6218B36c1d19D4a2e9Eb0cE3606EB48"
-  const usdtBalance =
-    isClient && address ? useTokenBalance(USDT_ADDRESS) : null
-  const usdcBalance =
-    isClient && address ? useTokenBalance(USDC_ADDRESS) : null
+  const usdtBalance = isClient && address ? useTokenBalance(USDT_ADDRESS) : null
+  const usdcBalance = isClient && address ? useTokenBalance(USDC_ADDRESS) : null
 
   if (!isClient) return null
 
@@ -74,12 +70,29 @@ export default function Home() {
 
       <div className={`${styles.page} ${geistSans.variable} ${geistMono.variable}`}>
         <main className={styles.main}>
-          {/* ⬇️ Wallet Connect Button (RainbowKit) */}
+          {/* ─── Wallet Connect Button ─────────────────────────────────────── */}
           <div className="mb-6">
-            <ConnectButton />
+            {address ? (
+              <button className="btn" disabled>
+                Connected: {address.slice(0, 6)}…{address.slice(-4)}
+              </button>
+            ) : (
+              <button
+                className="btn btn--blue"
+                onClick={() => connect({ connector: connectors[0] })}
+                disabled={isConnecting}
+              >
+                {isConnecting ? "Connecting…" : "Connect Wallet"}
+              </button>
+            )}
+            {connectError && (
+              <p className="text-red-500 text-sm mt-2">
+                {connectError.message}
+              </p>
+            )}
           </div>
 
-          {/* Show balances once connected */}
+          {/* ─── Balances ────────────────────────────────────────────────────── */}
           {address && (
             <div className="mb-6">
               <p>USDT Balance: {usdtBalance ?? "Loading..."}</p>
@@ -87,14 +100,14 @@ export default function Home() {
             </div>
           )}
 
-          {/* Show trade form once connected */}
+          {/* ─── Trade Form ─────────────────────────────────────────────────── */}
           {address && (
             <div className="mb-8">
               <TradeForm />
             </div>
           )}
 
-          {/* 🔥 Prediction Market UI */}
+          {/* ─── Market List ────────────────────────────────────────────────── */}
           <div className="w-full">
             <h2 className="text-2xl font-bold text-center mb-6 text-teal-500">
               PREDICTION MARKETS TODAY
@@ -121,7 +134,7 @@ export default function Home() {
                     ⏳ {getTimeRemainingText(market.eventTime)}
                   </p>
 
-                  {/* Tags from eventType */}
+                  {/* Tags */}
                   <div className="flex flex-wrap gap-2 mb-3">
                     {(market.eventType?.split(",") || []).map(
                       (tag: string, j: number) => (
@@ -135,7 +148,7 @@ export default function Home() {
                     )}
                   </div>
 
-                  {/* Pool buttons */}
+                  {/* Pool Buttons */}
                   <div className="space-y-2">
                     <div className="bg-teal-400 text-black font-semibold px-4 py-2 rounded-full">
                       Yes {yesPercent}%
@@ -150,7 +163,7 @@ export default function Home() {
           </div>
         </main>
 
-        {/* Footer */}
+        {/* ─── Footer ──────────────────────────────────────────────────────── */}
         <footer className={styles.footer}>
           <a
             href="https://nextjs.org"
