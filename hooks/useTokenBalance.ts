@@ -1,9 +1,11 @@
 // hooks/useTokenBalance.ts
+'use client'
+
 import { useState, useEffect } from 'react'
-import { Contract, ethers } from 'ethers'
+import { Contract, formatUnits } from 'ethers'
 import { useEthereum } from '../contexts/EthereumContext'
 
-// Minimal ERC-20 ABI for balanceOf & decimals
+// Minimal ERC-20 ABI
 const ERC20_ABI = [
   'function balanceOf(address) view returns (uint256)',
   'function decimals() view returns (uint8)',
@@ -17,16 +19,19 @@ export function useTokenBalance(tokenAddress: string): string {
     if (!provider || !address) return
     let stale = false
 
-    // Cast provider to any so Contract accepts it as a runner
+    // Create a read-only contract instance
     const contract = new Contract(tokenAddress, ERC20_ABI, provider as any)
 
     async function fetchBalance() {
       try {
-        const decimals: number = await contract.decimals()
-        const raw: ethers.BigNumberish = await contract.balanceOf(address)
+        // Fetch both decimals and raw balance in parallel
+        const [decimals, raw] = await Promise.all([
+          contract.decimals(),
+          contract.balanceOf(address),
+        ])
         if (stale) return
-        // v6: use ethers.formatUnits instead of ethers.utils.formatUnits
-        const formatted = ethers.formatUnits(raw, decimals)
+        // Format using the standalone import
+        const formatted = formatUnits(raw, decimals)
         setBalance(formatted)
       } catch (err) {
         console.error('useTokenBalance error', err)
@@ -34,7 +39,9 @@ export function useTokenBalance(tokenAddress: string): string {
     }
 
     fetchBalance()
-    return () => { stale = true }
+    return () => {
+      stale = true
+    }
   }, [provider, address, tokenAddress])
 
   return balance
