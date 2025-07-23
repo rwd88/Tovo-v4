@@ -3,12 +3,11 @@
 
 import React, { ReactNode, useEffect } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-
-// ─── Wagmi v2 / Ethereum ────────────────────────────────────────────────────────
 import { WagmiConfig, createConfig, configureChains } from 'wagmi'
 import { mainnet } from 'wagmi/chains'
-import { publicProvider } from 'wagmi/providers/public'         // ← here
-import { InjectedConnector } from '@wagmi/connectors/injected'  // ← same as before
+import { publicProvider } from '@wagmi/core/providers/public'
+import { InjectedConnector } from '@wagmi/connectors/injected'
+
 // ────────────────────────────────────────────────────────────────────────────────
 
 import { TonConnectUIProvider } from '@tonconnect/ui-react'
