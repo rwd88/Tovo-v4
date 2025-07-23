@@ -2,7 +2,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Contract, formatUnits } from 'ethers'
+import { Contract } from 'ethers'
+// ← pull formatUnits from the utils entrypoint
+import { formatUnits } from 'ethers/lib/utils'
 import { useEthereum } from '../contexts/EthereumContext'
 
 // Minimal ERC-20 ABI
@@ -19,18 +21,16 @@ export function useTokenBalance(tokenAddress: string): string {
     if (!provider || !address) return
     let stale = false
 
-    // Create a read-only contract instance
     const contract = new Contract(tokenAddress, ERC20_ABI, provider as any)
 
     async function fetchBalance() {
       try {
-        // Fetch both decimals and raw balance in parallel
         const [decimals, raw] = await Promise.all([
           contract.decimals(),
           contract.balanceOf(address),
         ])
         if (stale) return
-        // Format using the standalone import
+        // formatUnits now comes from ethers/lib/utils
         const formatted = formatUnits(raw, decimals)
         setBalance(formatted)
       } catch (err) {
