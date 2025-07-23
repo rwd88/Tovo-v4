@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react'
 import { Contract } from 'ethers'
-// ← pull formatUnits from the utils entrypoint
+// ← this is the single change!
 import { formatUnits } from 'ethers/lib/utils'
 import { useEthereum } from '../contexts/EthereumContext'
 
@@ -30,7 +30,6 @@ export function useTokenBalance(tokenAddress: string): string {
           contract.balanceOf(address),
         ])
         if (stale) return
-        // formatUnits now comes from ethers/lib/utils
         const formatted = formatUnits(raw, decimals)
         setBalance(formatted)
       } catch (err) {

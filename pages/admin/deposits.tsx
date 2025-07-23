@@ -1,5 +1,5 @@
 // pages/admin/deposits.tsx
-'use client'                          // ← this is crucial!
++ 'use client'
 
 import { useEffect, useState } from 'react'
 
@@ -36,12 +36,7 @@ export default function DepositsAdmin() {
       <table className="min-w-full border">
         <thead>
           <tr>
-            <th>ID</th>
-            <th>Network</th>
-            <th>TX Hash</th>
-            <th>Status</th>
-            <th>Time</th>
-            <th>Actions</th>
+            <th>ID</th><th>Network</th><th>TX Hash</th><th>Status</th><th>Time</th><th>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -54,20 +49,10 @@ export default function DepositsAdmin() {
               <td>{new Date(d.createdAt).toLocaleString()}</td>
               <td className="space-x-2">
                 {d.status !== 'approved' && (
-                  <button
-                    className="px-2 py-1 bg-green-500 text-white rounded"
-                    onClick={() => updateStatus(d.id, 'approved')}
-                  >
-                    Approve
-                  </button>
+                  <button onClick={() => updateStatus(d.id, 'approved')}>Approve</button>
                 )}
                 {d.status !== 'rejected' && (
-                  <button
-                    className="px-2 py-1 bg-red-500 text-white rounded"
-                    onClick={() => updateStatus(d.id, 'rejected')}
-                  >
-                    Reject
-                  </button>
+                  <button onClick={() => updateStatus(d.id, 'rejected')}>Reject</button>
                 )}
               </td>
             </tr>
