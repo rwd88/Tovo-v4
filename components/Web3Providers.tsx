@@ -1,51 +1,54 @@
 'use client'
+import React, { ReactNode } from 'react'
 
-import React, { ReactNode, useEffect } from 'react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { WagmiConfig, createConfig, configureChains } from 'wagmi'
-import { mainnet } from 'wagmi/chains'
-import { publicProvider } from 'wagmi/providers/public'
-import { InjectedConnector } from 'wagmi/connectors/injected'
-import { TonConnectUIProvider } from '@tonconnect/ui-react'
-import {
-  ConnectionProvider,
-  WalletProvider,
-} from '@solana/wallet-adapter-react'
-import { WalletModalProvider } from '@solana/wallet-adapter-react-ui'
+// Ethereum (Using Ethers + Web3Modal standalone)
+import { Web3Modal } from '@web3modal/standalone'
+import { ethers } from 'ethers'
+
+// Solana
+import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react'
 import { PhantomWalletAdapter } from '@solana/wallet-adapter-wallets'
+import { WalletModalProvider } from '@solana/wallet-adapter-react-ui'
+import '@solana/wallet-adapter-react-ui/styles.css'
 
-const queryClient = new QueryClient()
+// TON
+import { TonConnectUIProvider } from '@tonconnect/ui-react'
 
-const { chains, publicClient, webSocketPublicClient } = configureChains(
-  [mainnet],
-  [publicProvider()],
-)
-
-const wagmiConfig = createConfig({
-  autoConnect: true,
-  connectors: [new InjectedConnector({ chains })],
-  publicClient,
-  webSocketPublicClient,
+// Ethereum Web3Modal config
+const web3Modal = new Web3Modal({
+  projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID!,
+  walletConnectVersion: 2
 })
 
-export default function Web3Providers({ children }: { children: ReactNode }) {
-  useEffect(() => console.log('🔌 Web3Providers mounted'), [])
+// Solana wallets
+const solanaWallets = [new PhantomWalletAdapter()]
 
+export default function Web3Providers({ children }: { children: ReactNode }) {
   return (
-    <WagmiConfig config={wagmiConfig}>
-      <QueryClientProvider client={queryClient}>
-        <TonConnectUIProvider
-          manifestUrl={process.env.NEXT_PUBLIC_TON_MANIFEST_URL!}
-        >
-          <ConnectionProvider endpoint={process.env.NEXT_PUBLIC_SOLANA_RPC_URL!}>
-            <WalletProvider wallets={[new PhantomWalletAdapter()]} autoConnect>
-              <WalletModalProvider>
-                {children}
-              </WalletModalProvider>
-            </WalletProvider>
-          </ConnectionProvider>
-        </TonConnectUIProvider>
-      </QueryClientProvider>
-    </WagmiConfig>
+    <>
+      {/* Solana Provider */}
+      <ConnectionProvider endpoint={process.env.NEXT_PUBLIC_SOLANA_RPC_URL!}>
+        <WalletProvider wallets={solanaWallets} autoConnect>
+          <WalletModalProvider>
+            
+            {/* TON Provider */}
+            <TonConnectUIProvider manifestUrl={process.env.NEXT_PUBLIC_TON_MANIFEST_URL!}>
+              {children}
+            </TonConnectUIProvider>
+
+          </WalletModalProvider>
+        </WalletProvider>
+      </ConnectionProvider>
+    </>
   )
+}
+
+// Ethereum helper function (use anywhere in your app)
+export async function connectEthereum() {
+  const provider = await web3Modal.openModal()
+  const ethersProvider = new ethers.BrowserProvider(provider)
+  return {
+    provider,
+    signer: await ethersProvider.getSigner()
+  }
 }
