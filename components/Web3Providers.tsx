@@ -10,7 +10,6 @@ import { http } from 'viem'
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { TonConnectUIProvider } from '@tonconnect/ui-react'
-
 import {
   ConnectionProvider as SolanaConnectionProvider,
   WalletProvider as SolanaWalletProvider,
@@ -23,15 +22,13 @@ import {
 
 const queryClient = new QueryClient()
 
-// 1️⃣ Configure your Ethereum chains & providers
+// 1️⃣ configureChains
 const { publicClient, webSocketPublicClient } = configureChains(
   [mainnet],
-  [
-    publicProvider(),             // JSON-RPC fallback
-  ],
+  [publicProvider()],
 )
 
-// 2️⃣ Create your Wagmi config
+// 2️⃣ createConfig
 const wagmiConfig = createConfig({
   autoConnect: true,
   connectors: [
@@ -45,7 +42,6 @@ export default function Web3Providers({ children }: { children: React.ReactNode 
   const tonManifestUrl = process.env.NEXT_PUBLIC_TON_MANIFEST_URL!
   const solanaEndpoint   = process.env.NEXT_PUBLIC_SOLANA_RPC_URL!
 
-  // memoize your Solana adapters so they don’t re-init on every render
   const solanaWallets = useMemo(
     () => [ new PhantomWalletAdapter(), new SolflareWalletAdapter() ],
     []
