@@ -3,6 +3,7 @@ import Head from "next/head"
 import Image from "next/image"
 import { Geist, Geist_Mono } from "next/font/google"
 import styles from "../styles/Home.module.css"
+import TestConnection from '../components/TestConnection'
 
 import TradeForm from "../components/TradeForm"
 import { useTokenBalance } from "../hooks/useTokenBalance"
@@ -19,6 +20,14 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 })
 
+export default function Home() {
+  return (
+    <main>
+      <h1>Welcome to Tovo-Bot!</h1>
+      <TestConnection />
+    </main>
+  )
+}
 // Helper to show ⏳ time left
 function getTimeRemainingText(eventTime: string): string {
   const now = new Date()

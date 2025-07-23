@@ -5,10 +5,13 @@ import '../styles/globals.css'
 import type { AppProps } from 'next/app'
 import dynamic from 'next/dynamic'
 
-// dynamically load our entire Web3 stack (client-only)
+// dynamically load Web3Providers on the client only
 const Web3Providers = dynamic(
-  () => import('../components/Web3Providers').then((m) => m.default),
-  { ssr: false, loading: () => <div>Loading…</div> }
+  () => import('../components/Web3Providers'),
+  {
+    ssr: false,
+    loading: () => <div>Loading Web3…</div>,
+  }
 )
 
 export default function MyApp({ Component, pageProps }: AppProps) {
