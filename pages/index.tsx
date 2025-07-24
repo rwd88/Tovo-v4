@@ -11,7 +11,7 @@ import { useEffect, useState } from 'react'
 import { useEthereum } from '../contexts/EthereumContext'
 import { useSolana } from '../contexts/SolanaContext'
 import { useTon } from '../contexts/TonContext'
-import { ConnectWalletButton } from '../../components/ConnectWalletButton'
+import ConnectWalletButton from '../components/ConnectWalletButton'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
