@@ -1,80 +1,75 @@
-// src/components/ConnectWalletButton.tsx
-'use client'
+// components/ConnectWalletButton.tsx
+import React, { useState } from 'react';
+import { useEthereum } from '../../contexts/EthereumContext';
+import { useSolana } from '../../contexts/SolanaContext';
+import { useTon } from '<div styleName={} />../../../contexts/TonContext';
 
-import { useState, useEffect } from 'react'
-import { useEthereum } from '../../contexts/EthereumContext'
-
-export function ConnectWalletButton() {
-  const client = useEthereum()
-  const [address, setAddress] = useState<string | null>(null)
-  const [isConnecting, setIsConnecting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  // If already connected (e.g. on page reload), fetch accounts
-  useEffect(() => {
-    async function checkConnected() {
-      try {
-        const accounts = await (window.ethereum as any)?.request({
-          method: 'eth_accounts',
-        })
-        if (Array.isArray(accounts) && accounts[0]) {
-          setAddress(accounts[0] as string)
-        }
-      } catch {
-        // ignore
-      }
-    }
-    checkConnected()
-  }, [])
+export const ConnectWalletButton = () => {
+  const [activeChain, setActiveChain] = useState<'ethereum' | 'solana' | 'ton'>('ethereum');
+  const [isConnecting, setIsConnecting] = useState(false);
+  
+  const { address: ethAddress, connect: connectEth, disconnect: disconnectEth } = useEthereum();
+  const { publicKey: solAddress, connect: connectSol, disconnect: disconnectSol } = useSolana();
+  const { address: tonAddress, connect: connectTon, disconnect: disconnectTon } = useTon();
 
   const handleConnect = async () => {
-    setError(null)
-    if (!(window.ethereum as any)) {
-      setError('No Ethereum provider found')
-      return
-    }
-    setIsConnecting(true)
+    setIsConnecting(true);
     try {
-      const accounts: string[] = await (window.ethereum as any).request({
-        method: 'eth_requestAccounts',
-      })
-      setAddress(accounts[0])
-    } catch (err: any) {
-      if (err.code === 4001) {
-        // EIP-1193 user rejected
-        setError('Connection request rejected')
-      } else {
-        setError('Unexpected error')
-        console.error(err)
-      }
+      if (activeChain === 'ethereum') await connectEth();
+      if (activeChain === 'solana') await connectSol();
+      if (activeChain === 'ton') await connectTon();
     } finally {
-      setIsConnecting(false)
+      setIsConnecting(false);
     }
-  }
+  };
 
-  if (address) {
-    return (
-      <button className="btn">
-        ✅ {address.slice(0, 6)}…{address.slice(-4)}
-      </button>
-    )
-  }
+  const handleDisconnect = async () => {
+    if (activeChain === 'ethereum') await disconnectEth();
+    if (activeChain === 'solana') await disconnectSol();
+    if (activeChain === 'ton') await disconnectTon();
+  };
+
+  const currentAddress = 
+    activeChain === 'ethereum' ? ethAddress :
+    activeChain === 'solana' ? solAddress?.toString() :
+    tonAddress;
 
   return (
-    <>
-      <button
-        type="button"
-        className="btn bg-blue-500 text-white px-4 py-2 rounded"
-        onClick={handleConnect}
-        disabled={isConnecting}
-      >
-        {isConnecting ? 'Connecting…' : 'Connect Wallet'}
-      </button>
-      {error && (
-        <p className="mt-2 text-red-500 text-sm">
-          {error}
-        </p>
+    <div className="wallet-connector">
+      <div className="chain-selector">
+        <button 
+          className={activeChain === 'ethereum' ? 'active' : ''}
+          onClick={() => setActiveChain('ethereum')}
+        >
+          Ethereum
+        </button>
+        <button
+          className={activeChain === 'solana' ? 'active' : ''}
+          onClick={() => setActiveChain('solana')}
+        >
+          Solana
+        </button>
+        <button
+          className={activeChain === 'ton' ? 'active' : ''}
+          onClick={() => setActiveChain('ton')}
+        >
+          TON
+        </button>
+      </div>
+      
+      {currentAddress ? (
+        <button className="connected-btn" onClick={handleDisconnect}>
+          {`${currentAddress.slice(0, 6)}...${currentAddress.slice(-4)}`}
+        </button>
+      ) : (
+        <button 
+          className="connect-btn" 
+          onClick={handleConnect}
+          disabled={isConnecting}
+        >
+          {isConnecting ? 'Connecting...' : 'Connect Wallet'}
+        </button>
       )}
-    </>
-  )
-}
+    </div>
+  );
+};

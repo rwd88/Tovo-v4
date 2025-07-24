@@ -1,9 +1,5 @@
-import React, {
-  createContext,
-  useContext,
-  useState,
-  ReactNode,
-} from 'react';
+// contexts/EthereumContext.tsx
+import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { Web3Provider as EthersWeb3Provider } from '@ethersproject/providers';
 
 type EthContextType = {
@@ -20,30 +16,27 @@ const EthContext = createContext<EthContextType>({
   disconnect: async () => {},
 });
 
-export const EthereumProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+export const EthereumProvider = ({ children }: { children: ReactNode }) => {
   const [provider, setProvider] = useState<EthersWeb3Provider | null>(null);
   const [address, setAddress] = useState<string | null>(null);
 
   const connect = async () => {
     if (typeof window === 'undefined') return;
-    
     try {
       const Web3Modal = (await import('web3modal')).default;
       const modal = new Web3Modal({ cacheProvider: true });
       const instance = await modal.connect();
       const web3Provider = new EthersWeb3Provider(instance);
-      
       setProvider(web3Provider);
       const signer = web3Provider.getSigner();
       setAddress(await signer.getAddress());
     } catch (error) {
-      console.error('Connection error:', error);
+      console.error('Ethereum connection error:', error);
     }
   };
 
   const disconnect = async () => {
     if (typeof window === 'undefined') return;
-    
     try {
       const Web3Modal = (await import('web3modal')).default;
       const modal = new Web3Modal({ cacheProvider: true });
@@ -51,7 +44,7 @@ export const EthereumProvider: React.FC<{ children: ReactNode }> = ({ children }
       setProvider(null);
       setAddress(null);
     } catch (error) {
-      console.error('Disconnection error:', error);
+      console.error('Ethereum disconnection error:', error);
     }
   };
 

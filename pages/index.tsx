@@ -1,58 +1,66 @@
-'use client';
+// pages/index.tsx
+'use client'
 
-import Head from 'next/head';
-import Image from 'next/image';
-import { Geist, Geist_Mono } from 'next/font/google';
-import styles from '../styles/Home.module.css';
-import TradeForm from '../components/TradeForm';
-import { useTokenBalance } from '../hooks/useTokenBalance';
-import { useEffect, useState } from 'react';
-import { useEthereum } from '../contexts/EthereumContext';
+import Head from 'next/head'
+import Image from 'next/image'
+import { Geist, Geist_Mono } from 'next/font/google'
+import styles from '../styles/Home.module.css'
+import TradeForm from '../components/TradeForm'
+import { useTokenBalance } from '../hooks/useTokenBalance'
+import { useEffect, useState } from 'react'
+import { useEthereum } from '../contexts/EthereumContext'
+import { useSolana } from '../contexts/SolanaContext'
+import { useTon } from '../contexts/TonContext'
+import { ConnectWalletButton } from '../../components/ConnectWalletButton'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
   subsets: ['latin'],
-});
+})
 const geistMono = Geist_Mono({
   variable: '--font-geist-mono',
   subsets: ['latin'],
-});
+})
 
 function getTimeRemainingText(eventTime: string): string {
-  const now = new Date();
-  const end = new Date(eventTime);
-  const diff = end.getTime() - now.getTime();
-  if (diff <= 0) return 'Expired';
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+  const now = new Date()
+  const end = new Date(eventTime)
+  const diff = end.getTime() - now.getTime()
+  if (diff <= 0) return 'Expired'
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+  const hours = Math.floor((diff / (1000 * 60 * 60)) % 24)
   if (days > 0 && hours > 0)
     return `Ends in ${days} day${days > 1 ? 's' : ''} ${hours} hour${
       hours > 1 ? 's' : ''
-    }`;
-  if (days > 0) return `Ends in ${days} day${days > 1 ? 's' : ''}`;
-  return `Ends in ${hours} hour${hours > 1 ? 's' : ''}`;
+    }`
+  if (days > 0) return `Ends in ${days} day${days > 1 ? 's' : ''}`
+  return `Ends in ${hours} hour${hours > 1 ? 's' : ''}`
 }
 
 export default function Home() {
-  const { address, connect, disconnect } = useEthereum();
-  const [isClient, setIsClient] = useState(false);
-  const [markets, setMarkets] = useState<any[]>([]);
-  const [isConnecting, setIsConnecting] = useState(false);
+  const { address: ethAddress } = useEthereum()
+  const { publicKey: solAddress } = useSolana()
+  const { address: tonAddress } = useTon()
+  const [isClient, setIsClient] = useState(false)
+  const [markets, setMarkets] = useState<any[]>([])
+  
+  // Use Ethereum address for balances by default
+  const activeAddress = ethAddress || solAddress?.toString() || tonAddress
 
   useEffect(() => {
-    setIsClient(true);
+    setIsClient(true)
     fetch('/api/markets/active')
       .then((res) => res.json())
       .then((data) => setMarkets(data.markets || []))
-      .catch(console.error);
-  }, []);
+      .catch(console.error)
+  }, [])
 
-  const USDT_ADDRESS = '0xdAC17F958D2ee523a2206206994597C13D831ec7';
-  const USDC_ADDRESS = '0xA0b86991C6218B36c1d19D4a2e9Eb0cE3606EB48';
-  const usdtBalance = isClient && address ? useTokenBalance(USDT_ADDRESS) : null;
-  const usdcBalance = isClient && address ? useTokenBalance(USDC_ADDRESS) : null;
+  const USDT_ADDRESS = '0xdAC17F958D2ee523a2206206994597C13D831ec7'
+  const USDC_ADDRESS = '0xA0b86991C6218B36c1d19D4a2e9Eb0cE3606EB48'
+  const usdtBalance = isClient && ethAddress ? useTokenBalance(USDT_ADDRESS) : null
+  const usdcBalance = isClient && ethAddress ? useTokenBalance(USDC_ADDRESS) : null
 
-  if (!isClient) return null;
+  if (!isClient) return null
 
   return (
     <>
@@ -67,26 +75,11 @@ export default function Home() {
         <main className={styles.main}>
           {/* Wallet Connect */}
           <div className="mb-6">
-            {address ? (
-              <button className="btn" onClick={disconnect}>
-                Connected: {address.slice(0, 6)}…{address.slice(-4)}
-              </button>
-            ) : (
-              <button
-                className="btn btn--blue"
-                onClick={() => {
-                  setIsConnecting(true);
-                  connect().finally(() => setIsConnecting(false));
-                }}
-                disabled={isConnecting}
-              >
-                {isConnecting ? 'Connecting…' : 'Connect Wallet'}
-              </button>
-            )}
+            <ConnectWalletButton />
           </div>
 
-          {/* Balances */}
-          {address && (
+          {/* Balances - Only show for Ethereum */}
+          {ethAddress && (
             <div className="mb-6">
               <p>USDT Balance: {usdtBalance ?? 'Loading…'}</p>
               <p>USDC Balance: {usdcBalance ?? 'Loading…'}</p>
@@ -94,7 +87,7 @@ export default function Home() {
           )}
 
           {/* Trade Form */}
-          {address && (
+          {activeAddress && (
             <div className="mb-8">
               <TradeForm />
             </div>
@@ -107,10 +100,10 @@ export default function Home() {
             </h2>
 
             {markets.map((market, idx) => {
-              const yes = market.poolYes ?? 0;
-              const no = market.poolNo ?? 0;
-              const yesPct = yes + no > 0 ? Math.round((yes / (yes + no)) * 100) : 50;
-              const noPct = 100 - yesPct;
+              const yes = market.poolYes ?? 0
+              const no = market.poolNo ?? 0
+              const yesPct = yes + no > 0 ? Math.round((yes / (yes + no)) * 100) : 50
+              const noPct = 100 - yesPct
 
               return (
                 <div
@@ -144,7 +137,7 @@ export default function Home() {
                     </div>
                   </div>
                 </div>
-              );
+              )
             })}
           </div>
         </main>
@@ -157,5 +150,5 @@ export default function Home() {
         </footer>
       </div>
     </>
-  );
+  )
 }
