@@ -1,25 +1,32 @@
 // components/ErrorBoundary.tsx
 'use client'
 
-import { Component, ReactNode } from 'react'
+import { Component, ErrorInfo, ReactNode } from 'react'
 
 interface Props {
   children: ReactNode
-  fallback: ReactNode
+  fallback?: ReactNode
 }
 
 interface State {
   hasError: boolean
 }
 
-export default class ErrorBoundary extends Component<Props, State> {
-  state = { hasError: false }
+export class ErrorBoundary extends Component<Props, State> {
+  state: State = { hasError: false }
 
-  static getDerivedStateFromError() {
+  static getDerivedStateFromError(_: Error): State {
     return { hasError: true }
   }
 
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('ErrorBoundary caught:', error, errorInfo)
+  }
+
   render() {
-    return this.state.hasError ? this.props.fallback : this.props.children
+    if (this.state.hasError) {
+      return this.props.fallback || <div className="error">Something went wrong. Please refresh the page.</div>
+    }
+    return this.props.children
   }
 }

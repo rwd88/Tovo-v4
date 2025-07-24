@@ -1,75 +1,54 @@
-// components/ConnectWalletButton.tsx
-import React, { useState } from 'react';
-import { useEthereum } from '../../contexts/EthereumContext';
-import { useSolana } from '../../contexts/SolanaContext';
-import { useTon } from '<div styleName={} />../../../contexts/TonContext';
+'use client'
+import { useState, useEffect } from 'react'
+import { useEthereum } from '../../contexts/EthereumContext'
+import { useSolana } from '../../contexts/SolanaContext'
+import { useTon } from '../../contexts/TonContext'
 
 export const ConnectWalletButton = () => {
-  const [activeChain, setActiveChain] = useState<'ethereum' | 'solana' | 'ton'>('ethereum');
-  const [isConnecting, setIsConnecting] = useState(false);
-  
-  const { address: ethAddress, connect: connectEth, disconnect: disconnectEth } = useEthereum();
-  const { publicKey: solAddress, connect: connectSol, disconnect: disconnectSol } = useSolana();
-  const { address: tonAddress, connect: connectTon, disconnect: disconnectTon } = useTon();
+  const [mounted, setMounted] = useState(false)
+  const { address: ethAddress } = useEthereum()
+  const { publicKey: solAddress } = useSolana()
+  const { address: tonAddress } = useTon()
 
-  const handleConnect = async () => {
-    setIsConnecting(true);
-    try {
-      if (activeChain === 'ethereum') await connectEth();
-      if (activeChain === 'solana') await connectSol();
-      if (activeChain === 'ton') await connectTon();
-    } finally {
-      setIsConnecting(false);
-    }
-  };
+  // Fix hydration issues
+  useEffect(() => setMounted(true), [])
 
-  const handleDisconnect = async () => {
-    if (activeChain === 'ethereum') await disconnectEth();
-    if (activeChain === 'solana') await disconnectSol();
-    if (activeChain === 'ton') await disconnectTon();
-  };
+  if (!mounted) return (
+    <button className="btn" disabled>
+      Loading...
+    </button>
+  )
 
-  const currentAddress = 
-    activeChain === 'ethereum' ? ethAddress :
-    activeChain === 'solana' ? solAddress?.toString() :
-    tonAddress;
+  const activeAddress = ethAddress || solAddress?.toString() || tonAddress
 
   return (
     <div className="wallet-connector">
-      <div className="chain-selector">
-        <button 
-          className={activeChain === 'ethereum' ? 'active' : ''}
-          onClick={() => setActiveChain('ethereum')}
-        >
-          Ethereum
-        </button>
-        <button
-          className={activeChain === 'solana' ? 'active' : ''}
-          onClick={() => setActiveChain('solana')}
-        >
-          Solana
-        </button>
-        <button
-          className={activeChain === 'ton' ? 'active' : ''}
-          onClick={() => setActiveChain('ton')}
-        >
-          TON
-        </button>
-      </div>
-      
-      {currentAddress ? (
-        <button className="connected-btn" onClick={handleDisconnect}>
-          {`${currentAddress.slice(0, 6)}...${currentAddress.slice(-4)}`}
-        </button>
+      {activeAddress ? (
+        <div className="dropdown">
+          <button className="btn">
+            {`${activeAddress.slice(0, 6)}...${activeAddress.slice(-4)}`}
+          </button>
+          <div className="dropdown-content">
+            <button onClick={() => navigator.clipboard.writeText(activeAddress)}>
+              Copy address
+            </button>
+            <button onClick={() => window.ethereum?.request({ method: 'wallet_requestPermissions' })}>
+              Change wallet
+            </button>
+            <button onClick={() => {
+              if (ethAddress) disconnectEth()
+              if (solAddress) disconnectSol()
+              if (tonAddress) disconnectTon()
+            }}>
+              Disconnect
+            </button>
+          </div>
+        </div>
       ) : (
-        <button 
-          className="connect-btn" 
-          onClick={handleConnect}
-          disabled={isConnecting}
-        >
-          {isConnecting ? 'Connecting...' : 'Connect Wallet'}
+        <button className="btn btn--blue" onClick={handleConnect}>
+          Connect Wallet
         </button>
       )}
     </div>
-  );
-};
+  )
+}
