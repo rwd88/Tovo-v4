@@ -1,58 +1,36 @@
 // contexts/EthereumContext.tsx
-import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { Web3Provider as EthersWeb3Provider } from '@ethersproject/providers';
+'use client'
 
-type EthContextType = {
-  provider: EthersWeb3Provider | null;
-  address: string | null;
-  connect: () => Promise<void>;
-  disconnect: () => Promise<void>;
-};
+import React, { createContext, useContext, useState, ReactNode } from 'react'
 
-const EthContext = createContext<EthContextType>({
-  provider: null,
+interface EthereumContextType {
+  address: string | null
+  connect: () => Promise<void>
+  disconnect: () => Promise<void>
+}
+
+const EthereumContext = createContext<EthereumContextType>({
   address: null,
   connect: async () => {},
   disconnect: async () => {},
-});
+})
 
-export const EthereumProvider = ({ children }: { children: ReactNode }) => {
-  const [provider, setProvider] = useState<EthersWeb3Provider | null>(null);
-  const [address, setAddress] = useState<string | null>(null);
+export function EthereumProvider({ children }: { children: ReactNode }) {
+  const [address, setAddress] = useState<string | null>(null)
 
   const connect = async () => {
-    if (typeof window === 'undefined') return;
-    try {
-      const Web3Modal = (await import('web3modal')).default;
-      const modal = new Web3Modal({ cacheProvider: true });
-      const instance = await modal.connect();
-      const web3Provider = new EthersWeb3Provider(instance);
-      setProvider(web3Provider);
-      const signer = web3Provider.getSigner();
-      setAddress(await signer.getAddress());
-    } catch (error) {
-      console.error('Ethereum connection error:', error);
-    }
-  };
+    // Implementation
+  }
 
   const disconnect = async () => {
-    if (typeof window === 'undefined') return;
-    try {
-      const Web3Modal = (await import('web3modal')).default;
-      const modal = new Web3Modal({ cacheProvider: true });
-      await modal.clearCachedProvider();
-      setProvider(null);
-      setAddress(null);
-    } catch (error) {
-      console.error('Ethereum disconnection error:', error);
-    }
-  };
+    // Implementation
+  }
 
   return (
-    <EthContext.Provider value={{ provider, address, connect, disconnect }}>
+    <EthereumContext.Provider value={{ address, connect, disconnect }}>
       {children}
-    </EthContext.Provider>
-  );
-};
+    </EthereumContext.Provider>
+  )
+}
 
-export const useEthereum = () => useContext(EthContext);
+export const useEthereum = () => useContext(EthereumContext)

@@ -1,26 +1,28 @@
-// components/Web3Providers.tsx
 'use client'
 
-import React from 'react'
+import React, { ReactNode, useEffect } from 'react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+
+// your three contexts
 import { EthereumProvider } from '../contexts/EthereumContext'
-import { SolanaProvider } from '../contexts/SolanaContext'
-import { TonProvider } from '../contexts/TonContext'
-import { WalletAdapterNetwork } from '@solana/wallet-adapter-base'
-import { WalletModalProvider } from '@solana/wallet-adapter-react-ui'
-import { TonConnectUIProvider } from '@tonconnect/ui-react'
+import { SolanaProvider }   from '../contexts/SolanaContext'
+import { TonProvider }      from '../contexts/TonContext'
 
-require('@solana/wallet-adapter-react-ui/styles.css')
+// Solana UI wrapper (inside your SolanaProvider you already use WalletAdapter & Modal)
+import '@solana/wallet-adapter-react-ui/styles.css'
 
-export const Web3Providers = ({ children }: { children: React.ReactNode }) => {
+export default function Web3Providers({ children }: { children: ReactNode }) {
+  useEffect(() => console.log('🔌 Web3Providers mounted'), [])
+
   return (
-    <TonConnectUIProvider manifestUrl="https://your-app.com/tonconnect-manifest.json">
-      <EthereumProvider>
-        <SolanaProvider>
-          <WalletModalProvider>
+    <EthereumProvider>
+      <SolanaProvider>
+        <TonProvider>
+          <QueryClientProvider client={new QueryClient()}>
             {children}
-          </WalletModalProvider>
-        </SolanaProvider>
-      </EthereumProvider>
-    </TonConnectUIProvider>
+          </QueryClientProvider>
+        </TonProvider>
+      </SolanaProvider>
+    </EthereumProvider>
   )
 }
