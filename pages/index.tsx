@@ -1,60 +1,58 @@
-'use client'
+'use client';
 
-import Head from 'next/head'
-import Image from 'next/image'
-import { Geist, Geist_Mono } from 'next/font/google'
-import styles from '../styles/Home.module.css'
-import TradeForm from '../components/TradeForm'
-import { useTokenBalance } from '../hooks/useTokenBalance'
-import { useEffect, useState } from 'react'
-import { useConnect, useAccount } from 'wagmi'
+import Head from 'next/head';
+import Image from 'next/image';
+import { Geist, Geist_Mono } from 'next/font/google';
+import styles from '../styles/Home.module.css';
+import TradeForm from '../components/TradeForm';
+import { useTokenBalance } from '../hooks/useTokenBalance';
+import { useEffect, useState } from 'react';
+import { useEthereum } from '../contexts/EthereumContext';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
   subsets: ['latin'],
-})
+});
 const geistMono = Geist_Mono({
   variable: '--font-geist-mono',
   subsets: ['latin'],
-})
+});
 
 function getTimeRemainingText(eventTime: string): string {
-  const now = new Date()
-  const end = new Date(eventTime)
-  const diff = end.getTime() - now.getTime()
-  if (diff <= 0) return 'Expired'
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-  const hours = Math.floor((diff / (1000 * 60 * 60)) % 24)
+  const now = new Date();
+  const end = new Date(eventTime);
+  const diff = end.getTime() - now.getTime();
+  if (diff <= 0) return 'Expired';
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
   if (days > 0 && hours > 0)
     return `Ends in ${days} day${days > 1 ? 's' : ''} ${hours} hour${
       hours > 1 ? 's' : ''
-    }`
-  if (days > 0) return `Ends in ${days} day${days > 1 ? 's' : ''}`
-  return `Ends in ${hours} hour${hours > 1 ? 's' : ''}`
+    }`;
+  if (days > 0) return `Ends in ${days} day${days > 1 ? 's' : ''}`;
+  return `Ends in ${hours} hour${hours > 1 ? 's' : ''}`;
 }
 
 export default function Home() {
-  const { connect, connectors, error: connectError, isLoading: isConnecting } = useConnect()
-  const { address } = useAccount()
-  const [isClient, setIsClient] = useState(false)
-  const [markets, setMarkets] = useState<any[]>([])
+  const { address, connect, disconnect } = useEthereum();
+  const [isClient, setIsClient] = useState(false);
+  const [markets, setMarkets] = useState<any[]>([]);
+  const [isConnecting, setIsConnecting] = useState(false);
 
-  // Load markets and mark hydration
   useEffect(() => {
-    setIsClient(true)
+    setIsClient(true);
     fetch('/api/markets/active')
       .then((res) => res.json())
       .then((data) => setMarkets(data.markets || []))
-      .catch(console.error)
-  }, [])
+      .catch(console.error);
+  }, []);
 
-  // ERC-20 balances
-  const USDT_ADDRESS = '0xdAC17F958D2ee523a2206206994597C13D831ec7'
-  const USDC_ADDRESS = '0xA0b86991C6218B36c1d19D4a2e9Eb0cE3606EB48'
-  const usdtBalance = isClient && address ? useTokenBalance(USDT_ADDRESS) : null
-  const usdcBalance = isClient && address ? useTokenBalance(USDC_ADDRESS) : null
+  const USDT_ADDRESS = '0xdAC17F958D2ee523a2206206994597C13D831ec7';
+  const USDC_ADDRESS = '0xA0b86991C6218B36c1d19D4a2e9Eb0cE3606EB48';
+  const usdtBalance = isClient && address ? useTokenBalance(USDT_ADDRESS) : null;
+  const usdcBalance = isClient && address ? useTokenBalance(USDC_ADDRESS) : null;
 
-  if (!isClient) return null
+  if (!isClient) return null;
 
   return (
     <>
@@ -67,27 +65,27 @@ export default function Home() {
 
       <div className={`${styles.page} ${geistSans.variable} ${geistMono.variable}`}>
         <main className={styles.main}>
-          {/* ─── Wallet Connect ─────────────────────────────────────────── */}
+          {/* Wallet Connect */}
           <div className="mb-6">
             {address ? (
-              <button className="btn" disabled>
+              <button className="btn" onClick={disconnect}>
                 Connected: {address.slice(0, 6)}…{address.slice(-4)}
               </button>
             ) : (
               <button
                 className="btn btn--blue"
-                onClick={() => connect({ connector: connectors[0] })}
+                onClick={() => {
+                  setIsConnecting(true);
+                  connect().finally(() => setIsConnecting(false));
+                }}
                 disabled={isConnecting}
               >
                 {isConnecting ? 'Connecting…' : 'Connect Wallet'}
               </button>
             )}
-            {connectError && (
-              <p className="text-red-500 text-sm mt-2">{connectError.message}</p>
-            )}
           </div>
 
-          {/* ─── Balances ────────────────────────────────────────────────── */}
+          {/* Balances */}
           {address && (
             <div className="mb-6">
               <p>USDT Balance: {usdtBalance ?? 'Loading…'}</p>
@@ -95,24 +93,24 @@ export default function Home() {
             </div>
           )}
 
-          {/* ─── Trade Form ──────────────────────────────────────────────── */}
+          {/* Trade Form */}
           {address && (
             <div className="mb-8">
               <TradeForm />
             </div>
           )}
 
-          {/* ─── Active Markets ─────────────────────────────────────────── */}
+          {/* Active Markets */}
           <div className="w-full">
             <h2 className="text-2xl font-bold text-center mb-6 text-teal-500">
               PREDICTION MARKETS TODAY
             </h2>
 
             {markets.map((market, idx) => {
-              const yes = market.poolYes ?? 0
-              const no = market.poolNo ?? 0
-              const yesPct = yes + no > 0 ? Math.round((yes / (yes + no)) * 100) : 50
-              const noPct = 100 - yesPct
+              const yes = market.poolYes ?? 0;
+              const no = market.poolNo ?? 0;
+              const yesPct = yes + no > 0 ? Math.round((yes / (yes + no)) * 100) : 50;
+              const noPct = 100 - yesPct;
 
               return (
                 <div
@@ -146,12 +144,11 @@ export default function Home() {
                     </div>
                   </div>
                 </div>
-              )
+              );
             })}
           </div>
         </main>
 
-        {/* ─── Footer ───────────────────────────────────────────────────── */}
         <footer className={styles.footer}>
           <a href="https://nextjs.org" target="_blank" rel="noopener noreferrer">
             <Image src="/globe.svg" alt="Globe" width={16} height={16} />
@@ -160,5 +157,5 @@ export default function Home() {
         </footer>
       </div>
     </>
-  )
+  );
 }
