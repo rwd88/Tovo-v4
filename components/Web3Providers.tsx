@@ -1,9 +1,9 @@
 'use client'
 import React, { ReactNode } from 'react'
 
-// Ethereum (Using Ethers + Web3Modal standalone)
+// Ethereum (Using Web3Modal v2 standalone)
 import { Web3Modal } from '@web3modal/standalone'
-import { ethers } from 'ethers'
+import { BrowserProvider } from 'ethers'
 
 // Solana
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react'
@@ -14,21 +14,23 @@ import '@solana/wallet-adapter-react-ui/styles.css'
 // TON
 import { TonConnectUIProvider } from '@tonconnect/ui-react'
 
-// Ethereum Web3Modal config
+// Initialize Web3Modal
 const web3Modal = new Web3Modal({
   projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID!,
   walletConnectVersion: 2
 })
 
-// Solana wallets
-const solanaWallets = [new PhantomWalletAdapter()]
-
 export default function Web3Providers({ children }: { children: ReactNode }) {
+  // Validate environment variables
+  if (!process.env.NEXT_PUBLIC_SOLANA_RPC_URL?.startsWith('http')) {
+    throw new Error('Invalid Solana RPC URL - must start with http:// or https://')
+  }
+
   return (
     <>
       {/* Solana Provider */}
-      <ConnectionProvider endpoint={process.env.NEXT_PUBLIC_SOLANA_RPC_URL!}>
-        <WalletProvider wallets={solanaWallets} autoConnect>
+      <ConnectionProvider endpoint={process.env.NEXT_PUBLIC_SOLANA_RPC_URL}>
+        <WalletProvider wallets={[new PhantomWalletAdapter()]} autoConnect>
           <WalletModalProvider>
             
             {/* TON Provider */}
@@ -43,12 +45,12 @@ export default function Web3Providers({ children }: { children: ReactNode }) {
   )
 }
 
-// Ethereum helper function (use anywhere in your app)
+// Ethereum connection helper
 export async function connectEthereum() {
   const provider = await web3Modal.openModal()
-  const ethersProvider = new ethers.BrowserProvider(provider)
+  const ethersProvider = new BrowserProvider(provider)
   return {
-    provider,
-    signer: await ethersProvider.getSigner()
+    address: await (await ethersProvider.getSigner()).getAddress(),
+    provider: ethersProvider
   }
 }
