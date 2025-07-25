@@ -1,7 +1,9 @@
 // pages/api/cron/settle-markets.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { prisma } from '../../../lib/prisma'
+import  { determineResult } from '../../../lib/market-utils'      // ← new, correct path
 import { sendCronSummary, sendAdminAlert } from '../../../lib/telegram'
+
 
 export const config = {
   api: { bodyParser: false },
