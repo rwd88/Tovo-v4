@@ -2,9 +2,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { prisma } from '../../../lib/prisma'
 import bot from '../../../src/bot/bot'
-import { formatMarketMessage } from '../../../lib/market-utils'
 
-interface PublishResult {
+export type PublishResult = {
   id: string
   question: string
   sentCount: number
@@ -18,110 +17,97 @@ export default async function handler(
     | { success: false; error: string }
   >
 ) {
-  // Enhanced authentication
-  const authMethods = [
-    req.query.secret as string,
-    req.headers.authorization?.split(' ')[1],
-    req.headers['x-cron-secret']
-  ].filter(Boolean)
+  // 1) Authenticate via ?secret= or Authorization header
+  const secretFromQuery = (req.query.secret as string) || ''
+  const bearer = req.headers.authorization?.split(' ')[1] || ''
+  const incomingSecret = secretFromQuery || bearer
 
-  if (!authMethods.includes(process.env.CRON_SECRET!)) {
+  if (incomingSecret !== process.env.CRON_SECRET) {
     return res.status(403).json({ success: false, error: 'Unauthorized' })
   }
 
   try {
-    const [openMarkets, subscribers] = await Promise.all([
-      prisma.market.findMany({
-        where: { 
-          status: 'open', 
-          notified: false,
-          question: { not: '' }
-        },
-        orderBy: { eventTime: 'asc' },
-        take: 10 // Limit to prevent timeout
-      }),
-      prisma.subscriber.findMany({ 
-        where: { subscribed: true },
-        select: { chatId: true }
-      })
-    ])
+    // 2) Load all open, un-notified markets
+    const openMarkets = await prisma.market.findMany({
+      where: { status: 'open', notified: false, question: { not: undefined } },
+      orderBy: { eventTime: 'asc' },
+    })
+
+    // 3) Load subscribers
+    const subscribers = await prisma.subscriber.findMany({ where: { subscribed: true } })
 
     const results: PublishResult[] = []
     const failedSends: Array<{ chatId: string; error: string }> = []
 
-    // Parallel processing with rate limiting
-    await Promise.all(openMarkets.map(async (market) => {
-      try {
-        const { id, question } = market
-        const message = formatMarketMessage(market)
-        
-        const sendPromises = subscribers.map(sub => 
-          sendWithRetry(sub.chatId, message, createButtons(id), 2)
-            .catch(err => {
-              const errorMsg = err.description || err.message || String(err)
-              failedSends.push({ chatId: sub.chatId, error: errorMsg })
-              
-              if (err.code === 403) {
-                return prisma.subscriber.update({
-                  where: { chatId: sub.chatId },
-                  data: { subscribed: false }
-                })
-              }
-              return Promise.resolve()
-            })
-        )
-
-        const settled = await Promise.allSettled(sendPromises)
-        const sentCount = settled.filter(p => p.status === 'fulfilled').length
-
-        await prisma.market.update({
-          where: { id },
-          data: { notified: true }
-        })
-
-        results.push({ 
-          id, 
-          question, 
-          sentCount, 
-          failedCount: subscribers.length - sentCount 
-        })
-      } catch (err) {
-        console.error(`Failed processing market ${market.id}:`, err)
+    // 4) Send each market notification
+    for (const market of openMarkets) {
+      const { id, question, eventTime, poolYes, poolNo, forecast } = market
+      if (!question.trim()) {
+        console.warn(`Skipping empty question for market ${id}`)
+        continue
       }
-    }))
 
-    return res.status(200).json({ 
-      success: true, 
-      results,
-      ...(failedSends.length && { failedSends })
-    })
-  } catch (err: any) {
-    console.error('Cron job failed:', err)
-    return res.status(500).json({ 
-      success: false, 
-      error: err.message 
-    })
-  }
-}
+      // build the message + buttons
+      const when = eventTime ? `\n🕓 ${new Date(eventTime).toUTCString()}` : ''
+      const liquidity = (poolYes + poolNo).toFixed(2)
+      const forecastText =
+        forecast != null ? `\n📈 Forecast: ${forecast.toFixed(1)}% YES` : ''
 
-function createButtons(marketId: string) {
-  return {
-    parse_mode: 'Markdown' as const,
-    reply_markup: {
-      inline_keyboard: [[
-        { 
-          text: '✅ YES', 
-          url: `${process.env.NEXT_PUBLIC_SITE_URL}/trade/${marketId}?side=yes` 
+      const message = `📊 *New Prediction Market!*\n\n*${question}*${when}\n💰 Liquidity: $${liquidity}${forecastText}\n\nMake your prediction:`
+      const buttons = {
+        parse_mode: 'Markdown' as const,
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: '✅ YES', url: `${process.env.BOT_WEB_URL}/trade/${id}?side=yes` },
+              { text: '❌ NO',  url: `${process.env.BOT_WEB_URL}/trade/${id}?side=no`  },
+            ],
+          ],
         },
-        { 
-          text: '❌ NO',  
-          url: `${process.env.NEXT_PUBLIC_SITE_URL}/trade/${marketId}?side=no`  
+      }
+
+      let sentCount = 0
+      let failedCount = 0
+
+      for (const sub of subscribers) {
+        try {
+          await sendWithRetry(sub.chatId, message, buttons, 2)
+          sentCount++
+        } catch (err: any) {
+          failedCount++
+          const errorMsg = err.description || err.message || String(err)
+          failedSends.push({ chatId: sub.chatId, error: errorMsg })
+          console.error(`Failed to send market ${id} → ${sub.chatId}:`, errorMsg)
+
+          // auto-unsubscribe if blocked (403 or “blocked” text)
+          if (err.code === 403 || errorMsg.toLowerCase().includes('blocked')) {
+            await prisma.subscriber.update({
+              where: { chatId: sub.chatId },
+              data: { subscribed: false },
+            })
+          }
         }
-      ]]
+      }
+
+      // 5) Mark market as notified so it won’t run again
+      await prisma.market.update({
+        where: { id },
+        data: { notified: true },
+      })
+
+      results.push({ id, question, sentCount, failedCount })
     }
+
+    return res.status(200).json({ success: true, results, failedSends: failedSends.length ? failedSends : undefined })
+  } catch (err: any) {
+    console.error('publish-markets error:', err)
+    return res.status(500).json({ success: false, error: err.message })
   }
 }
 
+/**
+ * sendWithRetry: wraps bot.telegram.sendMessage with retries and backoff
+ */
 async function sendWithRetry(
   chatId: string,
   message: string,
@@ -132,9 +118,11 @@ async function sendWithRetry(
     await bot.telegram.sendMessage(chatId, message, buttons)
   } catch (err: any) {
     if (retries > 0) {
-      await new Promise(r => setTimeout(r, 1000 * (3 - retries))) // Exponential backoff
+      // wait 1s then retry
+      await new Promise((r) => setTimeout(r, 1000))
       return sendWithRetry(chatId, message, buttons, retries - 1)
     }
+    // rethrow if out of retries
     throw err
   }
 }
