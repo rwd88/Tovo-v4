@@ -1,84 +1,89 @@
-  // pages/api/create-market.ts
-  import type { NextApiRequest, NextApiResponse } from "next"
-  import { prisma } from "../../lib/prisma"
-  import { sendMarketToTelegram } from "@/lib/telegram/sendMarket";
+// pages/api/create-market.ts
+import type { NextApiRequest, NextApiResponse } from "next"
+import { prisma } from "../../lib/prisma"
+import { sendMarketToTelegram } from "@/lib/telegram/sendMarket"
 
+interface CreateMarketRequest {
+  externalId:  string
+  question:    string
+  status:      string
+  eventTime:   string | Date
+  forecast?:   number
+  outcome?:    string
+  poolYes:     number
+  poolNo:      number
+}
 
-  interface CreateMarketRequest {
-    externalId: string
-    question: string
-    status: string
-    eventTime: string | Date
-    forecast?: number
-    outcome?: string
-    poolYes: number
-    poolNo: number
+type CreateMarketResponse =
+  | { success: true; market: Awaited<ReturnType<typeof prisma.market.create>> }
+  | { success: false; error: string }
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse<CreateMarketResponse>
+) {
+  // 1) Only POST
+  if (req.method !== "POST") {
+    return res.status(405).json({ success: false, error: "Only POST allowed" })
   }
 
-  type CreateMarketResponse =
-    | { success: true; market: Awaited<ReturnType<typeof prisma.market.create>> }
-    | { success: false; error: string }
+  // 2) Secret‐check
+  const secret = req.query.secret as string
+  if (secret !== process.env.CRON_SECRET) {
+    return res
+      .status(401)
+      .json({ success: false, error: "Unauthorized: invalid secret" })
+  }
 
-  export default async function handler(
-    req: NextApiRequest,
-    res: NextApiResponse<CreateMarketResponse>
+  const {
+    externalId,
+    question,
+    status,
+    eventTime,
+    forecast,
+    outcome,
+    poolYes,
+    poolNo,
+  } = req.body as CreateMarketRequest
+
+  // 3) Validate
+  if (
+    !externalId ||
+    !question ||
+    !status ||
+    !eventTime ||
+    typeof poolYes !== "number" ||
+    typeof poolNo  !== "number"
   ) {
-    if (req.method !== "POST") {
-      return res.status(405).json({ success: false, error: "Only POST allowed" })
-    }
+    return res
+      .status(400)
+      .json({ success: false, error: "Missing or invalid required fields" })
+  }
 
-    const {
+  try {
+    // 4) Build data payload
+    const data: Parameters<typeof prisma.market.create>[0]["data"] = {
       externalId,
       question,
       status,
-      eventTime,
-      forecast,
-      outcome,
+      eventTime: new Date(eventTime),
       poolYes,
       poolNo,
-    } = req.body as CreateMarketRequest
-
-    // Validate required fields
-    if (
-      !externalId ||
-      !question ||
-      !status ||
-      !eventTime ||
-      typeof poolYes !== "number" ||
-      typeof poolNo  !== "number"
-    ) {
-      return res
-        .status(400)
-        .json({ success: false, error: "Missing or invalid required fields" })
+      ...(forecast !== undefined ? { forecast } : {}),
+      ...(outcome  !== undefined ? { resolvedOutcome: outcome } : {}),
     }
 
-    try {
-      // Build up the data object, only including optional fields if they exist
-      const data: Parameters<typeof prisma.market.create>[0]["data"] = {
-        externalId,
-        question,
-        status,
-        eventTime: new Date(eventTime),
-        poolYes,
-        poolNo,
-        // forecast & outcome are optional
-        ...(forecast !== undefined ? { forecast } : {}),
-        ...(outcome  !== undefined ? { outcome  } : {}),
-      }
+    // 5) Create
+    const market = await prisma.market.create({ data })
 
-// Create the market record
-const market = await prisma.market.create({ data })
+    // 6) Push immediately to Telegram
+    await sendMarketToTelegram(market)
 
-// 📤 Send it to Telegram channel
-await sendMarketToTelegram(market)
-
-return res.status(201).json({ success: true, market })
-    } catch (err) {
-      console.error("Create market error:", err)
-      return res
-        .status(500)
-        .json({ success: false, error: "Server error: " + (err as Error).message })
-    } finally {
-      await prisma.$disconnect()
-    }
+    return res.status(201).json({ success: true, market })
+  } catch (err: any) {
+    console.error("Create market error:", err)
+    return res
+      .status(500)
+      .json({ success: false, error: "Server error: " + err.message })
   }
+}
