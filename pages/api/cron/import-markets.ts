@@ -1,121 +1,150 @@
-// pages/api/cron/import-markets.ts
-import type { NextApiRequest, NextApiResponse } from "next";
-import axios from "axios";
-import { parseStringPromise } from "xml2js";
-import { prisma } from "../../../lib/prisma";
+// src/pages/api/cron/import-markets.ts
+import type { NextApiRequest, NextApiResponse } from 'next'
+import axios from 'axios'
+import { parseStringPromise } from 'xml2js'
+import { prisma } from '../../../lib/prisma'
+import { formatMarketMessage, notifyAdmin } from '../../../lib/market-utils'
+import { bot } from '../../../lib/telegram'
 
 interface CalendarEvent {
-  url?: string;
-  title?: string;
-  date?: string;
-  time?: string;
-  impact?: string;
-  forecast?: string;
+  url?: string
+  title?: string
+  date?: string
+  time?: string
+  impact?: string
+  forecast?: string
 }
 
 interface ApiResponse {
-  success: boolean;
-  added: number;
-  skipped: number;
-  error?: string;
+  success: boolean
+  added: number
+  skipped: number
+  error?: string
+}
+
+export const config = {
+  api: { bodyParser: false },
+  maxDuration: 60,
 }
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ApiResponse>
 ) {
-  // 🔐 auth
-  if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
-    return res.status(403).json({ success: false, added: 0, skipped: 0, error: "Unauthorized" });
+  // auth via ?secret=, Authorization or x-cron-secret
+  const token =
+    (req.query.secret as string) ||
+    req.headers.authorization?.replace('Bearer ', '') ||
+    (req.headers['x-cron-secret'] as string) ||
+    ''
+
+  if (token !== process.env.CRON_SECRET) {
+    return res
+      .status(403)
+      .json({ success: false, added: 0, skipped: 0, error: 'Unauthorized' })
   }
-  if (req.method !== "GET") {
-    return res.status(405).json({ success: false, added: 0, skipped: 0, error: "Only GET allowed" });
+  if (req.method !== 'GET') {
+    return res
+      .status(405)
+      .json({ success: false, added: 0, skipped: 0, error: 'Only GET allowed' })
   }
 
   try {
-    const CAL_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.xml";
-    const { data: xml } = await axios.get<string>(CAL_URL);
+    const CAL_URL = 'https://nfs.faireconomy.media/ff_calendar_thisweek.xml'
+    const { data: xml } = await axios.get<string>(CAL_URL)
     const parsed = await parseStringPromise(xml, {
       explicitArray: false,
       trim: true,
-    });
+    })
 
-    // normalize into an array
     const events: CalendarEvent[] = parsed?.weeklyevents?.event
       ? Array.isArray(parsed.weeklyevents.event)
         ? parsed.weeklyevents.event
         : [parsed.weeklyevents.event]
-      : [];
+      : []
 
-    let added = 0;
-    let skipped = 0;
-    const now = new Date();
+    let added = 0, skipped = 0
+    const now = new Date()
 
     for (const ev of events) {
-      // only high‐impact
-      if (ev.impact?.trim().toLowerCase() !== "high") {
-        skipped++;
-        continue;
+      if (ev.impact?.trim().toLowerCase() !== 'high') {
+        skipped++
+        continue
       }
 
-      // parse date & time
-      const dateStr = ev.date?.trim();
-      const rawTime = ev.time?.trim().toLowerCase();
+      // parse date/time
+      const dateStr = ev.date?.trim()
+      const rawTime = ev.time?.trim().toLowerCase()
       if (!dateStr || !rawTime) {
-        skipped++;
-        continue;
+        skipped++
+        continue
       }
-      const m = rawTime.match(/^(\d{1,2}):(\d{2})(am|pm)$/);
+      const m = rawTime.match(/^(\d{1,2}):(\d{2})(am|pm)$/)
       if (!m) {
-        skipped++;
-        continue;
+        skipped++
+        continue
       }
-      let hour = parseInt(m[1], 10);
-      if (m[3] === "pm" && hour < 12) hour += 12;
-      if (m[3] === "am" && hour === 12) hour = 0;
-      const minute = m[2];
-      const timeFormatted = `${hour.toString().padStart(2, "0")}:${minute}:00`;
-
-      const [mm, dd, yyyy] = dateStr.split("-");
-      const iso = `${yyyy}-${mm}-${dd}T${timeFormatted}Z`;
-      const eventTime = new Date(iso);
+      let hour = parseInt(m[1], 10)
+      if (m[3] === 'pm' && hour < 12) hour += 12
+      if (m[3] === 'am' && hour === 12) hour = 0
+      const minute = m[2]
+      const iso = `${dateStr.split('-')[2]}-${dateStr.split('-')[0]}-${dateStr.split('-')[1]}T${hour
+        .toString()
+        .padStart(2, '0')}:${minute}:00Z`
+      const eventTime = new Date(iso)
       if (isNaN(eventTime.getTime()) || eventTime < now) {
-        skipped++;
-        continue;
+        skipped++
+        continue
       }
 
       const externalId =
-        ev.url?.trim() || `ff-${ev.title}-${dateStr}-${timeFormatted}`;
-      const forecastVal = ev.forecast ? parseFloat(ev.forecast) : null;
+        ev.url?.trim() ||
+        `ff-${ev.title}-${dateStr}-${hour.toString().padStart(2, '0')}${minute}`
+      const forecastVal = ev.forecast ? parseFloat(ev.forecast) : null
 
-      // upsert
+      // upsert into Prisma
       await prisma.market.upsert({
         where: { externalId },
+        update: {
+          ...(forecastVal != null ? { forecast: forecastVal } : {}),
+        },
         create: {
           externalId,
-          question: ev.title?.trim() || "Unnamed Event",
-          status: "open",
+          question:   ev.title?.trim() || 'Untitled Event',
+          status:     'open',
           eventTime,
-          ...(forecastVal !== null ? { forecast: forecastVal } : {}),
-          poolYes: 0,
-          poolNo: 0,
-          notified: false,
-          resolved: false,
+          poolYes:    0,
+          poolNo:     0,
+          notified:   false,
+          resolved:   false,
+          ...(forecastVal != null ? { forecast: forecastVal } : {}),
         },
-        update: {
-          // e.g. update forecast if changed
-          ...(forecastVal !== null ? { forecast: forecastVal } : {}),
-        },
-      });
+      })
+      added++
 
-      added++;
+      // announce in Telegram
+      const msg = formatMarketMessage({ 
+        externalId, 
+        question: ev.title!.trim(), 
+        eventTime, 
+        poolYes: 0, 
+        poolNo: 0, 
+        forecast: forecastVal ?? undefined,
+        status: 'open'
+      } as any)
+      await bot.telegram.sendMessage(
+        process.env.TELEGRAM_ANNOUNCE_ID!,
+        msg,
+        { parse_mode: 'Markdown' }
+      )
     }
 
-    return res.status(200).json({ success: true, added, skipped });
+    return res.status(200).json({ success: true, added, skipped })
   } catch (err: any) {
-    console.error("❌ import-markets error:", err);
+    console.error('❌ import-markets error:', err)
+    await notifyAdmin(`import-markets failed: ${err.message}`)
     return res
       .status(500)
-      .json({ success: false, added: 0, skipped: 0, error: err.message });
+      .json({ success: false, added: 0, skipped: 0, error: err.message })
   }
 }

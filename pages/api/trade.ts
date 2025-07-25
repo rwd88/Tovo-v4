@@ -1,82 +1,81 @@
-// pages/api/trade.ts
-
-import type { NextApiRequest, NextApiResponse } from "next"
-import { PrismaClient } from "@prisma/client"
-import { verifyMessage } from "ethers"
-
-const prisma = new PrismaClient()
+// src/pages/api/trade.ts
+import type { NextApiRequest, NextApiResponse } from 'next'
+import { verifyMessage } from 'ethers'
+import { prisma } from '../../lib/prisma'
 
 type TradeRequest = {
-  marketId: string
-  side: "UP" | "DOWN"
-  amount: number
+  marketId:      string
+  side:          'UP' | 'DOWN'
+  amount:        number
   walletAddress: string
-  signature?: string
+  signature?:    string
 }
+
+type TradeResponse =
+  | { success: true; tradeId: string; market?: any }
+  | { success: false; error: string }
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse<TradeResponse>
 ) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" })
+  if (req.method !== 'POST') {
+    return res.status(405).json({ success: false, error: 'Method not allowed' })
+  }
+
+  const { marketId, side, amount, walletAddress, signature } =
+    req.body as TradeRequest
+
+  if (
+    !marketId ||
+    !walletAddress ||
+    !['UP', 'DOWN'].includes(side) ||
+    typeof amount !== 'number'
+  ) {
+    return res
+      .status(400)
+      .json({ success: false, error: 'Invalid or missing fields' })
+  }
+
+  // optional EIP-191 signature check
+  if (signature) {
+    const message = `Tovo Trade:${marketId}:${side}:${amount}`
+    const signer = verifyMessage(message, signature)
+    if (signer.toLowerCase() !== walletAddress.toLowerCase()) {
+      return res
+        .status(401)
+        .json({ success: false, error: 'Signature verification failed' })
+    }
   }
 
   try {
-    const {
-      marketId,
-      side,
-      amount,
-      walletAddress,
-      signature,
-    } = req.body as TradeRequest
-
-    // Basic validation
-    if (
-      !marketId ||
-      !walletAddress ||
-      !["UP", "DOWN"].includes(side) ||
-      typeof amount !== "number"
-    ) {
-      return res.status(400).json({ error: "Invalid or missing fields" })
-    }
-
-    // Optional: verify user signature
-    if (signature) {
-      const message = `Tovo Trade:${marketId}:${side}:${amount}`
-      const signer = verifyMessage(message, signature)
-      if (signer.toLowerCase() !== walletAddress.toLowerCase()) {
-        return res.status(401).json({ error: "Signature verification failed" })
-      }
-    }
-
-    // 1) Ensure the market exists
     const market = await prisma.market.findUnique({ where: { id: marketId } })
     if (!market) {
-      return res.status(404).json({ error: "Market not found" })
+      return res
+        .status(404)
+        .json({ success: false, error: 'Market not found' })
     }
 
-    // 2) Upsert the user by wallet address
+    // create user if missing
     await prisma.user.upsert({
       where: { id: walletAddress },
       create: {
         id: walletAddress,
         telegramId: walletAddress,
+        balance: 0,
       },
       update: {},
     })
 
-    // 3) Calculate fee, payout & shares
     const fee    = parseFloat((amount * 0.01).toFixed(6))
     const payout = parseFloat((amount - fee).toFixed(6))
     const shares = amount
 
-    // 4) Record the trade (no `status` field here)
     const trade = await prisma.trade.create({
       data: {
         marketId,
-        userId: walletAddress,
-        type: side,    // Prisma field `type`
+        userId:   walletAddress,
+        type:     side,
         amount,
         fee,
         payout,
@@ -84,22 +83,21 @@ export default async function handler(
       },
     })
 
-    // 5) Update the market’s pool
-    const updatedMarket = await prisma.market.update({
+    const updated = await prisma.market.update({
       where: { id: marketId },
       data:
-        side === "UP"
-          ? { poolYes: market.poolYes + amount }
-          : { poolNo:  market.poolNo  + amount },
+        side === 'UP'
+          ? { poolYes: { increment: amount } }
+          : { poolNo:  { increment: amount } },
     })
 
     return res
       .status(200)
-      .json({ success: true, trade, market: updatedMarket })
-  } catch (err) {
-    console.error("[/api/trade] error:", err)
-    return res.status(500).json({ error: "Server error" })
-  } finally {
-    await prisma.$disconnect()
+      .json({ success: true, tradeId: trade.id, market: updated })
+  } catch (err: any) {
+    console.error('[/api/trade] error:', err)
+    return res
+      .status(500)
+      .json({ success: false, error: 'Server error' })
   }
 }
