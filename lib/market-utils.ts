@@ -1,6 +1,6 @@
 // src/lib/market-utils.ts
 import { Market } from '@prisma/client'
-import { bot } from './telegram'
+import { sendAdminAlert } from './telegram'
 
 /**
  * Format a new‐market announcement for Telegram.
@@ -37,13 +37,9 @@ export function determineMarketResult(market: Market): 'YES' | 'NO' | null {
  * Send an admin‐only alert via Telegram.
  */
 export async function notifyAdmin(message: string) {
-  const adminId = process.env.ADMIN_TELEGRAM_ID
-  if (!adminId) return
   try {
-    await bot.telegram.sendMessage(adminId, `⚠️ Admin Alert:\n${message}`, {
-      parse_mode: 'Markdown',
-    })
+    await sendAdminAlert(message)
   } catch (err) {
-    console.error('Failed to notify admin:', err)
+    console.error('notifyAdmin failed:', err)
   }
 }
