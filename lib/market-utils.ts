@@ -1,5 +1,6 @@
 // lib/market-utils.ts
 import { Market } from '@prisma/client'
+import { bot } from './telegram' // Make sure this import exists
 
 export function formatMarketMessage(market: Market): string {
   const { question, eventTime, poolYes, poolNo, forecast } = market
@@ -12,6 +13,15 @@ export function formatMarketMessage(market: Market): string {
          `💰 Liquidity: $${liquidity}` +
          `${forecastText}\n\n` +
          `Make your prediction:`
+}
+
+export function determineMarketResult(market: Market): 'YES' | 'NO' | null {
+  // Implement your actual market resolution logic here
+  // This is just a placeholder - replace with your real logic
+  if (market.resolvedOutcome === 'YES' || market.resolvedOutcome === 'NO') {
+    return market.resolvedOutcome
+  }
+  return null
 }
 
 export async function notifyAdmin(message: string) {
