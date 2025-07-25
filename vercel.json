@@ -2,15 +2,15 @@
   "crons": [
     {
       "path": "/api/cron/import-markets?secret=${CRON_SECRET}&publish=true",
-      "schedule": "0 0 * * *"          // e.g. midnight daily
+      "schedule": "0 0 * * *"
     },
     {
       "path": "/api/cron/settle-markets?secret=${CRON_SECRET}",
-      "schedule": "*/10 * * * *"      // every 10 min
+      "schedule": "*/10 * * * *"
     },
     {
       "path": "/api/cron/publish-markets?secret=${CRON_SECRET}",
-      "schedule": "*/10 * * * *"      // backup publish every 10 min
+      "schedule": "*/10 * * * *"
     }
   ]
 }
