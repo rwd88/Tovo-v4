@@ -4,19 +4,32 @@ import { startTonDepositMonitor }    from '../../../src/services/tonDepositMonit
 import { startEvmDepositMonitor }    from '../../../src/services/evmDepositMonitor'
 import { startSolanaDepositMonitor } from '../../../src/services/solanaDepositMonitor'
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // optional: verify a shared secret so nobody can call this publicly
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse<{ success: boolean; results?: any; error?: string }>
+) {
+  // protect it with your CRON_SECRET
   if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'Unauthorized' })
+    return res.status(401).json({ success: false, error: 'Unauthorized' })
   }
 
-  const results: Record<string, any> = {}
+  // make sure all your RPC env-vars are present
+  const missing: string[] = []
+  if (!process.env.TON_RPC_URL || !process.env.TON_CHAIN_ID)     missing.push('TON_RPC_URL/TON_CHAIN_ID')
+  if (!process.env.EVM_RPC_URL && !process.env.ETH_RPC_URL)      missing.push('EVM_RPC_URL or ETH_RPC_URL')
+  if (!process.env.SOLANA_RPC_URL && !process.env.NEXT_PUBLIC_SOLANA_RPC_URL) missing.push('SOLANA_RPC_URL')
+  if (missing.length) {
+    return res
+      .status(500)
+      .json({ success: false, error: `Missing environment variables: ${missing.join(', ')}` })
+  }
 
   try {
-    results.ton    = await startTonDepositMonitor()    // make sure these return summaries
-    results.evm    = await startEvmDepositMonitor()
-    results.solana = await startSolanaDepositMonitor()
-
+    const results = {
+      ton:    await startTonDepositMonitor(),
+      evm:    await startEvmDepositMonitor(),
+      solana: await startSolanaDepositMonitor(),
+    }
     return res.status(200).json({ success: true, results })
   } catch (err: any) {
     console.error('daily-monitor error:', err)
