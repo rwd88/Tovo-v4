@@ -2,32 +2,34 @@ import '../styles/globals.css'
 import type { AppProps } from 'next/app'
 import { ErrorBoundary } from '../components/ErrorBoundary'
 
-// Wagmi & RainbowKit imports
-import { WagmiConfig, createClient, configureChains, chain } from 'wagmi'
-import { publicProvider } from 'wagmi/providers/public'
-import { getDefaultWallets, RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit'
-import '@rainbow-me/rainbowkit/styles.css'
+// Wagmi v2 + TanStack Query
+import { WagmiProvider, createConfig } from 'wagmi'
+import { mainnet } from 'wagmi/chains'
+import { http } from 'viem'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
-// Set up chains and providers
-const { chains, provider } = configureChains(
-  [chain.mainnet, chain.polygon, chain.optimism, chain.arbitrum],
-  [publicProvider()]
-)
+// Setup TanStack Query
+const queryClient = new QueryClient()
 
-// Get default connectors (MetaMask, WalletConnect, etc.)
-const { connectors } = getDefaultWallets({
-  appName: 'Tovo Prediction',
-  chains,
-})
-
-// Create Wagmi client
-const wagmiClient = createClient({
-  autoConnect: true,
-  connectors,
-  provider,
+// Configure Wagmi v2
+const config = createConfig({
+  chains: [mainnet],
+  transports: {
+    [mainnet.id]: http(process.env.NEXT_PUBLIC_ETH_RPC_URL!),
+  },
 })
 
 export default function MyApp({ Component, pageProps }: AppProps) {
+  return (
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <WagmiProvider config={config} reconnectOnMount>
+          <Component {...pageProps} />
+        </WagmiProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
+  )
+}({ Component, pageProps }: AppProps) {
   return (
     <ErrorBoundary>
       <WagmiConfig client={wagmiClient}>
