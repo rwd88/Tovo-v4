@@ -1,12 +1,12 @@
-// pages/api/cron/settle-markets.ts
+// src/pages/api/cron/settle-markets.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { prisma } from '../../../lib/prisma'
-import { determineMarketResult } from '../../../lib/market-utils'
-import { sendAdminNotification, sendCronSummary } from '../../../lib/telegram'
+import { determineMarketResult, notifyAdmin } from '../../../lib/market-utils'
+import { bot } from '../../../lib/telegram'
 
 export const config = {
   api: { bodyParser: false },
-  maxDuration: 120, // Increased timeout for large batches
+  maxDuration: 90, // allow up to 90s for long‐running batches
 }
 
 interface SettlementResult {
@@ -20,67 +20,43 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<SettlementResult>
 ) {
-  // Enhanced authentication with IP whitelisting
-  const clientIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress
-  const validIPs = process.env.CRON_ALLOWED_IPS?.split(',') || []
-  
-  const token = 
+  // auth via ?secret= or Authorization: Bearer or x-cron-secret
+  const token =
     (req.query.secret as string) ||
     req.headers.authorization?.replace('Bearer ', '') ||
-    (req.headers['x-cron-secret'] as string)
+    (req.headers['x-cron-secret'] as string) ||
+    ''
 
-  if (token !== process.env.CRON_SECRET || (validIPs.length > 0 && !validIPs.includes(clientIP as string))) {
-    console.warn('🚨 Unauthorized settlement attempt', {
-      ip: clientIP,
+  if (token !== process.env.CRON_SECRET) {
+    console.warn('🔒 Unauthorized settlement attempt', {
+      ip: req.headers['x-forwarded-for'],
       time: new Date().toISOString(),
-      method: req.method,
-      path: req.url
     })
-    
-    await sendAdminNotification(
-      `🚨 Unauthorized settlement attempt\n` +
-      `• IP: ${clientIP}\n` +
-      `• Time: ${new Date().toLocaleString()}\n` +
-      `• Path: ${req.url}`
-    )
-    
-    return res.status(403).json({ 
-      success: false, 
-      error: 'Forbidden' 
-    })
+    return res.status(403).json({ success: false, error: 'Invalid credentials' })
   }
 
   try {
-    console.log('🚀 Starting market settlement process')
-    const BATCH_SIZE = 20
+    console.log('🚀 Starting market settlement batch')
+    const BATCH_SIZE = 25
     let totalSettled = 0
     let totalProfit = 0
     let hasMore = true
-    let skip = 0
 
     while (hasMore) {
       const markets = await prisma.market.findMany({
         where: {
           status: 'open',
           eventTime: { lt: new Date() },
-          resolvedOutcome: { not: null }
+          resolvedOutcome: { not: null },
         },
         include: {
           trades: {
             where: { settled: false },
-            select: {
-              id: true,
-              userId: true,
-              type: true,
-              amount: true,
-              fee: true,
-              marketId: true
-            }
-          }
+            select: { id: true, userId: true, type: true, amount: true, fee: true },
+          },
         },
         take: BATCH_SIZE,
-        skip,
-        orderBy: { eventTime: 'asc' }
+        orderBy: { eventTime: 'asc' },
       })
 
       if (markets.length === 0) {
@@ -88,117 +64,96 @@ export default async function handler(
         break
       }
 
-      // Process markets in parallel with error handling
-      const batchResults = await Promise.allSettled(
-        markets.map(market => settleSingleMarket(market))
+      const results = await Promise.allSettled(
+        markets.map((m) => settleSingleMarket(m))
       )
 
-      for (const result of batchResults) {
-        if (result.status === 'fulfilled') {
-          totalSettled += result.value.settled ? 1 : 0
-          totalProfit += result.value.profit || 0
+      for (const r of results) {
+        if (r.status === 'fulfilled') {
+          totalSettled += r.value.settled ? 1 : 0
+          totalProfit += r.value.profit || 0
         } else {
-          console.error('❌ Market settlement failed:', result.reason)
-          await sendAdminNotification(
-            `⚠️ Market settlement failed\n` +
-            `• Error: ${result.reason?.message || 'Unknown error'}\n` +
-            `• Stack: ${result.reason?.stack || 'No stack trace'}`
+          console.error('❌ Market settlement error:', r.reason)
+          await notifyAdmin(
+            `⚠️ Failed to settle market: ${r.reason?.message}`
           )
         }
       }
-
-      skip += BATCH_SIZE
     }
 
-    // Send success notifications
-    const summaryMessage = `🏦 Settlement Complete\n` +
-      `• Markets Settled: ${totalSettled}\n` +
-      `• House Profit: $${totalProfit.toFixed(2)}\n` +
-      `• Completed At: ${new Date().toUTCString()}`
+    // Send a final summary to your admin Telegram chat
+    await bot.telegram.sendMessage(
+      process.env.ADMIN_TELEGRAM_ID!,
+      `🏦 Settlement Complete\n` +
+      `• Markets settled: ${totalSettled}\n` +
+      `• House profit: $${totalProfit.toFixed(2)}\n` +
+      `• Timestamp: ${new Date().toUTCString()}`
+    )
 
-    await sendCronSummary(summaryMessage)
-    await sendAdminNotification(summaryMessage)
-
-    return res.status(200).json({
-      success: true,
-      settledCount: totalSettled,
-      houseProfit: totalProfit
-    })
-
+    return res
+      .status(200)
+      .json({ success: true, settledCount: totalSettled, houseProfit: totalProfit })
   } catch (err: any) {
     console.error('🔥 Settlement process crashed:', err)
-    
-    const errorMessage = `🚨 CRITICAL: Settlement failed\n` +
-      `• Error: ${err.message}\n` +
-      `• Stack: ${err.stack || 'No stack trace'}\n` +
-      `• Time: ${new Date().toUTCString()}`
-
-    await sendAdminNotification(errorMessage)
-    
-    return res.status(500).json({
-      success: false,
-      error: process.env.NODE_ENV === 'development' 
-        ? err.message 
-        : 'Internal server error'
-    })
+    await notifyAdmin(
+      `🚨 Settlement failed:\n${err.message}\n${err.stack || ''}`
+    )
+    return res
+      .status(500)
+      .json({ success: false, error: err.message })
   }
 }
 
 async function settleSingleMarket(market: any) {
-  return await prisma.$transaction(async (tx) => {
-    // Validate market outcome
-    const outcome = determineMarketResult(market)
-    if (!outcome) {
+  return await prisma.$transaction(
+    async (tx) => {
+      const outcome = determineMarketResult(market)  // 'YES' | 'NO' | null
+      if (!outcome) {
+        // no valid outcome: just mark closed
+        await tx.market.update({
+          where: { id: market.id },
+          data: { status: 'settled' },
+        })
+        return { settled: true, profit: 0 }
+      }
+
+      const totalPool = market.poolYes + market.poolNo
+      const tradingFee = totalPool * 0.01 * 2
+      const houseCut = totalPool * 0.10
+      const winningPool = outcome === 'YES' ? market.poolYes : market.poolNo
+      const payoutFactor =
+        winningPool > 0 ? (totalPool - tradingFee - houseCut) / winningPool : 0
+
+      // pay out winners
+      const winningTrades = market.trades.filter(
+        (t: any) => t.type.toUpperCase() === outcome
+      )
+      for (const t of winningTrades) {
+        const profit = t.amount * payoutFactor - (t.fee || 0)
+        await tx.user.update({
+          where: { id: t.userId },
+          data: { balance: { increment: profit } },
+        })
+      }
+
+      // mark all trades settled
+      await tx.trade.updateMany({
+        where: { marketId: market.id },
+        data: { settled: true },
+      })
+
+      // finalize market record
       await tx.market.update({
         where: { id: market.id },
-        data: { status: 'settled' }
+        data: {
+          status: 'settled',
+          houseProfit: houseCut,
+          settledAt: new Date(),
+        },
       })
-      return { settled: true, profit: 0 }
-    }
 
-    // Calculate pools and fees
-    const totalPool = market.poolYes + market.poolNo
-    const tradingFee = totalPool * 0.02 // 1% each side
-    const houseCut = totalPool * 0.10
-    const winningPool = outcome === 'YES' ? market.poolYes : market.poolNo
-    const payoutFactor = winningPool > 0 
-      ? (totalPool - tradingFee - houseCut) / winningPool 
-      : 0
-
-    // Process winning trades
-    const winningTrades = market.trades.filter(
-      (t: any) => t.type.toUpperCase() === outcome
-    )
-
-    for (const trade of winningTrades) {
-      const payout = trade.amount * payoutFactor
-      const netPayout = payout - (trade.fee || 0)
-      
-      await tx.user.update({
-        where: { id: trade.userId },
-        data: { balance: { increment: netPayout } }
-      })
-    }
-
-    // Mark all trades as settled
-    await tx.trade.updateMany({
-      where: { marketId: market.id },
-      data: { settled: true }
-    })
-
-    // Finalize market settlement
-    await tx.market.update({
-      where: { id: market.id },
-      data: {
-        status: 'settled',
-        houseProfit: houseCut,
-        settledAt: new Date()
-      }
-    })
-
-    return { settled: true, profit: houseCut }
-  }, {
-    maxWait: 15000, // 15s max wait time
-    timeout: 45000  // 45s timeout
-  })
+      return { settled: true, profit: houseCut }
+    },
+    { maxWait: 10000, timeout: 30000 }
+  )
 }
