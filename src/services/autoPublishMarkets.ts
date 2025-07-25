@@ -1,28 +1,38 @@
-// src/services/autoPublishMarkets.ts
-import { PrismaClient } from '@prisma/client';
-import { notifyNewMarkets } from './telegram';
+import { PrismaClient } from '@prisma/client'
+import { notifyNewMarkets } from './telegram'
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient()
 
-export async function autoPublishMarkets() {
-  // 1. Grab all open, un-notified markets ending in the future
-  const now = new Date();
+export type PublishResult = {
+  published: number
+  ids: string[]
+}
+
+export async function autoPublishMarkets(): Promise<PublishResult> {
+  const now = new Date()
   const markets = await prisma.market.findMany({
     where: {
       status: 'open',
       notified: false,
-      eventTime: { gt: now }
-    }
-  });
+      eventTime: { gt: now },
+    },
+  })
 
-  if (markets.length === 0) return;
+  if (markets.length === 0) {
+    return { published: 0, ids: [] }
+  }
 
-  // 2. Send them to Telegram
-  await notifyNewMarkets(markets);
+  // send them all in one batch
+  await notifyNewMarkets(markets)
 
-  // 3. Mark them as “notified”
+  // mark as notified
   await prisma.market.updateMany({
-    where: { id: { in: markets.map(m => m.id) } },
-    data: { notified: true }
-  });
+    where: { id: { in: markets.map((m) => m.id) } },
+    data: { notified: true },
+  })
+
+  return {
+    published: markets.length,
+    ids: markets.map((m) => m.id),
+  }
 }
