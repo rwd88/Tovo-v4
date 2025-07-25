@@ -46,6 +46,17 @@ export default function MyApp({ Component, pageProps }: AppProps) {
               <QueryClientProvider client={queryClient}>
                 {/* Wagmi (EVM) provider */}
                 <WagmiProvider config={evmConfig}>
+                  {/*
+                    Your App components can now use these Connect buttons:
+                    - TON Connect: TonConnectButton
+                    - EVM (RainbowKit): ConnectButton
+                    - Solana: WalletMultiButton (from @solana/wallet-adapter-react-ui)
+                  */}
+                  {/* Example placement: */}
+                  {/* <TonConnectButton /> */}
+                  {/* <ConnectButton /> */}
+                  {/* <WalletMultiButton /> */}
+
                   <Component {...pageProps} />
                 </WagmiProvider>
               </QueryClientProvider>
