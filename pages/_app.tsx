@@ -13,30 +13,19 @@ const queryClient = new QueryClient()
 
 // Configure Wagmi v2
 const config = createConfig({
+  autoConnect: true,
+  publicClient: http(process.env.NEXT_PUBLIC_ETH_RPC_URL!),
   chains: [mainnet],
-  transports: {
-    [mainnet.id]: http(process.env.NEXT_PUBLIC_ETH_RPC_URL!),
-  },
 })
 
 export default function MyApp({ Component, pageProps }: AppProps) {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <WagmiProvider config={config} reconnectOnMount>
+        <WagmiProvider config={config}>
           <Component {...pageProps} />
         </WagmiProvider>
       </QueryClientProvider>
-    </ErrorBoundary>
-  )
-}({ Component, pageProps }: AppProps) {
-  return (
-    <ErrorBoundary>
-      <WagmiConfig client={wagmiClient}>
-        <RainbowKitProvider chains={chains} theme={darkTheme()}>
-          <Component {...pageProps} />
-        </RainbowKitProvider>
-      </WagmiConfig>
     </ErrorBoundary>
   )
 }
