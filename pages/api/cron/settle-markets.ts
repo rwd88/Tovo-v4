@@ -6,7 +6,7 @@ import { sendCronSummary, sendAdminAlert } from '../../../lib/telegram'
 
 export const config = {
   api: { bodyParser: false },
-  maxDuration: 90,
+  maxDuration: 90, // 1m30s max
 }
 
 interface SettlementResult {
@@ -20,11 +20,13 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<SettlementResult>
 ) {
+  // authenticate via ?secret=, Authorization: Bearer or x-cron-secret
   const token =
     (req.query.secret as string) ||
     req.headers.authorization?.replace('Bearer ', '') ||
     (req.headers['x-cron-secret'] as string) ||
     ''
+
   if (token !== process.env.CRON_SECRET) {
     return res.status(403).json({ success: false, error: 'Invalid credentials' })
   }
@@ -36,6 +38,7 @@ export default async function handler(
     let hasMore = true
 
     while (hasMore) {
+      // only pull fields you actually have in your schema
       const markets = await prisma.market.findMany({
         where: {
           status: 'open',
@@ -62,37 +65,39 @@ export default async function handler(
           const { settled, profit } = await prisma.$transaction(async (tx) => {
             const outcome = determineMarketResult(m)
             if (!outcome) {
+              // mark closed with no payouts
               await tx.market.update({
                 where: { id: m.id },
                 data: { status: 'settled' },
               })
               return { settled: true, profit: 0 }
             }
+
             const totalPool = m.poolYes + m.poolNo
             const tradingFee = totalPool * 0.01 * 2
             const houseCut = totalPool * 0.10
             const winningPool = outcome === 'YES' ? m.poolYes : m.poolNo
             const payoutFactor =
-              winningPool > 0
-                ? (totalPool - tradingFee - houseCut) / winningPool
-                : 0
+              winningPool > 0 ? (totalPool - tradingFee - houseCut) / winningPool : 0
 
             // pay winners
             for (const t of m.trades) {
               if (t.type.toUpperCase() === outcome) {
-                const profit = t.amount * payoutFactor - (t.fee || 0)
+                const userProfit = t.amount * payoutFactor - (t.fee || 0)
                 await tx.user.update({
                   where: { id: t.userId },
-                  data: { balance: { increment: profit } },
+                  data: { balance: { increment: userProfit } },
                 })
               }
             }
-            // mark trades settled
+
+            // mark all trades settled
             await tx.trade.updateMany({
               where: { marketId: m.id },
               data: { settled: true },
             })
-            // finalize market
+
+            // finalize market record
             await tx.market.update({
               where: { id: m.id },
               data: {
@@ -101,22 +106,22 @@ export default async function handler(
                 settledAt: new Date(),
               },
             })
+
             return { settled: true, profit: houseCut }
           })
+
           totalSettled += settled ? 1 : 0
           totalProfit += profit
-        } catch (err: any) {
-          console.error('❌ settlement error on market', m.id, err)
-          await sendAdminAlert(`Failed to settle market ${m.id}: ${err.message}`)
+        } catch (innerErr: any) {
+          console.error('❌ settlement error on market', m.id, innerErr)
+          await sendAdminAlert(`Failed to settle market ${m.id}: ${innerErr.message}`)
         }
       }
     }
 
-    // final summary
+    // once done send a summary
     await sendCronSummary(
-      `Settled ${totalSettled} markets • House profit $${totalProfit.toFixed(
-        2
-      )}`
+      `Settled ${totalSettled} markets • House profit $${totalProfit.toFixed(2)}`
     )
 
     return res
