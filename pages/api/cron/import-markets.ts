@@ -4,7 +4,7 @@ import axios from 'axios'
 import { parseStringPromise } from 'xml2js'
 import { prisma } from '../../../lib/prisma'
 import { formatMarketMessage, notifyAdmin } from '../../../lib/market-utils'
-import { bot } from '../../../lib/telegram'
+import { sendTelegramMessage } from '../../../lib/telegram'
 
 interface CalendarEvent {
   url?: string
@@ -31,12 +31,13 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ApiResponse>
 ) {
-  // auth via ?secret=, Authorization or x-cron-secret
-  const token =
-    (req.query.secret as string) ||
+  // 🔐 authorize
+  const token = (
+    (req.query.secret  as string) ||
     req.headers.authorization?.replace('Bearer ', '') ||
     (req.headers['x-cron-secret'] as string) ||
     ''
+  )
 
   if (token !== process.env.CRON_SECRET) {
     return res
@@ -72,7 +73,7 @@ export default async function handler(
         continue
       }
 
-      // parse date/time
+      // parse date + time
       const dateStr = ev.date?.trim()
       const rawTime = ev.time?.trim().toLowerCase()
       if (!dateStr || !rawTime) {
@@ -88,9 +89,8 @@ export default async function handler(
       if (m[3] === 'pm' && hour < 12) hour += 12
       if (m[3] === 'am' && hour === 12) hour = 0
       const minute = m[2]
-      const iso = `${dateStr.split('-')[2]}-${dateStr.split('-')[0]}-${dateStr.split('-')[1]}T${hour
-        .toString()
-        .padStart(2, '0')}:${minute}:00Z`
+      const [mm, dd, yyyy] = dateStr.split('-')  // expecting MM-DD-YYYY
+      const iso = `${yyyy}-${mm}-${dd}T${hour.toString().padStart(2,'0')}:${minute}:00Z`
       const eventTime = new Date(iso)
       if (isNaN(eventTime.getTime()) || eventTime < now) {
         skipped++
@@ -99,10 +99,10 @@ export default async function handler(
 
       const externalId =
         ev.url?.trim() ||
-        `ff-${ev.title}-${dateStr}-${hour.toString().padStart(2, '0')}${minute}`
+        `ff-${ev.title}-${dateStr}-${hour.toString().padStart(2,'0')}${minute}`
       const forecastVal = ev.forecast ? parseFloat(ev.forecast) : null
 
-      // upsert into Prisma
+      // upsert into your DB
       await prisma.market.upsert({
         where: { externalId },
         update: {
@@ -110,7 +110,7 @@ export default async function handler(
         },
         create: {
           externalId,
-          question:   ev.title?.trim() || 'Untitled Event',
+          question:   ev.title?.trim() ?? 'Untitled Event',
           status:     'open',
           eventTime,
           poolYes:    0,
@@ -122,21 +122,23 @@ export default async function handler(
       })
       added++
 
-      // announce in Telegram
-      const msg = formatMarketMessage({ 
-        externalId, 
-        question: ev.title!.trim(), 
-        eventTime, 
-        poolYes: 0, 
-        poolNo: 0, 
+      // announce on Telegram
+      const msg = formatMarketMessage({
+        // we only need these five for the announcement
+        externalId,
+        question: ev.title!.trim(),
+        eventTime,
+        poolYes: 0,
+        poolNo: 0,
         forecast: forecastVal ?? undefined,
         status: 'open'
       } as any)
-      await bot.telegram.sendMessage(
-        process.env.TELEGRAM_ANNOUNCE_ID!,
-        msg,
-        { parse_mode: 'Markdown' }
-      )
+
+      await sendTelegramMessage({
+        chat_id: process.env.TELEGRAM_CHANNEL_ID!,
+        text: msg,
+        parse_mode: 'Markdown',
+      })
     }
 
     return res.status(200).json({ success: true, added, skipped })
