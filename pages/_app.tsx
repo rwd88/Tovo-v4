@@ -8,6 +8,9 @@ import { mainnet } from 'wagmi/chains'
 import { http } from 'viem'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
+// TON Connect UI
+import { TonConnectUIProvider } from '@tonconnect/ui-react'
+
 // Setup TanStack Query
 const queryClient = new QueryClient()
 
@@ -21,11 +24,16 @@ const config = createConfig({
 export default function MyApp({ Component, pageProps }: AppProps) {
   return (
     <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <WagmiProvider config={config}>
-          <Component {...pageProps} />
-        </WagmiProvider>
-      </QueryClientProvider>
+      {/* TON Connect wrapper: provide manifest URL for TonConnect */}
+      <TonConnectUIProvider manifestUrl={process.env.NEXT_PUBLIC_TON_MANIFEST_URL!}>
+        {/* React Query provider */}
+        <QueryClientProvider client={queryClient}>
+          {/* Wagmi (EVM) provider */}
+          <WagmiProvider config={config}>
+            <Component {...pageProps} />
+          </WagmiProvider>
+        </QueryClientProvider>
+      </TonConnectUIProvider>
     </ErrorBoundary>
   )
 }
