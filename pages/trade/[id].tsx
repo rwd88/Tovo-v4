@@ -2,10 +2,10 @@ import Image from 'next/image'
 import { useState } from 'react'
 import type { GetServerSideProps } from 'next'
 import type { Market } from '@prisma/client'
-import { useEthereum } from '../../src/contexts/EthereumContext'
+import { useEthereum } from '../../contexts/EthereumContext'
 import dynamic from 'next/dynamic'
 
-const WalletDrawer = dynamic(() => import('../../src/components/WalletDrawer'), { ssr: false })
+const WalletDrawer = dynamic(() => import('../../components/WalletDrawer'), { ssr: false })
 
 type Props = {
   market: Omit<Market, 'eventTime'> & { eventTime: string }
