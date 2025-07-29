@@ -1,16 +1,16 @@
 {
   "crons": [
     {
-      "path": "/api/cron/import-markets?secret=${CRON_SECRET}&publish=true",
+      "path": "/api/cron/import-markets?secret=12345A",
       "schedule": "0 0 * * *"
     },
     {
-      "path": "/api/cron/settle-markets?secret=${CRON_SECRET}",
+      "path": "/api/cron/settle-markets?secret=12345A",
       "schedule": "*/10 * * * *"
     },
     {
-      "path": "/api/cron/publish-markets?secret=${CRON_SECRET}",
-      "schedule": "*/10 * * * *"
+      "path": "/api/cron/publish-markets?secret=12345A",
+      "schedule": "*/20 * * * *"
     }
   ]
 }
