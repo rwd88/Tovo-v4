@@ -1,80 +1,64 @@
 'use client'
 
-import {
-  useAccount,
-  useConnect,
-  useDisconnect,
-  useConfig,
-} from 'wagmi'
+import { useAccount, useConnect, useDisconnect } from 'wagmi'
 import { injected } from '@wagmi/connectors'
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  ReactNode,
-} from 'react'
+import { useEffect, useState, createContext, useContext, ReactNode } from 'react'
 
 interface EthereumContextType {
   address: string | null
+  isConnected: boolean
   connect: () => Promise<void>
   disconnect: () => Promise<void>
-  isConnected: boolean
 }
 
 const EthereumContext = createContext<EthereumContextType>({
   address: null,
+  isConnected: false,
   connect: async () => {},
   disconnect: async () => {},
-  isConnected: false,
 })
 
 export function EthereumProvider({ children }: { children: ReactNode }) {
+  const [isMounted, setIsMounted] = useState(false)
+  
   const { address, isConnected } = useAccount()
-  const { connectAsync } = useConnect()
+  const { connectAsync } = useConnect({
+    connector: injected({ target: 'metaMask' })
+  })
   const { disconnectAsync } = useDisconnect()
-  const config = useConfig()
-
-  const [walletAddress, setWalletAddress] = useState<string | null>(null)
-  const [connectionStatus, setConnectionStatus] = useState(false)
 
   useEffect(() => {
-    if (isConnected && address) {
-      setWalletAddress(address)
-      setConnectionStatus(true)
-    } else {
-      setWalletAddress(null)
-      setConnectionStatus(false)
-    }
-  }, [isConnected, address])
+    setIsMounted(true)
+    return () => setIsMounted(false)
+  }, [])
 
   const connect = async () => {
+    if (!isMounted) return
     try {
-      await connectAsync({ 
-        connector: injected({ target: 'metaMask' }) 
-      })
-    } catch (err) {
-      console.error('Connection error:', err)
-      throw err // Re-throw if you want to handle this in the UI
+      await connectAsync()
+    } catch (error) {
+      console.error('Connection error:', error)
+      throw error
     }
   }
 
   const disconnect = async () => {
+    if (!isMounted) return
     try {
       await disconnectAsync()
-    } catch (err) {
-      console.error('Disconnection error:', err)
-      throw err
+    } catch (error) {
+      console.error('Disconnection error:', error)
+      throw error
     }
   }
 
   return (
-    <EthereumContext.Provider 
-      value={{ 
-        address: walletAddress, 
-        connect, 
+    <EthereumContext.Provider
+      value={{
+        address: isMounted ? address : null,
+        isConnected: isMounted ? isConnected : false,
+        connect,
         disconnect,
-        isConnected: connectionStatus
       }}
     >
       {children}
@@ -82,4 +66,10 @@ export function EthereumProvider({ children }: { children: ReactNode }) {
   )
 }
 
-export const useEthereum = () => useContext(EthereumContext)
+export const useEthereum = () => {
+  const context = useContext(EthereumContext)
+  if (!context) {
+    throw new Error('useEthereum must be used within an EthereumProvider')
+  }
+  return context
+}
