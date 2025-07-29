@@ -39,6 +39,7 @@ model Market {
   forecast        Float?
   houseProfit     Float?
   tag             String?
+  lastPublishedAt DateTime? @map("last_published_at")  // NEW FIELD ADDED
   outcomes        Outcome[]
   trades          Trade[]
 
