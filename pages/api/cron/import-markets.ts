@@ -42,9 +42,18 @@ export default async function handler(
   }
 
   try {
+    // Debug: Log environment variables
+    console.log('[DEBUG] Env vars:', {
+      TELEGRAM_BOT_TOKEN: !!process.env.TELEGRAM_BOT_TOKEN,
+      ADMIN_TELEGRAM_ID: !!process.env.ADMIN_TELEGRAM_ID
+    })
+
     // 1) fetch the XML
     const CAL_URL = 'https://nfs.faireconomy.media/ff_calendar_thisweek.xml'
+    console.log('[DEBUG] Fetching XML from:', CAL_URL)
     const { data: xml } = await axios.get<string>(CAL_URL)
+    console.log('[DEBUG] Raw XML:', xml.slice(0, 200) + '...') // Log first 200 chars
+
     const parsed = await parseStringPromise(xml, {
       explicitArray: false,
       trim: true,
@@ -55,6 +64,7 @@ export default async function handler(
         ? parsed.weeklyevents.event
         : [parsed.weeklyevents.event]
       : []
+    console.log(`[DEBUG] Found ${events.length} events`)
 
     // 2) upsert
     let added = 0,
@@ -62,9 +72,26 @@ export default async function handler(
     const now = new Date()
 
     for (const ev of events) {
-      if (ev.impact?.trim().toLowerCase() !== 'high') {
+      const isHighImpact = ev.impact?.trim().toLowerCase() === 'high'
+      console.log(`[DEBUG] Processing event: ${ev.title} | High Impact: ${isHighImpact}`)
+
+      if (!isHighImpact) {
         skipped++
         continue
+      }
+
+      // Send Telegram notification for high-impact events
+      try {
+        await notifyAdmin(
+          `🚨 *New High-Impact Event*\n` +
+          `• *${ev.title}*\n` +
+          `• *Date*: ${ev.date}\n` +
+          `• *Time*: ${ev.time}\n` +
+          `• *Currency*: ${ev.country || 'N/A'}`
+        )
+        console.log('[DEBUG] Telegram notification sent for:', ev.title)
+      } catch (err) {
+        console.error('[ERROR] Failed to send Telegram alert:', err)
       }
 
       // parse date & time...
@@ -89,7 +116,13 @@ export default async function handler(
         .toString()
         .padStart(2, '0')}:${minute}:00Z`
       const eventTime = new Date(iso)
-      if (isNaN(eventTime.getTime()) || eventTime < now) {
+      if (isNaN(eventTime.getTime()) {
+        console.error('[ERROR] Invalid date for event:', ev.title, iso)
+        skipped++
+        continue
+      }
+      if (eventTime < now) {
+        console.log('[DEBUG] Skipping past event:', ev.title)
         skipped++
         continue
       }
@@ -119,6 +152,7 @@ export default async function handler(
       })
 
       added++
+      console.log('[DEBUG] Added market:', ev.title)
     }
 
     // 3) auto-publish if asked
@@ -129,6 +163,7 @@ export default async function handler(
       const result = await autoPublishMarkets()
       published = result.published
       publishIds = result.ids
+      console.log('[DEBUG] Auto-published markets:', published)
     }
 
     return res.status(200).json({
