@@ -7,7 +7,7 @@ import { sendAdminAlert } from '../../../lib/telegram'
 
 export const config = {
   api: { bodyParser: false },
-  maxDuration: 60, // up to 60s for XML fetch
+  maxDuration: 60,
 }
 
 interface ImportResponse {
@@ -21,7 +21,7 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ImportResponse>
 ) {
-  // 🔐 Auth
+  // 1) Auth
   const token =
     (req.query.secret as string) ||
     (req.headers['x-cron-secret'] as string) ||
@@ -30,7 +30,7 @@ export default async function handler(
     await sendAdminAlert('⚠️ Unauthorized import-markets call')
     return res
       .status(403)
-      .json({ success: false, added: 0, skipped: 0, error: 'Unauthorized' })
+      .json({ success: false, added: 0, skipped: 0, error: 'Forbidden' })
   }
   if (req.method !== 'GET') {
     return res
@@ -39,58 +39,63 @@ export default async function handler(
   }
 
   try {
-    // 1) Fetch & parse XML
+    // 2) Fetch & parse the XML
     const CAL_URL = 'https://nfs.faireconomy.media/ff_calendar_thisweek.xml'
     const { data: xml } = await axios.get<string>(CAL_URL)
     const parsed = await parseStringPromise(xml, {
       explicitArray: false,
       trim:          true,
     })
-    const events: any[] = parsed?.weeklyevents?.event
-      ? Array.isArray(parsed.weeklyevents.event)
-        ? parsed.weeklyevents.event
-        : [parsed.weeklyevents.event]
+    const raw = parsed?.weeklyevents?.event
+    const events = raw
+      ? Array.isArray(raw)
+        ? raw
+        : [raw]
       : []
 
     let added = 0, skipped = 0
-    const now = new Date()
+    const now = Date.now()
 
-    // 2) Upsert loop
     for (const ev of events) {
-      // only high-impact
+      // only “High” impact
       if (ev.impact?.trim().toLowerCase() !== 'high') {
-        skipped++; continue
+        skipped++
+        continue
       }
-      // notify admin that we saw this event
-      await sendAdminAlert(
-        `🚨 High-Impact Event\n${ev.title}\nDate: ${ev.date} ${ev.time}`
-      )
 
-      // parse date/time
-      const dateStr = ev.date?.trim(), rawTime = ev.time?.trim().toLowerCase()
-      if (!dateStr || !rawTime) { skipped++; continue }
-      const m = rawTime.match(/^(\d{1,2}):(\d{2})(am|pm)$/)
+      // parse time
+      const dateStr = ev.date?.trim()    // MM-DD-YYYY
+      const t = ev.time?.trim().toLowerCase() // e.g. “8:30am”
+      if (!dateStr || !t) { skipped++; continue }
+      const m = t.match(/^(\d{1,2}):(\d{2})(am|pm)$/)
       if (!m) { skipped++; continue }
-      let hour = parseInt(m[1], 10)
+      let hour = parseInt(m[1],10)
       if (m[3] === 'pm' && hour < 12) hour += 12
       if (m[3] === 'am' && hour === 12) hour = 0
-      const minute = m[2]
       const [mm, dd, yyyy] = dateStr.split('-')
-      const iso = `${yyyy}-${mm}-${dd}T${hour
-        .toString()
-        .padStart(2, '0')}:${minute}:00Z`
+      const iso = `${yyyy}-${mm}-${dd}T${hour.toString().padStart(2,'0')}:${m[2]}:00Z`
       const eventTime = new Date(iso)
-      if (isNaN(eventTime.getTime()) || eventTime < now) {
-        skipped++; continue
+      if (isNaN(eventTime.getTime()) || eventTime.getTime() < now) {
+        skipped++
+        continue
       }
 
-      const externalId   = ev.url?.trim() ||
-                           `ff-${ev.title}-${mm}${dd}-${hour}${minute}`
-      const forecastVal  = ev.forecast ? parseFloat(ev.forecast) : undefined
+      // pull forecast out of XML, if present
+      const rawForecast = ev.forecast?.trim()
+      const forecastVal = rawForecast && !isNaN(Number(rawForecast))
+        ? parseFloat(rawForecast)
+        : null
 
+      const externalId = ev.url?.trim() ||
+        `ff-${ev.title}-${mm}${dd}-${hour}${m[2]}`
+
+      // 3) Upsert into your markets table, **including** forecast
       await prisma.market.upsert({
-        where:  { externalId },
-        update: forecastVal != null ? { forecast: forecastVal } : {},
+        where: { externalId },
+        update: {
+          // ALWAYS overwrite forecast if XML provides it
+          ...(forecastVal != null ? { forecast: forecastVal } : {}),
+        },
         create: {
           externalId,
           question:  ev.title.trim(),
@@ -103,12 +108,13 @@ export default async function handler(
           ...(forecastVal != null ? { forecast: forecastVal } : {}),
         },
       })
+
       added++
     }
 
     return res.status(200).json({ success: true, added, skipped })
   } catch (err: any) {
-    console.error('import-markets error:', err)
+    console.error('import-markets crashed:', err)
     await sendAdminAlert(`import-markets failed: ${err.message}`)
     return res
       .status(500)
