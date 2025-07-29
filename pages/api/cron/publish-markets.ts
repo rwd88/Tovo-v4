@@ -1,128 +1,156 @@
-// pages/api/cron/publish-markets.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { prisma } from '../../../lib/prisma'
-import bot from '../../../src/bot/bot'
+import { sendAdminAlert, sendTelegramMessage } from '../../../lib/telegram'
+import { formatMarketMessage } from '../../../lib/market-utils'
 
-export type PublishResult = {
+interface PublishResult {
   id: string
   question: string
-  sentCount: number
-  failedCount: number
+  telegramSent: boolean
+  error?: string
 }
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse<
-    | { success: true; results: PublishResult[]; failedSends?: { chatId: string; error: string }[] }
-    | { success: false; error: string }
-  >
+  res: NextApiResponse<{ 
+    success: boolean
+    results: PublishResult[]
+    stats?: {
+      total: number
+      success: number
+      failed: number
+    }
+  }>
 ) {
-  // 1) Authenticate via ?secret= or Authorization header
-  const secretFromQuery = (req.query.secret as string) || ''
-  const bearer = req.headers.authorization?.split(' ')[1] || ''
-  const incomingSecret = secretFromQuery || bearer
-
-  if (incomingSecret !== process.env.CRON_SECRET) {
-    return res.status(403).json({ success: false, error: 'Unauthorized' })
+  // Authentication
+  const token = req.query.secret || req.headers.authorization?.split(' ')[1] || ''
+  if (token !== process.env.CRON_SECRET) {
+    await sendAdminAlert('⚠️ Unauthorized access attempt to publish-markets')
+    return res.status(403).json({ 
+      success: false, 
+      results: [] 
+    })
   }
 
   try {
-    // 2) Load all open, un-notified markets
-    const openMarkets = await prisma.market.findMany({
-      where: { status: 'open', notified: false, question: { not: undefined } },
+    console.log('[PUBLISH] Starting market publication...')
+    
+    // 1. Get unpublished markets
+    const markets = await prisma.market.findMany({
+      where: { 
+        status: 'open',
+        notified: false,
+        eventTime: { gt: new Date() }
+      },
       orderBy: { eventTime: 'asc' },
+      take: 50 // Limit to prevent timeout
     })
 
-    // 3) Load subscribers
-    const subscribers = await prisma.subscriber.findMany({ where: { subscribed: true } })
+    if (markets.length === 0) {
+      console.log('[PUBLISH] No markets to publish')
+      return res.status(200).json({ 
+        success: true, 
+        results: [],
+        stats: { total: 0, success: 0, failed: 0 }
+      })
+    }
 
     const results: PublishResult[] = []
-    const failedSends: Array<{ chatId: string; error: string }> = []
+    let successCount = 0
+    let failCount = 0
 
-    // 4) Send each market notification
-    for (const market of openMarkets) {
-      const { id, question, eventTime, poolYes, poolNo, forecast } = market
-      if (!question.trim()) {
-        console.warn(`Skipping empty question for market ${id}`)
-        continue
+    // 2. Process markets in batches
+    for (const market of markets) {
+      const result: PublishResult = {
+        id: market.id,
+        question: market.question,
+        telegramSent: false
       }
 
-      // build the message + buttons
-      const when = eventTime ? `\n🕓 ${new Date(eventTime).toUTCString()}` : ''
-      const liquidity = (poolYes + poolNo).toFixed(2)
-      const forecastText =
-        forecast != null ? `\n📈 Forecast: ${forecast.toFixed(1)}% YES` : ''
+      try {
+        // Enhanced message formatting
+        const message = `🎯 *New Trading Opportunity!*\n\n` +
+          `${formatMarketMessage(market)}\n\n` +
+          `_Expires: ${market.eventTime?.toUTCString()}_`
 
-      const message = `📊 *New Prediction Market!*\n\n*${question}*${when}\n💰 Liquidity: $${liquidity}${forecastText}\n\nMake your prediction:`
-      const buttons = {
-        parse_mode: 'Markdown' as const,
-        reply_markup: {
-          inline_keyboard: [
-            [
-              { text: '✅ YES', url: `${process.env.BOT_WEB_URL}/trade/${id}?side=yes` },
-              { text: '❌ NO',  url: `${process.env.BOT_WEB_URL}/trade/${id}?side=no`  },
-            ],
-          ],
-        },
-      }
-
-      let sentCount = 0
-      let failedCount = 0
-
-      for (const sub of subscribers) {
-        try {
-          await sendWithRetry(sub.chatId, message, buttons, 2)
-          sentCount++
-        } catch (err: any) {
-          failedCount++
-          const errorMsg = err.description || err.message || String(err)
-          failedSends.push({ chatId: sub.chatId, error: errorMsg })
-          console.error(`Failed to send market ${id} → ${sub.chatId}:`, errorMsg)
-
-          // auto-unsubscribe if blocked (403 or “blocked” text)
-          if (err.code === 403 || errorMsg.toLowerCase().includes('blocked')) {
-            await prisma.subscriber.update({
-              where: { chatId: sub.chatId },
-              data: { subscribed: false },
-            })
+        console.log(`[PUBLISH] Sending market ${market.id} to Telegram`)
+        
+        await sendTelegramMessage({
+          chat_id: process.env.TELEGRAM_CHANNEL_ID!,
+          text: message,
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { 
+                  text: '📈 Trade YES', 
+                  url: `${process.env.BOT_WEB_URL}/trade/${market.id}?side=yes` 
+                },
+                { 
+                  text: '📉 Trade NO', 
+                  url: `${process.env.BOT_WEB_URL}/trade/${market.id}?side=no` 
+                }
+              ],
+              [
+                {
+                  text: '📊 View Market',
+                  url: `${process.env.BOT_WEB_URL}/markets/${market.id}`
+                }
+              ]
+            ]
           }
+        })
+
+        await prisma.market.update({
+          where: { id: market.id },
+          data: { notified: true }
+        })
+
+        result.telegramSent = true
+        successCount++
+        console.log(`[SUCCESS] Published market ${market.id}`)
+
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : 'Unknown error'
+        console.error(`[FAILED] Market ${market.id}:`, errorMsg)
+        result.error = errorMsg
+        failCount++
+        
+        // Send immediate alert for critical failures
+        if (errorMsg.includes('blocked') || errorMsg.includes('403')) {
+          await sendAdminAlert(`🚨 Critical Telegram error: ${errorMsg}`)
         }
       }
 
-      // 5) Mark market as notified so it won’t run again
-      await prisma.market.update({
-        where: { id },
-        data: { notified: true },
-      })
-
-      results.push({ id, question, sentCount, failedCount })
+      results.push(result)
     }
 
-    return res.status(200).json({ success: true, results, failedSends: failedSends.length ? failedSends : undefined })
-  } catch (err: any) {
-    console.error('publish-markets error:', err)
-    return res.status(500).json({ success: false, error: err.message })
-  }
-}
+    // 3. Send summary notification
+    const summary = `📢 Published ${successCount} markets\n` +
+      `${failCount > 0 ? `⚠️ Failed: ${failCount}` : '✅ All succeeded'}`
+    
+    await sendAdminAlert(summary)
 
-/**
- * sendWithRetry: wraps bot.telegram.sendMessage with retries and backoff
- */
-async function sendWithRetry(
-  chatId: string,
-  message: string,
-  buttons: any,
-  retries: number
-): Promise<void> {
-  try {
-    await bot.telegram.sendMessage(chatId, message, buttons)
-  } catch (err: any) {
-    if (retries > 0) {
-      // wait 1s then retry
-      await new Promise((r) => setTimeout(r, 1000))
-      return sendWithRetry(chatId, message, buttons, retries - 1)
-    }
-    // rethrow if out of retries
-    throw err
+    return res.status(200).json({ 
+      success: true, 
+      results,
+      stats: {
+        total: markets.length,
+        success: successCount,
+        failed: failCount
+      }
+    })
+
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error'
+    console.error('[CRITICAL] Publish failed:', errorMsg)
+    
+    await sendAdminAlert(`💥 publish-markets crashed:\n${errorMsg}`)
+    
+    return res.status(500).json({ 
+      success: false, 
+      results: [],
+      stats: { total: 0, success: 0, failed: 0 }
+    })
   }
 }
