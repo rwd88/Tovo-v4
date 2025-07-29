@@ -1,99 +1,64 @@
+// pages/api/cron/publish-markets.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { prisma } from '../../../lib/prisma'
-import { sendTelegramMessage } from '../../../lib/telegram'
+import { sendTelegramMessage, sendAdminAlert } from '../../../lib/telegram'
+import { formatMarketMessage } from '../../../lib/market-utils'
+
+interface PublishResponse {
+  success:   boolean
+  published: number
+  id?:       string
+  error?:    string
+}
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse<{ success: boolean; published: number }>
+  res: NextApiResponse<PublishResponse>
 ) {
-  // Authentication
-  const token = req.query.secret as string || ''
-  if (token !== '12345A') {
+  // 1) Authenticate
+  const token = (req.query.secret as string) ||
+                req.headers.authorization?.replace('Bearer ', '') ||
+                ''
+  if (token !== process.env.CRON_SECRET) {
+    await sendAdminAlert('⚠️ Unauthorized access to publish-markets')
     return res.status(403).json({ success: false, published: 0 })
   }
 
   try {
-    // 1. Verify the field exists
-    const modelFields = await prisma.$queryRaw`
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name = 'Market' 
-      AND column_name = 'last_published_at'
-    `;
-    
-    if (!modelFields.length) {
-      throw new Error('lastPublishedAt field missing in database');
-    }
-
-    // 2. Get the next market to publish
-    const market = await prisma.$transaction(async (tx) => {
-      const candidates = await tx.market.findMany({
-        where: {
-          status: 'open',
-          eventTime: { gt: new Date() },
-          OR: [
-            { lastPublishedAt: null },
-            { lastPublishedAt: { lt: new Date(Date.now() - 6 * 60 * 60 * 1000) } }
-          ]
-        },
-        orderBy: [
-          { lastPublishedAt: 'asc' },
-          { eventTime: 'asc' }
-        ],
-        take: 1
-      });
-
-      if (!candidates.length) return null;
-
-      await tx.market.update({
-        where: { id: candidates[0].id },
-        data: { lastPublishedAt: new Date() }
-      });
-
-      return candidates[0];
-    });
+    // 2) Grab exactly one “next” market
+    const market = await prisma.market.findFirst({
+      where: { status: 'open', notified: false, eventTime: { gt: new Date() } },
+      orderBy: { eventTime: 'asc' },
+    })
 
     if (!market) {
-      return res.status(200).json({ success: true, published: 0 });
+      return res.status(200).json({ success: true, published: 0 })
     }
 
-    // 3. Format and send message
-    const formattedQuestion = market.question.endsWith('?') 
-      ? market.question 
-      : `${market.question}?`;
+    // 3) Build and send the Telegram post
+    const message =
+      `📊 *New Prediction Market!*\n\n${formatMarketMessage(market)}\n\n` +
+      `[✅ YES](${process.env.BOT_WEB_URL}/trade/${market.id}?side=yes) ` +
+      `[❌ NO](${process.env.BOT_WEB_URL}/trade/${market.id}?side=no)\n` +
+      `[🔍 View Market](${process.env.BOT_WEB_URL}/markets/${market.id})`
 
     await sendTelegramMessage({
-      chat_id: "-1002266469531",
-      text: `🎯 *New Prediction Market*\n\n` +
-            `*${formattedQuestion}*\n` +
-            `🕒 Expires: ${market.eventTime.toUTCString()}\n` +
-            `💰 Liquidity: $${(market.poolYes + market.poolNo).toFixed(2)}` +
-            (market.forecast ? `\n📈 Forecast: ${market.forecast.toFixed(1)}% YES` : ''),
+      chat_id: process.env.TELEGRAM_CHANNEL_ID!,
+      text: message,
       parse_mode: 'Markdown',
-      reply_markup: {
-        inline_keyboard: [[
-          { text: "✅ Trade YES", url: `${process.env.NEXT_PUBLIC_SITE_URL}/trade/${market.id}?side=yes` },
-          { text: "❌ Trade NO", url: `${process.env.NEXT_PUBLIC_SITE_URL}/trade/${market.id}?side=no` }
-        ]]
-      }
-    });
+      disable_web_page_preview: true,
+    })
 
-    return res.status(200).json({ success: true, published: 1 });
+    // 4) Mark it as sent
+    await prisma.market.update({
+      where: { id: market.id },
+      data:  { notified: true },
+    })
 
-  } catch (err) {
-    console.error('Publish failed:', err);
-    
-    // Special handling for schema errors
-    if (err.message.includes('lastPublishedAt') || err.message.includes('Unknown argument')) {
-      await sendTelegramMessage({
-        chat_id: process.env.ADMIN_TELEGRAM_ID!,
-        text: `⚠️ Database Schema Error\n\n${err.message}\n\nRun migrations!`
-      });
-    }
-    
-    return res.status(500).json({ 
-      success: false, 
-      published: 0 
-    });
+    return res.status(200).json({ success: true, published: 1, id: market.id })
+  } catch (err: any) {
+    console.error('publish-markets error:', err)
+    await sendAdminAlert(`❌ publish-markets crashed: ${err.message}`)
+    return res.status(500).json({ success: false, published: 0, error: err.message })
   }
 }

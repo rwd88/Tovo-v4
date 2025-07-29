@@ -1,29 +1,35 @@
-// src/lib/telegram.ts
 import { Telegraf } from 'telegraf'
 import type { Context } from 'telegraf'
-import { PrismaClient } from '@prisma/client'
 
-// shared Prisma client just in case your bot uses it
-const prisma = new PrismaClient()
-
-// create & export the bot instance
 export const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN!)
 
-/**
- * Send a one-off message to your admin (for cron summaries or errors).
- */
-export async function sendAdminNotification(text: string) {
-  const adminId = process.env.ADMIN_TELEGRAM_ID
-  if (!adminId) return
-
+// Send to public channel
+export async function sendToChannel(text: string, options?: any) {
   try {
-    await bot.telegram.sendMessage(adminId, text, { parse_mode: 'Markdown' })
+    await bot.telegram.sendMessage(
+      process.env.TELEGRAM_CHANNEL_ID!, 
+      text, 
+      { parse_mode: 'Markdown', ...options }
+    )
   } catch (err) {
-    console.error('sendAdminNotification error:', err)
+    console.error('Channel send failed:', err)
   }
 }
 
-// (Optional) export a helper to start the bot in serverless environments
+// Send to admin only
+export async function sendAdminAlert(text: string) {
+  try {
+    await bot.telegram.sendMessage(
+      process.env.ADMIN_TELEGRAM_ID!, 
+      `⚠️ ADMIN: ${text}`,
+      { parse_mode: 'Markdown' }
+    )
+  } catch (err) {
+    console.error('Admin alert failed:', err)
+  }
+}
+
+// Start bot (for serverless)
 export function startBot() {
   bot.launch().catch(console.error)
 }

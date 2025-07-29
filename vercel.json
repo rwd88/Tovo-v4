@@ -10,7 +10,7 @@
     },
     {
       "path": "/api/cron/publish-markets?secret=12345A",
-      "schedule": "*/20 * * * *"
+      "schedule": "*/15 * * * *"
     }
   ]
 }
