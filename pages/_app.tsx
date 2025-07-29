@@ -1,6 +1,7 @@
 import '../styles/globals.css'
 import type { AppProps } from 'next/app'
 import { ErrorBoundary } from '../components/ErrorBoundary'
+import '@fontsource/montserrat' // npm install @fontsource/montserrat
 
 // Wagmi v2 + TanStack Query (EVM)
 import { WagmiProvider, createConfig } from 'wagmi'
