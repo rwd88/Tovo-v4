@@ -2,7 +2,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { prisma } from '../../../lib/prisma'
 import { sendTelegramMessage, sendAdminAlert } from '../../../lib/telegram'
-import { formatMarketMessage } from '../../../lib/market-utils'
+import { escapeHtml, formatMarketHtml } from '../../../lib/market-utils'
 
 interface PublishResponse {
   success:   boolean
@@ -11,11 +11,12 @@ interface PublishResponse {
   error?:    string
 }
 
+// Run every 15 min via Vercel Cron
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<PublishResponse>
 ) {
-  // 1️⃣ Authenticate
+  // auth
   const token =
     (req.query.secret as string) ||
     req.headers.authorization?.replace('Bearer ', '') ||
@@ -26,8 +27,8 @@ export default async function handler(
   }
 
   try {
-    // 2️⃣ Find the *next* un-notified market
-    const market = await prisma.market.findFirst({
+    // pick next market
+    const m = await prisma.market.findFirst({
       where: {
         status:    'open',
         notified:  false,
@@ -35,39 +36,55 @@ export default async function handler(
       },
       orderBy: { eventTime: 'asc' },
     })
-
-    if (!market) {
-      // nothing to send
+    if (!m) {
       return res.status(200).json({ success: true, published: 0 })
     }
 
-    // 3️⃣ Build the Telegram message
-    const msg =
-      formatMarketMessage(market) + '\n\n' +
-      `[✅ YES](${process.env.BOT_WEB_URL}/trade/${market.id}?side=yes) ` +
-      `[❌ NO](${process.env.BOT_WEB_URL}/trade/${market.id}?side=no)`
+    // build the HTML block
+    const coreHtml = formatMarketHtml(m)
 
-    // 4️⃣ Send to your public channel
+    // build inline‐keyboard URLs
+    const baseUrl = (process.env.BOT_WEB_URL || '').replace(/\/$/, '')
+    const yesUrl  = `${baseUrl}/trade/${m.id}?side=yes`
+    const noUrl   = `${baseUrl}/trade/${m.id}?side=no`
+
+    const fullHtml = `
+${coreHtml}
+
+<a href="${yesUrl}">✅ Trade YES</a>   <a href="${noUrl}">❌ Trade NO</a>
+`.trim()
+
+    // send to public channel
     await sendTelegramMessage({
-      chat_id:    process.env.TELEGRAM_CHANNEL_ID!,
-      text:       msg,
-      parse_mode: 'Markdown',
+      chat_id:                  process.env.TELEGRAM_CHANNEL_ID!,
+      text:                     fullHtml,
+      disable_web_page_preview: true,
+      // reply_markup must be JSON‐stringified
+      reply_markup: JSON.stringify({
+        inline_keyboard: [
+          [
+            { text: '✅ Trade YES', url: yesUrl },
+            { text: '❌ Trade NO', url: noUrl },
+          ],
+        ],
+      }),
     })
 
-    // 5️⃣ Mark it notified
+    // mark as notified
     await prisma.market.update({
-      where: { id: market.id },
+      where: { id: m.id },
       data:  { notified: true },
     })
 
-    return res.status(200).json({
-      success:   true,
-      published: 1,
-      id:        market.id,
-    })
+    return res.status(200).json({ success: true, published: 1, id: m.id })
   } catch (err: any) {
     console.error('publish-markets error:', err)
-    await sendAdminAlert(`❌ publish-markets failed: ${err.message}`)
+    await sendAdminAlert(`❌ publish-markets crashed: ${err.message}`)
     return res.status(500).json({ success: false, published: 0, error: err.message })
   }
+}
+
+// If you ever need to escape HTML elsewhere:
+function escapeHtml(s: string): string {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
 }

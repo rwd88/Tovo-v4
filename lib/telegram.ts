@@ -1,14 +1,13 @@
+// src/lib/telegram.ts
 import axios from 'axios'
 
-/**
- * Low-level send helper using Telegram Bot API, using HTML parse mode by default
- */
 interface TelegramMessage {
   chat_id: string | number
   text: string
   parse_mode?: 'Markdown' | 'HTML'
   disable_web_page_preview?: boolean
   disable_notification?: boolean
+  reply_markup?: string
 }
 
 interface TelegramResponse {
@@ -18,7 +17,7 @@ interface TelegramResponse {
 }
 
 /**
- * sendTelegramMessage can be called either with a params object or with text directly.
+ * Generic Telegram send helper (defaults to HTML mode).
  */
 export async function sendTelegramMessage(
   params: TelegramMessage
@@ -35,11 +34,8 @@ export async function sendTelegramMessage(
   chatId = process.env.TELEGRAM_CHANNEL_ID!
 ): Promise<TelegramResponse> {
   const token = process.env.TELEGRAM_BOT_TOKEN
-  if (!token) {
-    throw new Error('TELEGRAM_BOT_TOKEN is not configured')
-  }
+  if (!token) throw new Error('TELEGRAM_BOT_TOKEN not set')
 
-  // Build the payload, defaulting to HTML parse mode
   const payload: TelegramMessage =
     typeof arg1 === 'string'
       ? {
@@ -55,7 +51,6 @@ export async function sendTelegramMessage(
           disable_web_page_preview:  true,
         }
 
-  // Send the HTTP request
   const res = await axios.post<TelegramResponse>(
     `https://api.telegram.org/bot${token}/sendMessage`,
     payload,
@@ -68,9 +63,7 @@ export async function sendTelegramMessage(
   return res.data
 }
 
-/**
- * sendAdminAlert → urgent alerts to your admin/chat ID using HTML formatting
- */
+/** Urgent admin alerts (errors, unauthorized access, etc.) */
 export async function sendAdminAlert(message: string): Promise<void> {
   const adminId = process.env.ADMIN_TELEGRAM_ID
   if (!adminId) {
@@ -79,18 +72,15 @@ export async function sendAdminAlert(message: string): Promise<void> {
   }
   try {
     await sendTelegramMessage({
-      chat_id:    adminId,
-      text:       `<b>🚨 ADMIN ALERT</b>\n${message}`,
-      parse_mode: 'HTML',
+      chat_id: adminId,
+      text:    `<b>🚨 ADMIN ALERT</b>\n${message}`,
     })
   } catch (err) {
     console.error('sendAdminAlert failed:', err)
   }
 }
 
-/**
- * sendCronSummary → settlement or cron status to admin only, using HTML mode
- */
+/** Cron‐run summaries go only to the admin/bot chat */
 export async function sendCronSummary(text: string): Promise<void> {
   const adminId = process.env.ADMIN_TELEGRAM_ID
   if (!adminId) {
@@ -99,11 +89,9 @@ export async function sendCronSummary(text: string): Promise<void> {
   }
   try {
     await sendTelegramMessage({
-      chat_id:               adminId,
-      text:                  `<b>⏰ CRON UPDATE</b>\n${text}`,
-      parse_mode:            'HTML',
-      disable_notification:  true,
-      disable_web_page_preview: true,
+      chat_id:              adminId,
+      text:                 `<b>⏰ CRON UPDATE</b>\n${text}`,
+      disable_notification: true,
     })
   } catch (err) {
     console.error('sendCronSummary failed:', err)
