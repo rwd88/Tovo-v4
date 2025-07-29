@@ -2,6 +2,7 @@ import '../styles/globals.css'
 import type { AppProps } from 'next/app'
 import { ErrorBoundary } from '../components/ErrorBoundary'
 import '@fontsource/montserrat'
+import { useMemo } from 'react' // Add this import
 
 // Wagmi v2 (EVM)
 import { WagmiProvider, createConfig } from 'wagmi'
