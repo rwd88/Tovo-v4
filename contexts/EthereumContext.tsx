@@ -7,7 +7,7 @@ import {
   useConfig,
 } from 'wagmi'
 
-import { InjectedConnector } from '@wagmi/connectors'
+import { InjectedConnector } from 'wagmi/connectors/injected'
 import React, {
   createContext,
   useContext,
