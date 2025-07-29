@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/cron/settle-markets?secret=12345A",
-      "schedule": "*/10 * * * *"
+      "schedule": "*/60 * * * *"
     },
     {
       "path": "/api/cron/publish-markets?secret=12345A",
