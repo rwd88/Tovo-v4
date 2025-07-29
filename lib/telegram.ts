@@ -1,8 +1,8 @@
 // src/lib/telegram.ts
-import axios, { AxiosError, AxiosResponse } from 'axios'
+import axios from 'axios'
 
 /**
- * Low-level send helper
+ * Low-level send helper using Telegram Bot API
  */
 interface TelegramMessage {
   chat_id: string | number
@@ -20,7 +20,7 @@ interface TelegramResponse {
 
 /**
  * sendTelegramMessage can be called either with a payload object
- * or directly with a string + optional flags.
+ * or directly with a text string + optional flags.
  */
 export async function sendTelegramMessage(
   params: TelegramMessage
@@ -41,6 +41,7 @@ export async function sendTelegramMessage(
     throw new Error('TELEGRAM_BOT_TOKEN is not configured')
   }
 
+  // Construct payload
   const payload: TelegramMessage =
     typeof arg1 === 'string'
       ? {
@@ -52,10 +53,11 @@ export async function sendTelegramMessage(
         }
       : {
           ...arg1,
-          disable_web_page_preview: true,
           parse_mode: arg1.parse_mode ?? 'Markdown',
+          disable_web_page_preview: true,
         }
 
+  // Send HTTP request
   const res = await axios.post<TelegramResponse>(
     `https://api.telegram.org/bot${token}/sendMessage`,
     payload,
@@ -69,7 +71,7 @@ export async function sendTelegramMessage(
 }
 
 /**
- * sendAdminAlert → one-off alerts to your ADMIN_TELEGRAM_ID
+ * sendAdminAlert → urgent alerts to your admin/chat ID
  */
 export async function sendAdminAlert(message: string): Promise<void> {
   const adminId = process.env.ADMIN_TELEGRAM_ID
@@ -89,19 +91,20 @@ export async function sendAdminAlert(message: string): Promise<void> {
 }
 
 /**
- * sendCronSummary → a daily or batch summary to TELEGRAM_CHANNEL_ID
+ * sendCronSummary → settlement or cron status to admin, not public channel
  */
 export async function sendCronSummary(text: string): Promise<void> {
-  const chan = process.env.TELEGRAM_CHANNEL_ID
-  if (!chan) {
-    console.error('CRON SUMMARY FAILED: TELEGRAM_CHANNEL_ID not set')
+  const adminId = process.env.ADMIN_TELEGRAM_ID
+  if (!adminId) {
+    console.error('CRON SUMMARY FAILED: ADMIN_TELEGRAM_ID not set')
     return
   }
   try {
     await sendTelegramMessage({
-      chat_id: chan,
-      text: `📊 *CRON UPDATE*\n${text}`,
+      chat_id: adminId,
+      text: `⏰ *CRON UPDATE*\n${text}`,
       parse_mode: 'Markdown',
+      disable_notification: true,
     })
   } catch (err) {
     console.error('sendCronSummary failed:', err)

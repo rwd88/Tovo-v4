@@ -1,33 +1,30 @@
 // src/lib/market-utils.ts
 import type { Market } from '@prisma/client'
 
-/**
- * Build the Markdown text for a new‐market Telegram post.
- */
-export function formatMarketMessage(market: Market): string {
-  // Ensure the question reads as a full “Will …?” question
-  let q = market.question.trim()
+export function formatMarketMessage(m: Market): string {
+  // Normalize the question to “Will …?”
+  let q = m.question.trim()
   if (!/^Will\s/i.test(q)) {
-    // Prefix “Will ” and append “?” if not already present
     q = `Will ${q.replace(/\?$/,'')}?`
   }
 
-  const totalPool = market.poolYes + market.poolNo
-  const forecastPct = market.forecast != null
-    ? `${market.forecast.toFixed(1)}% YES`
-    : null
+  // Compute pool and percentages
+  const totalPool = m.poolYes + m.poolNo
+  const yesPct    = totalPool ? (m.poolYes / totalPool) * 100 : 0
+  const noPct     = totalPool ? (m.poolNo  / totalPool) * 100 : 0
 
-  return [
+  const lines = [
     `📊 *New Prediction Market!*`,
     ``,
     `*${q}*`,
     ``,
-    `⏰ Expires: ${market.eventTime.toUTCString()}`,
+    `⏰ Expires: ${m.eventTime.toUTCString()}`,
     `💰 Liquidity: $${totalPool.toFixed(2)}`,
-    forecastPct ? `📈 Forecast: ${forecastPct}` : null,
+    `✅ ${yesPct.toFixed(1)}% YES   ❌ ${noPct.toFixed(1)}% NO`,
+    m.forecast != null ? `📈 Forecast: ${m.forecast.toFixed(1)}% YES` : null,
     ``,
     `Make your prediction below:`
   ]
-    .filter(Boolean)
-    .join('\n')
+
+  return lines.filter(Boolean).join('\n')
 }
