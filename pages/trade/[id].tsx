@@ -2,7 +2,7 @@ import Image from 'next/image'
 import { useState } from 'react'
 import type { GetServerSideProps } from 'next'
 import type { Market } from '@prisma/client'
-import { useEthereum } from '../../src/contexts/EthereumContext'
+import { useEthereum } from '../../contexts/EthereumContext'
 
 type Props = {
   market: Omit<Market, 'eventTime'> & { eventTime: string }
