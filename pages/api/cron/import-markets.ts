@@ -116,11 +116,11 @@ export default async function handler(
         .toString()
         .padStart(2, '0')}:${minute}:00Z`
       const eventTime = new Date(iso)
-      if (isNaN(eventTime.getTime()) {
-        console.error('[ERROR] Invalid date for event:', ev.title, iso)
-        skipped++
-        continue
-      }
+      if (isNaN(eventTime.getTime())) {  // ← Added missing `)`
+  console.error('[ERROR] Invalid date for event:', ev.title, iso)
+  skipped++
+  continue
+}
       if (eventTime < now) {
         console.log('[DEBUG] Skipping past event:', ev.title)
         skipped++
