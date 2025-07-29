@@ -1,28 +1,33 @@
 import '../styles/globals.css'
 import type { AppProps } from 'next/app'
 import { ErrorBoundary } from '../components/ErrorBoundary'
-import '@fontsource/montserrat' // npm install @fontsource/montserrat
+import '@fontsource/montserrat'
 
-// Wagmi v2 + TanStack Query (EVM)
+// Wagmi v2 (EVM)
 import { WagmiProvider, createConfig } from 'wagmi'
 import { mainnet } from 'wagmi/chains'
 import { http } from 'viem'
+
+// Query Client
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
-// Solana wallet adapter
+// Solana
 import { ConnectionProvider, WalletProvider as SolanaWalletProvider } from '@solana/wallet-adapter-react'
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base'
 import { PhantomWalletAdapter } from '@solana/wallet-adapter-wallets'
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui'
 import '@solana/wallet-adapter-react-ui/styles.css'
 
-// TON Connect UI
+// TON
 import { TonConnectUIProvider } from '@tonconnect/ui-react'
 
-// Setup TanStack Query
+// ✅ EthereumContext
+import { EthereumProvider } from '../contexts/EthereumContext'
+
+// Create QueryClient
 const queryClient = new QueryClient()
 
-// Configure Wagmi v2 for EVM
+// Wagmi config
 const evmConfig = createConfig({
   autoConnect: true,
   publicClient: http(process.env.NEXT_PUBLIC_ETH_RPC_URL!),
@@ -30,35 +35,22 @@ const evmConfig = createConfig({
 })
 
 export default function MyApp({ Component, pageProps }: AppProps) {
-  // Solana network and wallets
   const solanaNetwork = WalletAdapterNetwork.Mainnet
   const solanaEndpoint = process.env.NEXT_PUBLIC_SOLANA_RPC_URL!
   const solanaWallets = [new PhantomWalletAdapter()]
 
   return (
     <ErrorBoundary>
-      {/* TON Connect wrapper */}
       <TonConnectUIProvider manifestUrl={process.env.NEXT_PUBLIC_TON_MANIFEST_URL!}>
-        {/* Solana wallet adapter provider */}
         <ConnectionProvider endpoint={solanaEndpoint}>
           <SolanaWalletProvider wallets={solanaWallets} autoConnect>
             <WalletModalProvider>
-              {/* React Query provider */}
               <QueryClientProvider client={queryClient}>
-                {/* Wagmi (EVM) provider */}
                 <WagmiProvider config={evmConfig}>
-                  {/*
-                    Your App components can now use these Connect buttons:
-                    - TON Connect: TonConnectButton
-                    - EVM (RainbowKit): ConnectButton
-                    - Solana: WalletMultiButton (from @solana/wallet-adapter-react-ui)
-                  */}
-                  {/* Example placement: */}
-                  {/* <TonConnectButton /> */}
-                  {/* <ConnectButton /> */}
-                  {/* <WalletMultiButton /> */}
-
-                  <Component {...pageProps} />
+                  {/* ✅ Add Ethereum Context */}
+                  <EthereumProvider>
+                    <Component {...pageProps} />
+                  </EthereumProvider>
                 </WagmiProvider>
               </QueryClientProvider>
             </WalletModalProvider>

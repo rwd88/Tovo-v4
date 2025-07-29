@@ -1,7 +1,13 @@
-// contexts/EthereumContext.tsx
 'use client'
 
-import React, { createContext, useContext, useState, ReactNode } from 'react'
+import {
+  useAccount,
+  useConnect,
+  useDisconnect,
+  useConfig,
+} from 'wagmi'
+import { InjectedConnector } from '@wagmi/connectors'
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 
 interface EthereumContextType {
   address: string | null
@@ -18,12 +24,40 @@ const EthereumContext = createContext<EthereumContextType>({
 export function EthereumProvider({ children }: { children: ReactNode }) {
   const [address, setAddress] = useState<string | null>(null)
 
+  const config = useConfig()
+  const { connectAsync } = useConnect({
+    connector: new InjectedConnector(),
+    config,
+  })
+  const { disconnectAsync } = useDisconnect()
+  const { isConnected, address: wagmiAddress } = useAccount()
+
+  useEffect(() => {
+    if (isConnected && wagmiAddress) {
+      setAddress(wagmiAddress)
+    } else {
+      setAddress(null)
+    }
+  }, [isConnected, wagmiAddress])
+
   const connect = async () => {
-    // Implementation
+    try {
+      const result = await connectAsync()
+      if (result.accounts.length > 0) {
+        setAddress(result.accounts[0].address)
+      }
+    } catch (err) {
+      console.error('❌ Failed to connect MetaMask:', err)
+    }
   }
 
   const disconnect = async () => {
-    // Implementation
+    try {
+      await disconnectAsync()
+      setAddress(null)
+    } catch (err) {
+      console.error('❌ Failed to disconnect wallet:', err)
+    }
   }
 
   return (
