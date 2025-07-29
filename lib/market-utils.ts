@@ -17,7 +17,7 @@ export function formatMarketHtml(m: Market): string {
   // 1) Normalize question to “Will …?”
   let q = m.question.trim()
   if (!/^Will\s/i.test(q)) {
-    q = `Will ${q.replace(/\?$/,'')}?`
+    q = `Will ${q.replace(/\?$/, '')}?`
   }
   const questionEsc = escapeHtml(q)
 
@@ -39,4 +39,17 @@ export function formatMarketHtml(m: Market): string {
 <b>👍 ${yesPct.toFixed(1)}% Yes   –   👎 ${noPct.toFixed(1)}% No</b>
 💰 ${totalPool.toFixed(2)} USDC${forecastLine}
 `.trim()
+}
+
+/**
+ * Given a market that has been resolved (i.e. you’ve set `resolvedOutcome`),
+ * return `'YES'`, `'NO'`, or `null` if undecided or invalid.
+ */
+export function determineMarketResult(
+  market: Pick<Market, 'resolvedOutcome'>
+): 'YES' | 'NO' | null {
+  const o = market.resolvedOutcome
+  if (!o) return null
+  const up = o.toUpperCase()
+  return up === 'YES' || up === 'NO' ? up : null
 }
