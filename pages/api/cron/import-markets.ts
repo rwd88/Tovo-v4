@@ -42,18 +42,15 @@ export default async function handler(
   }
 
   try {
-    // Debug: Log environment variables
-    console.log('[DEBUG] Env vars:', {
-      TELEGRAM_BOT_TOKEN: !!process.env.TELEGRAM_BOT_TOKEN,
-      ADMIN_TELEGRAM_ID: !!process.env.ADMIN_TELEGRAM_ID
+    // Debug: Verify Telegram config
+    console.log('[DEBUG] Telegram Config:', {
+      hasToken: !!process.env.TELEGRAM_BOT_TOKEN,
+      hasChatId: !!process.env.ADMIN_TELEGRAM_ID
     })
 
     // 1) fetch the XML
     const CAL_URL = 'https://nfs.faireconomy.media/ff_calendar_thisweek.xml'
-    console.log('[DEBUG] Fetching XML from:', CAL_URL)
     const { data: xml } = await axios.get<string>(CAL_URL)
-    console.log('[DEBUG] Raw XML:', xml.slice(0, 200) + '...') // Log first 200 chars
-
     const parsed = await parseStringPromise(xml, {
       explicitArray: false,
       trim: true,
@@ -73,25 +70,20 @@ export default async function handler(
 
     for (const ev of events) {
       const isHighImpact = ev.impact?.trim().toLowerCase() === 'high'
-      console.log(`[DEBUG] Processing event: ${ev.title} | High Impact: ${isHighImpact}`)
+      console.log(`[DEBUG] Processing: ${ev.title} | High Impact: ${isHighImpact}`)
 
       if (!isHighImpact) {
         skipped++
         continue
       }
 
-      // Send Telegram notification for high-impact events
+      // Send Telegram notification
       try {
-        await notifyAdmin(
-          `🚨 *New High-Impact Event*\n` +
-          `• *${ev.title}*\n` +
-          `• *Date*: ${ev.date}\n` +
-          `• *Time*: ${ev.time}\n` +
-          `• *Currency*: ${ev.country || 'N/A'}`
-        )
-        console.log('[DEBUG] Telegram notification sent for:', ev.title)
+        const message = `🚨 *High Impact Event*\n• ${ev.title}\n• ${ev.date} ${ev.time}`
+        console.log('[DEBUG] Sending Telegram:', message)
+        await notifyAdmin(message)
       } catch (err) {
-        console.error('[ERROR] Failed to send Telegram alert:', err)
+        console.error('[ERROR] Telegram failed:', err)
       }
 
       // parse date & time...
@@ -111,10 +103,8 @@ export default async function handler(
       if (m[3] === 'pm' && hour < 12) hour += 12
       if (m[3] === 'am' && hour === 12) hour = 0
       const minute = m[2]
-      const [mm, dd, yyyy] = dateStr.split('-') // MM-DD-YYYY
-      const iso = `${yyyy}-${mm}-${dd}T${hour
-        .toString()
-        .padStart(2, '0')}:${minute}:00Z`
+      const [mm, dd, yyyy] = dateStr.split('-')
+      const iso = `${yyyy}-${mm}-${dd}T${hour.toString().padStart(2, '0')}:${minute}:00Z`
       const eventTime = new Date(iso)
       if (isNaN(eventTime.getTime())) {  // ← Added missing `)`
   console.error('[ERROR] Invalid date for event:', ev.title, iso)
@@ -122,37 +112,30 @@ export default async function handler(
   continue
 }
       if (eventTime < now) {
-        console.log('[DEBUG] Skipping past event:', ev.title)
         skipped++
         continue
       }
 
-      const externalId =
-        ev.url?.trim() ||
-        `ff-${ev.title}-${dateStr}-${hour.toString().padStart(2, '0')}${minute}`
+      const externalId = ev.url?.trim() || `ff-${ev.title}-${dateStr}-${hour}${minute}`
       const forecastVal = ev.forecast ? parseFloat(ev.forecast) : null
 
       await prisma.market.upsert({
         where: { externalId },
-        update:
-          forecastVal != null
-            ? { forecast: forecastVal }
-            : {},
+        update: forecastVal != null ? { forecast: forecastVal } : {},
         create: {
           externalId,
-          question:  ev.title?.trim() ?? 'Untitled Event',
-          status:    'open',
+          question: ev.title?.trim() ?? 'Untitled Event',
+          status: 'open',
           eventTime,
-          poolYes:   0,
-          poolNo:    0,
-          notified:  false,
-          resolved:  false,
+          poolYes: 0,
+          poolNo: 0,
+          notified: false,
+          resolved: false,
           ...(forecastVal != null ? { forecast: forecastVal } : {}),
         },
       })
 
       added++
-      console.log('[DEBUG] Added market:', ev.title)
     }
 
     // 3) auto-publish if asked
@@ -163,7 +146,6 @@ export default async function handler(
       const result = await autoPublishMarkets()
       published = result.published
       publishIds = result.ids
-      console.log('[DEBUG] Auto-published markets:', published)
     }
 
     return res.status(200).json({
