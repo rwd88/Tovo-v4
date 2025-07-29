@@ -6,7 +6,7 @@ import {
   useDisconnect,
   useConfig,
 } from 'wagmi'
-import { InjectedConnector } from '@wagmi/connectors'
+import { InjectedConnector } from '@wagmi/connectors/injected' // ✅ Correct import
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 
 interface EthereumContextType {
