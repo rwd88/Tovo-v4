@@ -1,5 +1,5 @@
 // src/components/WalletDrawer.tsx
-import { X } from 'lucide-react'
+const XIcon = () => <span className="text-xl">×</span>
 import ConnectWalletButton from './ConnectWalletButton'
 
 type Props = {
@@ -17,7 +17,7 @@ export default function WalletDrawer({ open, onClose }: Props) {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-lg font-semibold">Connect Wallet</h2>
         <button onClick={onClose}>
-          <X className="text-white" />
+<XIcon />
         </button>
       </div>
       <ConnectWalletButton />
