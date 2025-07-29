@@ -43,14 +43,16 @@ export default async function handler(
 
   try {
     // Debug: Verify Telegram config
-    console.log('[DEBUG] Telegram Config:', {
+    console.log('[CONFIG] Telegram:', {
       hasToken: !!process.env.TELEGRAM_BOT_TOKEN,
       hasChatId: !!process.env.ADMIN_TELEGRAM_ID
     })
 
     // 1) fetch the XML
     const CAL_URL = 'https://nfs.faireconomy.media/ff_calendar_thisweek.xml'
+    console.log('[FETCH] Loading XML from:', CAL_URL)
     const { data: xml } = await axios.get<string>(CAL_URL)
+    
     const parsed = await parseStringPromise(xml, {
       explicitArray: false,
       trim: true,
@@ -61,7 +63,7 @@ export default async function handler(
         ? parsed.weeklyevents.event
         : [parsed.weeklyevents.event]
       : []
-    console.log(`[DEBUG] Found ${events.length} events`)
+    console.log(`[EVENTS] Found ${events.length} events`)
 
     // 2) upsert
     let added = 0,
@@ -70,7 +72,7 @@ export default async function handler(
 
     for (const ev of events) {
       const isHighImpact = ev.impact?.trim().toLowerCase() === 'high'
-      console.log(`[DEBUG] Processing: ${ev.title} | High Impact: ${isHighImpact}`)
+      console.log(`[PROCESSING] ${ev.title} | High Impact: ${isHighImpact}`)
 
       if (!isHighImpact) {
         skipped++
@@ -79,11 +81,16 @@ export default async function handler(
 
       // Send Telegram notification
       try {
-        const message = `🚨 *High Impact Event*\n• ${ev.title}\n• ${ev.date} ${ev.time}`
-        console.log('[DEBUG] Sending Telegram:', message)
+        const message = `🚨 *High Impact Event*\n` +
+          `• ${ev.title}\n` +
+          `• ${ev.date} ${ev.time}\n` +
+          `• Currency: ${ev.country || 'N/A'}`
+        
+        console.log('[TELEGRAM] Sending:', message)
         await notifyAdmin(message)
       } catch (err) {
-        console.error('[ERROR] Telegram failed:', err)
+        console.error('[TELEGRAM ERROR] Failed to send:', err)
+        throw err // Fail fast if notifications are critical
       }
 
       // parse date & time...
@@ -99,19 +106,23 @@ export default async function handler(
         skipped++
         continue
       }
+      
       let hour = parseInt(m[1], 10)
       if (m[3] === 'pm' && hour < 12) hour += 12
       if (m[3] === 'am' && hour === 12) hour = 0
+      
       const minute = m[2]
       const [mm, dd, yyyy] = dateStr.split('-')
       const iso = `${yyyy}-${mm}-${dd}T${hour.toString().padStart(2, '0')}:${minute}:00Z`
       const eventTime = new Date(iso)
-      if (isNaN(eventTime.getTime())) {  // ← Added missing `)`
-  console.error('[ERROR] Invalid date for event:', ev.title, iso)
-  skipped++
-  continue
-}
+      
+      if (isNaN(eventTime.getTime())) {
+        console.error('[DATE ERROR] Invalid date:', iso)
+        skipped++
+        continue
+      }
       if (eventTime < now) {
+        console.log('[SKIPPING] Past event:', ev.title)
         skipped++
         continue
       }
@@ -136,6 +147,7 @@ export default async function handler(
       })
 
       added++
+      console.log('[ADDED] Market:', ev.title)
     }
 
     // 3) auto-publish if asked
@@ -146,6 +158,7 @@ export default async function handler(
       const result = await autoPublishMarkets()
       published = result.published
       publishIds = result.ids
+      console.log('[PUBLISHED] Markets:', published)
     }
 
     return res.status(200).json({
@@ -155,8 +168,8 @@ export default async function handler(
       ...(published != null ? { published, publishIds } : {}),
     })
   } catch (err: any) {
-    console.error('❌ import-markets error:', err)
-    await notifyAdmin(`import-markets failed: ${err.message}`)
+    console.error('❌ CRITICAL ERROR:', err)
+    await notifyAdmin(`import-markets crashed: ${err.message}`)
     return res
       .status(500)
       .json({ success: false, added: 0, skipped: 0, error: err.message })

@@ -13,7 +13,7 @@ export function formatMarketMessage(market: Market): string {
     `*${question}*\n` +
     (eventTime ? `🕓 ${new Date(eventTime).toUTCString()}\n` : '') +
     `💰 Liquidity: $${liquidity}` +
-    `${forecastText}`
+    forecastText
   )
 }
 
@@ -23,13 +23,17 @@ export function determineMarketResult(market: Market): 'YES' | 'NO' | null {
     : null
 }
 
-export async function notifyAdmin(message: string) {
-  console.log('[Telegram] Attempting to send:', message)
+export async function notifyAdmin(message: string): Promise<void> {
+  console.log('[TELEGRAM OUTGOING]', message)
   try {
-    await sendAdminAlert(`🔔 ${message}`)
-    console.log('[Telegram] Notification sent successfully')
+    const startTime = Date.now()
+    await sendAdminAlert(message)
+    console.log(`[TELEGRAM SUCCESS] ${Date.now() - startTime}ms`)
   } catch (err) {
-    console.error('[Telegram] Failed to send:', err)
-    throw err // Re-throw to handle in parent function
+    console.error('[TELEGRAM FAILURE]', {
+      error: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined
+    })
+    throw err // Propagate error to caller
   }
 }
