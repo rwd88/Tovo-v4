@@ -1,39 +1,33 @@
-import { Market } from '@prisma/client'
-import { sendAdminAlert } from './telegram'
+// src/lib/market-utils.ts
+import type { Market } from '@prisma/client'
 
+/**
+ * Build the Markdown text for a new‐market Telegram post.
+ */
 export function formatMarketMessage(market: Market): string {
-  const { question, eventTime, poolYes, poolNo, forecast } = market
-  const liquidity = (poolYes + poolNo).toFixed(2)
-  const forecastText = forecast != null
-    ? `\n📈 Forecast: ${forecast.toFixed(1)}% YES`
-    : ''
-
-  return (
-    `📊 *New Prediction Market!*\n\n` +
-    `*${question}*\n` +
-    (eventTime ? `🕓 ${new Date(eventTime).toUTCString()}\n` : '') +
-    `💰 Liquidity: $${liquidity}` +
-    forecastText
-  )
-}
-
-export function determineMarketResult(market: Market): 'YES' | 'NO' | null {
-  return market.resolvedOutcome === 'YES' || market.resolvedOutcome === 'NO' 
-    ? market.resolvedOutcome 
-    : null
-}
-
-export async function notifyAdmin(message: string): Promise<void> {
-  console.log('[TELEGRAM OUTGOING]', message)
-  try {
-    const startTime = Date.now()
-    await sendAdminAlert(message)
-    console.log(`[TELEGRAM SUCCESS] ${Date.now() - startTime}ms`)
-  } catch (err) {
-    console.error('[TELEGRAM FAILURE]', {
-      error: err instanceof Error ? err.message : String(err),
-      stack: err instanceof Error ? err.stack : undefined
-    })
-    throw err // Propagate error to caller
+  // Ensure the question reads as a full “Will …?” question
+  let q = market.question.trim()
+  if (!/^Will\s/i.test(q)) {
+    // Prefix “Will ” and append “?” if not already present
+    q = `Will ${q.replace(/\?$/,'')}?`
   }
+
+  const totalPool = market.poolYes + market.poolNo
+  const forecastPct = market.forecast != null
+    ? `${market.forecast.toFixed(1)}% YES`
+    : null
+
+  return [
+    `📊 *New Prediction Market!*`,
+    ``,
+    `*${q}*`,
+    ``,
+    `⏰ Expires: ${market.eventTime.toUTCString()}`,
+    `💰 Liquidity: $${totalPool.toFixed(2)}`,
+    forecastPct ? `📈 Forecast: ${forecastPct}` : null,
+    ``,
+    `Make your prediction below:`
+  ]
+    .filter(Boolean)
+    .join('\n')
 }
