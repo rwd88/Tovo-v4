@@ -2,7 +2,10 @@ import Image from 'next/image'
 import { useState } from 'react'
 import type { GetServerSideProps } from 'next'
 import type { Market } from '@prisma/client'
-import { useEthereum } from '../../contexts/EthereumContext'
+import { useEthereum } from '../../src/contexts/EthereumContext'
+import dynamic from 'next/dynamic'
+
+const WalletDrawer = dynamic(() => import('../../src/components/WalletDrawer'), { ssr: false })
 
 type Props = {
   market: Omit<Market, 'eventTime'> & { eventTime: string }
@@ -13,23 +16,19 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
   const { address } = useEthereum()
 
   const [market, setMarket] = useState(initialMarket)
-  const [chosenSide, setChosenSide] = useState<'yes' | 'no'>(initialSide)
   const [amount, setAmount] = useState<string>('1.0')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const [drawerOpen, setDrawerOpen] = useState(false)
 
   const total = market.poolYes + market.poolNo
   const yesPct = total > 0 ? (market.poolYes / total) * 100 : 0
+  const side = initialSide === 'yes' ? 'UP' : 'DOWN'
 
   const handleTrade = async () => {
-    if (!address) {
-      return setMessage('❌ Connect your wallet first.')
-    }
-
+    if (!address) return setMessage('❌ Connect your wallet first.')
     const amt = parseFloat(amount)
-    if (isNaN(amt) || amt <= 0) {
-      return setMessage('❌ Invalid amount.')
-    }
+    if (isNaN(amt) || amt <= 0) return setMessage('❌ Invalid amount.')
 
     setLoading(true)
     setMessage(null)
@@ -42,16 +41,14 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
           marketId: market.id,
           walletAddress: address,
           amount: amt,
-          side: chosenSide === 'yes' ? 'UP' : 'DOWN',
+          side,
         }),
       })
 
       const json = await res.json()
       if (json.success) {
         setMessage('✅ Trade submitted successfully.')
-        if (json.market) {
-          setMarket(json.market)
-        }
+        if (json.market) setMarket(json.market)
       } else {
         setMessage(`❌ ${json.error}`)
       }
@@ -64,18 +61,26 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
   }
 
   return (
-    <div className="min-h-screen bg-[#2C2F3A] text-white">
-      <header className="flex items-center p-4 bg-[#15463D]">
-        <Image src="/logo.png" alt="Tovo" width={32} height={32} />
-        <h1 className="ml-2 font-bold text-xl">Tovo</h1>
+    <div className="min-h-screen bg-[#2C2F3A] text-white relative">
+      {/* Header */}
+      <header className="flex justify-between items-center p-4 bg-[#15463D]">
+        <div className="flex items-center">
+          <Image src="/logo.png" alt="Tovo" width={32} height={32} />
+          <h1 className="ml-2 font-bold text-xl">Tovo</h1>
+        </div>
+        <button
+          onClick={() => setDrawerOpen(true)}
+          className="text-sm bg-[#43E1C8] text-[#15463D] px-4 py-2 rounded-full"
+        >
+          {address ? 'Wallet Connected' : 'Connect Wallet'}
+        </button>
       </header>
 
+      {/* Main content */}
       <main className="px-4 py-8 max-w-md mx-auto">
         <div className="bg-[#15463D] rounded-2xl p-6 space-y-4">
           <h2 className="text-2xl font-semibold">{market.question}</h2>
-          <p className="text-gray-300">
-            Ends: {new Date(market.eventTime).toUTCString()}
-          </p>
+          <p className="text-gray-300">Ends: {new Date(market.eventTime).toUTCString()}</p>
 
           <div className="relative h-2 bg-gray-700 rounded-full overflow-hidden">
             <div
@@ -88,28 +93,13 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
             <span className="text-pink-400">{(100 - yesPct).toFixed(1)}% No</span>
           </div>
 
-          <div className="flex space-x-4">
-            <button
-              onClick={() => setChosenSide('yes')}
-              className={`flex-1 py-2 rounded-full font-medium ${
-                chosenSide === 'yes'
-                  ? 'bg-[#43E1C8] text-[#15463D]'
-                  : 'bg-gray-800 hover:bg-gray-700'
-              }`}
-            >
-              Yes
-            </button>
-            <button
-              onClick={() => setChosenSide('no')}
-              className={`flex-1 py-2 rounded-full font-medium ${
-                chosenSide === 'no'
-                  ? 'bg-[#43E1C8] text-[#15463D]'
-                  : 'bg-gray-800 hover:bg-gray-700'
-              }`}
-            >
-              No
-            </button>
-          </div>
+          {/* Static selected side */}
+          <p className="text-lg font-medium text-center">
+            ✅ You’re betting:{" "}
+            <span className={initialSide === 'yes' ? 'text-[#43E1C8]' : 'text-pink-400'}>
+              {initialSide.toUpperCase()}
+            </span>
+          </p>
 
           <input
             type="number"
@@ -129,13 +119,12 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
             {loading ? 'Placing bet...' : 'Confirm Bet'}
           </button>
 
-          {message && (
-            <div className="text-sm text-center mt-2">
-              {message}
-            </div>
-          )}
+          {message && <div className="text-sm text-center mt-2">{message}</div>}
         </div>
       </main>
+
+      {/* Wallet Drawer */}
+      <WalletDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
     </div>
   )
 }
