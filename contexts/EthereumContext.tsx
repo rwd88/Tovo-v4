@@ -30,7 +30,9 @@ export function EthereumProvider({ children }: { children: ReactNode }) {
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    setMounted(true)
+    if (typeof window !== 'undefined') {
+      setMounted(true)
+    }
   }, [])
 
   const connect = async () => {
