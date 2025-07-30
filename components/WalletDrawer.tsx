@@ -18,7 +18,9 @@ export default function WalletDrawer({ open, onClose }: Props) {
           ×
         </button>
       </div>
-      <ConnectWalletButton />
+      
+      {/* Only render the wallet UI when drawer is open */}
+      {open && <ConnectWalletButton />}
     </div>
   )
 }
