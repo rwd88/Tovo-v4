@@ -65,7 +65,7 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
     <div className="trade-wrapper min-h-screen bg-white text-black font-[Montserrat]">
       {/* Header */}
       <header className="trade-header flex items-center justify-between px-4 py-4">
-        <Image src="/logo.png" alt="Tovo" width={60} height={20} />
+        <Image src="/logo.png" alt="Tovo" width={60} height={20} className="trade-logo" />
         <button
           onClick={() => setDrawerOpen(true)}
           className="connect-wallet-link text-[13px] underline"
@@ -123,25 +123,26 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
             </button>
           </div>
 
-          {/* Trade input */}
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            className="trade-input w-full mt-4 p-2 rounded-md border border-gray-300 text-sm text-black"
-            placeholder="Enter amount"
-          />
+          {/* Trade form */}
+          <div className="trade-form mt-4 space-y-2">
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className="trade-input w-full p-2 rounded-md border border-gray-300 text-sm text-black"
+              placeholder="Enter amount"
+            />
 
-          {/* Confirm button */}
-          <button
-            onClick={handleTrade}
-            disabled={loading}
-            className="trade-confirm-btn w-full bg-[#00B89F] text-white font-semibold py-2 rounded-md"
-          >
-            {loading ? 'Placing bet...' : 'Confirm Bet'}
-          </button>
+            <button
+              onClick={handleTrade}
+              disabled={loading}
+              className="trade-submit w-full bg-[#00B89F] text-white font-semibold py-2 rounded-md"
+            >
+              {loading ? 'Placing bet...' : 'Confirm Bet'}
+            </button>
+          </div>
 
           {/* Message */}
           {message && <div className="trade-message text-sm mt-2">{message}</div>}
