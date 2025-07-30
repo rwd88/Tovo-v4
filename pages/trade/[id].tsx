@@ -1,9 +1,7 @@
-// pages/trade/[id].tsx
 import Image from 'next/image'
 import { useState } from 'react'
 import type { GetServerSideProps } from 'next'
 import type { Market } from '@prisma/client'
-import { useEthereum } from '../../contexts/EthereumContext'
 import dynamic from 'next/dynamic'
 
 const WalletDrawer = dynamic(() => import('../../components/WalletDrawer'), { ssr: false })
@@ -14,7 +12,6 @@ type Props = {
 }
 
 export default function TradePage({ market: initialMarket, initialSide }: Props) {
-  const { address } = useEthereum()
   const [market, setMarket] = useState(initialMarket)
   const [amount, setAmount] = useState('1.0')
   const [loading, setLoading] = useState(false)
@@ -27,7 +24,6 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
   const side = initialSide === 'yes' ? 'UP' : 'DOWN'
 
   const handleTrade = async () => {
-    if (!address) return setMessage('❌ Connect your wallet first.')
     const amt = parseFloat(amount)
     if (isNaN(amt) || amt <= 0) return setMessage('❌ Invalid amount.')
 
@@ -40,7 +36,6 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           marketId: market.id,
-          walletAddress: address,
           amount: amt,
           side,
         }),
@@ -66,46 +61,28 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
       {/* Header */}
       <header className="trade-header flex items-center justify-between px-4 py-4">
         <Image src="/logo.png" alt="Tovo" width={60} height={20} className="trade-logo" />
-       <button
-  onClick={() => setDrawerOpen(true)}
-  className="connect-wallet-button"
-  aria-label="Connect Wallet"
->
-  <img
-    src="/connect wallet.svg"
-    alt="Connect Wallet Icon"
-    width={24}
-    height={24}
-  />
-</button>
+        <button onClick={() => setDrawerOpen(true)} className="w-6 h-6">
+          <Image src="/connect wallet.svg" alt="Connect" width={24} height={24} />
+        </button>
       </header>
 
       {/* Main content */}
       <main className="trade-main px-4 py-4 max-w-md mx-auto">
-        {/* Title */}
         <div className="trade-heading text-center mb-6">
           <h1 className="text-[#00B89F] uppercase text-sm font-semibold tracking-wide">
             Prediction Markets Today
           </h1>
         </div>
 
-        {/* Card */}
         <div className="trade-card bg-[#003E37] rounded-xl px-6 py-8 text-center space-y-4 text-white">
           <h2 className="trade-question text-xl font-semibold">{market.question}</h2>
           <p className="trade-timer text-sm text-gray-300">
-            Ends on {new Date(market.eventTime).toLocaleString('en-US', {
-              month: 'numeric',
-              day: 'numeric',
-              year: 'numeric',
-              hour: 'numeric',
-              minute: '2-digit',
-            })}
+            Ends on {new Date(market.eventTime).toLocaleString('en-US')}
           </p>
           <p className="trade-percentages text-sm font-medium text-gray-200">
             {yesPct.toFixed(1)}% Yes — <strong>{noPct.toFixed(1)}% No</strong>
           </p>
 
-          {/* Progress bar */}
           <div className="trade-progress h-2 w-full bg-[#E5E5E5] rounded-full overflow-hidden">
             <div
               className="trade-progress-fill h-full bg-[#00B89F]"
@@ -113,7 +90,6 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
             />
           </div>
 
-          {/* Buttons */}
           <div className="trade-buttons flex justify-center gap-4 mt-4">
             <button
               onClick={() => setAmount('1.0')}
@@ -129,7 +105,6 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
             </button>
           </div>
 
-          {/* Trade form */}
           <div className="trade-form mt-4 space-y-2">
             <input
               type="number"
@@ -150,12 +125,10 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
             </button>
           </div>
 
-          {/* Message */}
           {message && <div className="trade-message text-sm mt-2">{message}</div>}
         </div>
       </main>
 
-      {/* Wallet Drawer */}
       <WalletDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
     </div>
   )

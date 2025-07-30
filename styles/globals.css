@@ -389,3 +389,10 @@ mg.trade-logo {
 .flex.justify-between.items-center.mb-6 {
     display: flex;
 }
+button.connect-wallet-button {
+    background: transparent;
+    border: 0px;
+}
+button.connect-wallet-button img {
+    width: 123px;
+}

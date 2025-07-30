@@ -73,8 +73,6 @@ export default function Home() {
 
       <div className={`${styles.page} ${geistSans.variable} ${geistMono.variable}`}>
         <main className={styles.main}>
-{/* Wallet Connect temporarily removed for drawer-only UI */}
-
 
           {/* Balances - Only show for Ethereum */}
           {ethAddress && (

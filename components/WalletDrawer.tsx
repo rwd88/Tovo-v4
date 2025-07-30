@@ -1,4 +1,3 @@
-// components/WalletDrawer.tsx
 import ConnectWalletButton from './ConnectWalletButton'
 
 type Props = {
@@ -15,8 +14,8 @@ export default function WalletDrawer({ open, onClose }: Props) {
     >
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-lg font-semibold">Connect Wallet</h2>
-        <button id="wallet-drawer-close" onClick={onClose}>
-          <span className="text-xl">×</span>
+        <button id="wallet-drawer-close" onClick={onClose} className="text-xl">
+          ×
         </button>
       </div>
       <ConnectWalletButton />
