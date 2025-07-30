@@ -149,14 +149,14 @@ input, button {
   padding: 4%;
 }
 
-.trade-heading.text-center.mb-6 {
+h1.text-\[\#00B89F\].uppercase.text-sm.font-semibold.tracking-wide {
     padding: 0px 20px;
   font-size: 22px !important;
   text-align: center;
   color: #43E1C8;
 }
 
-.trade-card.bg-\[\#003E37\].rounded-xl.px-6.py-8.text-center.space-y-4.text-white {
+.bg-\[\#003E37\].rounded-xl.px-6.py-8.text-center.space-y-4.text-white{
   margin-top: 50px;
   display: grid;
   justify-content: center;
@@ -166,34 +166,34 @@ input, button {
   border-radius: 20px;
 }
 
-h2.trade-question.text-xl.font-semibold {
+h2.text-xl.font-semibold {
   color: #43E1C8;
   font-family: 'Montserrat';
   text-transform: capitalize;
   font-size: 29px;
 }
 
-p.trade-timer.text-sm.text-gray-300 {
+p.text-sm.text-gray-300 {
   color: #fff;
   font-style: italic;
   font-family: 'Montserrat';
 }
 
-p.trade-percentages.text-sm.font-medium.text-gray-200 {
+p.text-sm.font-medium.text-gray-200 {
   font-family: 'Montserrat';
   color: #fff;
   font-weight: bold;
   font-size: 18px;
 }
 
-.trade-buttons.flex.justify-center.gap-4.mt-4 {
+.flex.justify-center.gap-4.mt-4 {
   display: flex;
   gap: 1rem;
   justify-content: center;
   margin-top: 1rem;
 }
 
-button.btn.w-24.py-2.border.border-white.rounded-full.font-medium.hover\:bg-white.hover\:text-black {
+button.w-24.py-2.border.border-white.rounded-full.font-medium.hover\:bg-white.hover\:text-black {
   height: 50px;
   width: 47%;
   background: transparent;
@@ -211,7 +211,7 @@ button.btn.w-24.py-2.border.border-white.rounded-full.font-medium.hover\:bg-whit
 }
 
 /* Input field */
-.trade-input {
+input.w-full.p-2.rounded-md.border.border-gray-300.text-sm.text-black {
   padding: 10px;
   border-radius: 0px;
   justify-items: center;
@@ -353,13 +353,13 @@ body {
 input, button {
   font-family: inherit;
 }
-.trade-form.mt-4.space-y-2 {
+.mt-4.space-y-2 {
     margin-top: 20px;
     display: grid;
     grid-template-columns: 35% 63%;
     justify-content: space-between;
 }
-button.trade-submit.w-full.bg-\[\#00B89F\].text-white.font-semibold.py-2.rounded-md {
+button.w-full.bg-\[\#00B89F\].text-white.font-semibold.py-2.rounded-md {
     font-size: 14px;
     font-family: 'Montserrat';
     font-weight: 800;
@@ -383,10 +383,10 @@ mg.trade-logo {
 .flex.justify-between.items-center.mb-6 {
     display: flex;
 }
-button.w-6.h-6 {
+button.wallet-toggle-btn {
     background: transparent;
     border: 0px;
 }
-button.w-6.h-6 img {
+button.wallet-toggle-btn img {
     width: 123px;
 }
