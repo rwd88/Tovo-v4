@@ -1,18 +1,14 @@
 // lib/wagmi.ts
-import { createConfig, configureChains } from 'wagmi'
+import { createConfig, http } from 'wagmi'
 import { mainnet } from 'wagmi/chains'
-import { http } from 'wagmi'
 import { injected } from 'wagmi/connectors'
 
-const { chains, publicClient } = configureChains(
-  [mainnet],
-  [http(process.env.NEXT_PUBLIC_ETH_RPC_URL!)]
-)
-
 export const wagmiConfig = createConfig({
-  autoConnect: true,
+  chains: [mainnet],
   connectors: [
-    injected({ chains })
+    injected()
   ],
-  publicClient,
+  transports: {
+    [mainnet.id]: http(process.env.NEXT_PUBLIC_ETH_RPC_URL!)
+  },
 })
