@@ -1,8 +1,14 @@
 'use client'
 
 import { useAccount, useConnect, useDisconnect } from 'wagmi'
-import { injected } from '@wagmi/connectors'
-import { useEffect, useState, createContext, useContext, ReactNode } from 'react'
+import { InjectedConnector } from 'wagmi/connectors/injected'
+import {
+  useEffect,
+  useState,
+  createContext,
+  useContext,
+  ReactNode,
+} from 'react'
 
 interface EthereumContextType {
   address: string | null
@@ -20,8 +26,8 @@ const EthereumContext = createContext<EthereumContextType>({
 
 export function EthereumProvider({ children }: { children: ReactNode }) {
   const [isMounted, setIsMounted] = useState(false)
-  
-  const { connectors, connectAsync } = useConnect()
+
+  const { connectAsync } = useConnect()
   const { disconnectAsync } = useDisconnect()
   const { address, isConnected } = useAccount()
 
@@ -31,17 +37,24 @@ export function EthereumProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const connect = async () => {
-    if (!isMounted) return
-    
-    try {
-      // Find the injected connector (MetaMask)
-      const injectedConnector = connectors.find((c) => c.id === 'injected')
-      
-      if (!injectedConnector) {
-        throw new Error('MetaMask connector not found')
-      }
+    if (
+      !isMounted ||
+      typeof window === 'undefined' ||
+      typeof window.ethereum === 'undefined'
+    ) {
+      alert('MetaMask is not available in this browser.')
+      return
+    }
 
-      await connectAsync({ connector: injectedConnector })
+    try {
+      const connector = new InjectedConnector({
+        options: {
+          name: 'MetaMask',
+          shimDisconnect: true,
+        },
+      })
+
+      await connectAsync({ connector })
     } catch (error) {
       console.error('Connection error:', error)
       throw error
