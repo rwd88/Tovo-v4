@@ -375,12 +375,6 @@ button.trade-submit.w-full.bg-\[\#00B89F\].text-white.font-semibold.py-2.rounded
     border-radius: 20px 20px 0px 0px;
     padding: 20px;
 }
-.trade-wrapper.min-h-screen.bg-white.text-black.font-\[Montserrat\] {
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    justify-content: space-between;
-}
 mg.trade-logo {
     width: 26%;
     height: 37px;
