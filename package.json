@@ -28,7 +28,6 @@
     "@walletconnect/ethereum-provider": "^2.21.5",
     "@web3modal/ethereum": "^2.7.1",
     "@web3modal/html": "^2.7.1",
-    "@web3modal/standalone": "^2.7.1",
     "cheerio": "^1.0.0",
     "csv-parse": "^5.6.0",
     "d3-dsv": "^3.0.1",
