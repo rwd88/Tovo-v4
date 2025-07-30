@@ -16,7 +16,7 @@ export default function WalletDrawer({ open, onClose }: Props) {
     >
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-lg font-semibold">Connect Wallet</h2>
-        <button onClick={onClose}>
+  <button id="wallet-drawer-close" onClick={onClose}>
 <XIcon />
         </button>
       </div>

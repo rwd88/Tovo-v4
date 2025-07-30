@@ -212,7 +212,8 @@ button.btn.w-24.py-2.border.border-white.rounded-full.font-medium.hover\:bg-whit
 /* Input field */
 .trade-input {
   padding: 10px;
-  border-radius: 8px;
+  border-radius: 0px;
+  justify-items: center;
   border: 1px solid #ccc;
   width: 100%;
   font-size: 14px;
@@ -350,4 +351,32 @@ body {
 
 input, button {
   font-family: inherit;
+}
+.trade-form.mt-4.space-y-2 {
+    margin-top: 20px;
+    display: grid;
+    grid-template-columns: 35% 63%;
+    justify-content: space-between;
+}
+button.trade-submit.w-full.bg-\[\#00B89F\].text-white.font-semibold.py-2.rounded-md {
+    font-size: 14px;
+    font-family: 'Montserrat';
+    font-weight: 800;
+    background: #43E1C8;
+    text-transform: uppercase;
+    border: 0px;
+}
+.fixed.top-0.right-0.h-full.w-80.max-w-\[90\%\].bg-\[\#1C1F2A\].text-white.p-6.z-50.transform.transition-transform.duration-300.translate-x-full {
+    display: grid;
+    justify-items: center;
+    margin-top: 50px;
+    background: #43E1C8;
+    border-radius: 20px 20px 0px 0px;
+    padding: 20px;
+}
+.trade-wrapper.min-h-screen.bg-white.text-black.font-\[Montserrat\] {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    justify-content: space-between;
 }
