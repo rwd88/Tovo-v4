@@ -2,7 +2,7 @@
 import { mainnet } from 'wagmi/chains'
 import { http } from 'viem'
 import { createConfig } from 'wagmi'
-import { InjectedConnector } from '@wagmi/connectors/injected'
+import { InjectedConnector } from '@wagmi/connectors'
 
 export const wagmiConfig = createConfig({
   chains: [mainnet],
