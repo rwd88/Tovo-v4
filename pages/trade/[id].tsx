@@ -1,163 +1,74 @@
-import Image from 'next/image'
-import { useState } from 'react'
-import type { GetServerSideProps } from 'next'
-import type { Market } from '@prisma/client'
-import { useEthereum } from '../../contexts/EthereumContext'
-import dynamic from 'next/dynamic'
+'use client'
 
-const WalletDrawer = dynamic(() => import('../../components/WalletDrawer'), { ssr: false })
+import { useAccount, useConnect, useDisconnect } from 'wagmi'
+import { useEffect, useState, createContext, useContext, ReactNode } from 'react'
 
-type Props = {
-  market: Omit<Market, 'eventTime'> & { eventTime: string }
-  initialSide: 'yes' | 'no'
+interface EthereumContextType {
+  address: string | null
+  isConnected: boolean
+  connect: () => Promise<void>
+  disconnect: () => Promise<void>
 }
 
-export default function TradePage({ market: initialMarket, initialSide }: Props) {
-  const { address } = useEthereum()
-  const [market, setMarket] = useState(initialMarket)
-  const [amount, setAmount] = useState('1.0')
-  const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState<string | null>(null)
-  const [drawerOpen, setDrawerOpen] = useState(false)
+const EthereumContext = createContext<EthereumContextType>({
+  address: null,
+  isConnected: false,
+  connect: async () => {},
+  disconnect: async () => {},
+})
 
-  const total = market.poolYes + market.poolNo
-  const yesPct = total > 0 ? (market.poolYes / total) * 100 : 0
-  const noPct = 100 - yesPct
-  const side = initialSide === 'yes' ? 'UP' : 'DOWN'
+export function EthereumProvider({ children }: { children: ReactNode }) {
+  const [isMounted, setIsMounted] = useState(false)
 
-  const handleTrade = async () => {
-    if (!address) return setMessage('❌ Connect your wallet first.')
-    const amt = parseFloat(amount)
-    if (isNaN(amt) || amt <= 0) return setMessage('❌ Invalid amount.')
+  const { address, isConnected } = useAccount()
+  const { connectAsync, connectors } = useConnect()
+  const { disconnectAsync } = useDisconnect()
 
-    setLoading(true)
-    setMessage(null)
+  useEffect(() => {
+    setIsMounted(true)
+    return () => setIsMounted(false)
+  }, [])
+
+  const connect = async () => {
+    if (!isMounted) return
 
     try {
-      const res = await fetch('/api/trade', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          marketId: market.id,
-          walletAddress: address,
-          amount: amt,
-          side,
-        }),
-      })
+      const injectedConnector = connectors.find((c) => c.id === 'injected')
+      if (!injectedConnector) throw new Error('MetaMask connector not found')
 
-      const json = await res.json()
-      if (json.success) {
-        setMessage('✅ Trade submitted successfully.')
-        if (json.market) setMarket(json.market)
-      } else {
-        setMessage(`❌ ${json.error}`)
-      }
-    } catch (err) {
-      console.error(err)
-      setMessage('❌ Server error.')
-    } finally {
-      setLoading(false)
+      await connectAsync({ connector: injectedConnector })
+    } catch (error) {
+      console.error('Connection error:', error)
+    }
+  }
+
+  const disconnect = async () => {
+    if (!isMounted) return
+    try {
+      await disconnectAsync()
+    } catch (error) {
+      console.error('Disconnection error:', error)
     }
   }
 
   return (
-    <div className="min-h-screen bg-white text-black font-[Montserrat]">
-      {/* Top nav */}
-      <div className="flex items-center justify-between px-4 py-4">
-        <Image src="/logo.png" alt="Tovo" width={60} height={20} />
-        <button
-          onClick={() => setDrawerOpen(true)}
-          className="text-[13px] underline"
-        >
-          Connect Wallet
-        </button>
-      </div>
-
-      <main className="px-4 py-4 max-w-md mx-auto">
-        {/* Title block */}
-        <div className="text-center mb-6">
-          <h1 className="uppercase text-[#00B89F] text-sm font-semibold tracking-wide">
-            Prediction Markets Today
-          </h1>
-        </div>
-
-        <div className="bg-[#EAF1F0] rounded-xl px-6 py-8 text-center space-y-4">
-          <h2 className="text-xl font-semibold">{market.question}</h2>
-          <p className="text-sm text-gray-700">
-            Ends on {new Date(market.eventTime).toLocaleString('en-US', {
-              month: 'numeric',
-              day: 'numeric',
-              year: 'numeric',
-              hour: 'numeric',
-              minute: '2-digit',
-            })}
-          </p>
-          <p className="text-sm font-medium text-gray-800">
-            {yesPct.toFixed(1)}% Yes — <strong>{noPct.toFixed(1)}% No</strong>
-          </p>
-
-          {/* Progress bar */}
-          <div className="h-2 w-full bg-gray-300 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-[#00B89F]"
-              style={{ width: `${yesPct}%` }}
-            />
-          </div>
-
-          {/* Buttons */}
-          <div className="flex justify-center gap-4 mt-4">
-            <button
-              onClick={() => setAmount('1.0')}
-              className="w-24 py-2 border border-black rounded-full font-medium hover:bg-gray-100"
-            >
-              Yes
-            </button>
-            <button
-              onClick={() => setAmount('1.0')}
-              className="w-24 py-2 border border-black rounded-full font-medium hover:bg-gray-100"
-            >
-              No
-            </button>
-          </div>
-
-          {/* Trade input & confirm */}
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            className="w-full mt-4 p-2 rounded-md border border-gray-300 text-sm"
-            placeholder="Enter amount"
-          />
-          <button
-            onClick={handleTrade}
-            disabled={loading}
-            className="w-full bg-[#00B89F] text-white font-semibold py-2 rounded-md"
-          >
-            {loading ? 'Placing bet...' : 'Confirm Bet'}
-          </button>
-
-          {message && <div className="text-sm mt-2">{message}</div>}
-        </div>
-      </main>
-
-      {/* Drawer */}
-      <WalletDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
-    </div>
+    <EthereumContext.Provider
+      value={{
+        address: isMounted ? address : null,
+        isConnected: isMounted ? isConnected : false,
+        connect,
+        disconnect,
+      }}
+    >
+      {children}
+    </EthereumContext.Provider>
   )
 }
 
-export const getServerSideProps: GetServerSideProps<Props> = async (ctx) => {
-  const { id, side } = ctx.query
-  const { prisma } = await import('../../lib/prisma')
-  const m = await prisma.market.findUnique({ where: { id: String(id) } })
-  if (!m) return { notFound: true }
-
-  return {
-    props: {
-      market: { ...m, eventTime: m.eventTime.toISOString() },
-      initialSide: side === 'no' ? 'no' : 'yes',
-    },
+export const useEthereum = () => {
+  const context = useContext(EthereumContext)
+  if (!context) {
+    throw new Error('useEthereum must be used within an EthereumProvider')
   }
+  return context
 }
