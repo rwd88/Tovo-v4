@@ -117,3 +117,16 @@ a {
 .btn--blue:hover {
   background-color: #2563eb;
 }
+html {
+  color-scheme: light;
+  background: #ffffff !important;
+}
+
+body {
+  background-color: #ffffff !important;
+  color: #000 !important;
+}
+
+input, button {
+  font-family: inherit;
+}
