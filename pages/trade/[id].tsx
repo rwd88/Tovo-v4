@@ -66,12 +66,12 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
       {/* Header */}
       <header className="trade-header flex items-center justify-between px-4 py-4">
         <Image src="/logo.png" alt="Tovo" width={60} height={20} className="trade-logo" />
-        <button
-          onClick={() => setDrawerOpen(true)}
-          className="connect-wallet-link text-[13px] underline"
-        >
-          Connect Wallet
-        </button>
+       <button
+  onClick={() => setDrawerOpen(true)}
+  className="connect-wallet-link text-[13px] underline"
+>
+  Connect Wallet
+</button>
       </header>
 
       {/* Main content */}
