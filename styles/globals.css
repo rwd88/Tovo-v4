@@ -192,7 +192,13 @@ p.text-sm.font-medium.text-gray-200 {
   justify-content: center;
   margin-top: 1rem;
 }
-
+button.w-24.py-2.border.rounded-full.font-medium.transition.bg-white.text-black.border-white{
+  height: 50px;
+  width: 47%;
+  border: 1px solid white;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
+}
 button.w-24.py-2.border.border-white.rounded-full.font-medium.hover\:bg-white.hover\:text-black {
   height: 50px;
   width: 47%;
@@ -375,9 +381,8 @@ button.w-full.bg-\[\#00B89F\].text-white.font-semibold.py-2.rounded-md {
     border-radius: 20px 20px 0px 0px;
     padding: 20px;
 }
-header.flex.items-center.justify-between.px-4.py-4 {
-    width: 26%;
-    height: 37px;
+header.flex.items-center.justify-between.px-4.py-4 img {
+    height: 25px;
     object-fit: contain;
 }
 .flex.justify-between.items-center.mb-6 {
