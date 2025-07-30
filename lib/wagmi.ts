@@ -1,23 +1,18 @@
 // lib/wagmi.ts
+import { createConfig, configureChains } from 'wagmi'
 import { mainnet } from 'wagmi/chains'
-import { http } from 'viem'
-import { createConfig } from 'wagmi'
-import { InjectedConnector } from '@wagmi/connectors'
+import { http } from 'wagmi'
+import { injected } from 'wagmi/connectors'
+
+const { chains, publicClient } = configureChains(
+  [mainnet],
+  [http(process.env.NEXT_PUBLIC_ETH_RPC_URL!)]
+)
 
 export const wagmiConfig = createConfig({
-  chains: [mainnet],
-  connectors: [
-    new InjectedConnector({
-      chains: [mainnet],
-      options: {
-        name: 'MetaMask',
-        shimDisconnect: true,
-      },
-    }),
-  ],
-  transports: {
-    [mainnet.id]: http(process.env.NEXT_PUBLIC_ETH_RPC_URL!),
-  },
-  ssr: true,
   autoConnect: true,
+  connectors: [
+    injected({ chains })
+  ],
+  publicClient,
 })
