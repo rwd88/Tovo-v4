@@ -2,12 +2,11 @@ import '../styles/globals.css'
 import type { AppProps } from 'next/app'
 import { ErrorBoundary } from '../components/ErrorBoundary'
 import '@fontsource/montserrat'
-import { useMemo } from 'react' // Add this import
+import { useMemo } from 'react'
 
-// Wagmi v2 (EVM)
-import { WagmiProvider, createConfig } from 'wagmi'
-import { mainnet } from 'wagmi/chains'
-import { http } from 'viem'
+// Wagmi + Config
+import { WagmiProvider } from 'wagmi'
+import { wagmiConfig } from '../lib/wagmi'
 
 // Query Client
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -25,24 +24,14 @@ import { TonConnectUIProvider } from '@tonconnect/ui-react'
 // Ethereum Context
 import { EthereumProvider } from '../contexts/EthereumContext'
 
-// Create QueryClient
+// Query Client setup
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
-      retry: 1
-    }
-  }
-})
-
-// Wagmi config
-const evmConfig = createConfig({
-  autoConnect: true,
-  publicClient: http(process.env.NEXT_PUBLIC_ETH_RPC_URL!),
-  chains: [mainnet],
-  batch: {
-    multicall: true
-  }
+      retry: 1,
+    },
+  },
 })
 
 export default function MyApp({ Component, pageProps }: AppProps) {
@@ -55,7 +44,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
 
   return (
     <ErrorBoundary>
-      <TonConnectUIProvider 
+      <TonConnectUIProvider
         manifestUrl={process.env.NEXT_PUBLIC_TON_MANIFEST_URL!}
         walletsListConfiguration={{
           includeWallets: [
@@ -66,16 +55,16 @@ export default function MyApp({ Component, pageProps }: AppProps) {
               aboutUrl: "https://ton.org/wallets",
               jsBridgeKey: "tonconnect",
               bridgeUrl: "https://bridge.tonapi.io/bridge",
-              platforms: ["ios", "android", "chrome", "macos", "windows"]
-            }
-          ]
+              platforms: ["ios", "android", "chrome", "macos", "windows"],
+            },
+          ],
         }}
       >
         <ConnectionProvider endpoint={solanaEndpoint}>
           <SolanaWalletProvider wallets={solanaWallets} autoConnect>
             <WalletModalProvider>
               <QueryClientProvider client={queryClient}>
-                <WagmiProvider config={evmConfig}>
+                <WagmiProvider config={wagmiConfig}>
                   <EthereumProvider>
                     <Component {...pageProps} />
                   </EthereumProvider>
