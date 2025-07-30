@@ -19,16 +19,18 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [selectedSide, setSelectedSide] = useState<'yes' | 'no' | null>(initialSide)
 
   const total = market.poolYes + market.poolNo
   const yesPct = total > 0 ? (market.poolYes / total) * 100 : 0
   const noPct = 100 - yesPct
-  const side = initialSide === 'yes' ? 'UP' : 'DOWN'
+  const side = selectedSide === 'yes' ? 'UP' : 'DOWN'
 
   const handleTrade = async () => {
     if (!address) return setMessage('❌ Connect your wallet first.')
     const amt = parseFloat(amount)
     if (isNaN(amt) || amt <= 0) return setMessage('❌ Invalid amount.')
+    if (!selectedSide) return setMessage('❌ Choose Yes or No.')
 
     setLoading(true)
     setMessage(null)
@@ -84,6 +86,7 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
         {/* Card */}
         <div className="bg-[#003E37] rounded-xl px-6 py-8 text-center space-y-4 text-white">
           <h2 className="text-xl font-semibold">{market.question}</h2>
+
           <p className="text-sm text-gray-300">
             Ends on {new Date(market.eventTime).toLocaleString('en-US', {
               month: 'numeric',
@@ -93,8 +96,24 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
               minute: '2-digit',
             })}
           </p>
+
+          {market.forecast != null && (
+            <p className="text-sm text-gray-300">
+              Forecast: {(market.forecast).toFixed(1)}%
+            </p>
+          )}
+
           <p className="text-sm font-medium text-gray-200">
-            {yesPct.toFixed(1)}% Yes — <strong>{noPct.toFixed(1)}% No</strong>
+            {market.forecast != null ? (
+              <>
+                {yesPct.toFixed(1)}% say it will be above {(market.forecast).toFixed(1)}% —{' '}
+                {noPct.toFixed(1)}% say it will be below
+              </>
+            ) : (
+              <>
+                {yesPct.toFixed(1)}% Yes — {noPct.toFixed(1)}% No
+              </>
+            )}
           </p>
 
           {/* Progress bar */}
@@ -105,17 +124,31 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
             />
           </div>
 
-          {/* Buttons */}
+          {/* Yes / No Buttons */}
           <div className="flex justify-center gap-4 mt-4">
             <button
-              onClick={() => setAmount('1.0')}
-              className="w-24 py-2 border border-white rounded-full font-medium hover:bg-white hover:text-black"
+              onClick={() => {
+                setAmount('1.0')
+                setSelectedSide('yes')
+              }}
+              className={`w-24 py-2 border rounded-full font-medium transition ${
+                selectedSide === 'yes'
+                  ? 'bg-white text-black border-white'
+                  : 'border-white text-white hover:bg-white hover:text-black'
+              }`}
             >
               Yes
             </button>
             <button
-              onClick={() => setAmount('1.0')}
-              className="w-24 py-2 border border-white rounded-full font-medium hover:bg-white hover:text-black"
+              onClick={() => {
+                setAmount('1.0')
+                setSelectedSide('no')
+              }}
+              className={`w-24 py-2 border rounded-full font-medium transition ${
+                selectedSide === 'no'
+                  ? 'bg-white text-black border-white'
+                  : 'border-white text-white hover:bg-white hover:text-black'
+              }`}
             >
               No
             </button>
