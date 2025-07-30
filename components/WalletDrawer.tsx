@@ -9,11 +9,18 @@ type Props = {
 
 export default function WalletDrawer({ open, onClose }: Props) {
   const [visible, setVisible] = useState(false)
+  const [animatingOut, setAnimatingOut] = useState(false)
 
   useEffect(() => {
-    if (open) setVisible(true)
-    else {
-      const timeout = setTimeout(() => setVisible(false), 300)
+    if (open) {
+      setVisible(true)
+      setAnimatingOut(false)
+    } else {
+      setAnimatingOut(true)
+      const timeout = setTimeout(() => {
+        setVisible(false)
+        setAnimatingOut(false)
+      }, 300) // match animation duration
       return () => clearTimeout(timeout)
     }
   }, [open])
@@ -21,32 +28,31 @@ export default function WalletDrawer({ open, onClose }: Props) {
   if (!visible) return null
 
   return (
-    <div className="fixed inset-0 z-50 bg-black bg-opacity-50">
-      {/* Drawer panel */}
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black bg-opacity-60">
       <div
-        className={`fixed top-0 left-0 h-full w-[90%] max-w-sm bg-[#003E37] text-white p-6 rounded-r-2xl shadow-lg transform transition-transform duration-300 ease-in-out ${
-          open ? 'translate-x-0' : '-translate-x-full'
+        className={`bg-[#003E37] text-white w-[90%] h-full max-w-md p-6 rounded-b-2xl shadow-xl relative overflow-y-auto ${
+          animatingOut ? 'drawer-close' : 'drawer-open'
         }`}
       >
-        {/* Header with avatar and close */}
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center gap-3">
-            <Image src="/logo.png" alt="Tovo Logo" width={50} height={30} />
-            <div>
-              <h3 className="text-lg font-semibold">Connect Wallet</h3>
-              <p className="text-sm text-gray-300">Choose your network</p>
-            </div>
-          </div>
+        {/* Close Button */}
+        <button
+          id="wallet-drawer-close"
+          onClick={onClose}
+          className="absolute top-4 right-4 text-white text-2xl font-bold"
+        >
+          ×
+        </button>
 
-          <button
-            onClick={onClose}
-            className="text-white text-2xl font-bold"
-          >
-            ×
-          </button>
+        {/* Logo */}
+        <div className="flex items-center gap-3 mb-6">
+          <Image src="/logo.png" alt="Logo" width={50} height={30} />
+          <div>
+            <h3 className="text-lg font-semibold">Connect Wallet</h3>
+            <p className="text-sm text-gray-300">Choose your network</p>
+          </div>
         </div>
 
-        {/* Body content */}
+        {/* Wallet Buttons */}
         <div className="space-y-4 mt-6">
           <ConnectWalletButton />
         </div>
