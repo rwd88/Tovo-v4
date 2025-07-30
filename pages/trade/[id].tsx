@@ -68,9 +68,15 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
         <Image src="/logo.png" alt="Tovo" width={60} height={20} className="trade-logo" />
        <button
   onClick={() => setDrawerOpen(true)}
-  className="connect-wallet-link text-[13px] underline"
+  className="connect-wallet-button"
+  aria-label="Connect Wallet"
 >
-  Connect Wallet
+  <img
+    src="/connect wallet.svg"
+    alt="Connect Wallet Icon"
+    width={24}
+    height={24}
+  />
 </button>
       </header>
 
