@@ -7,70 +7,61 @@ import { sendAdminAlert } from '../../../lib/telegram'
 
 export const config = {
   api: { bodyParser: false },
-  maxDuration: 60, // allow up to 60s for the XML fetch
+  maxDuration: 60,
 }
 
 interface ImportResponse {
   success: boolean
-  added:   number
+  added: number
   skipped: number
-  error?:  string
+  error?: string
+}
+
+function generateQuestion(title: string): string {
+  const cleaned = title.trim()
+  return `Will the ${cleaned} be above forecast?`
 }
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ImportResponse>
 ) {
-  // 1) Authenticate
   const token =
     (req.query.secret as string) ||
     (req.headers['x-cron-secret'] as string) ||
     ''
   if (token !== process.env.CRON_SECRET) {
     await sendAdminAlert('⚠️ Unauthorized import-markets call')
-    return res
-      .status(403)
-      .json({ success: false, added: 0, skipped: 0, error: 'Forbidden' })
+    return res.status(403).json({ success: false, added: 0, skipped: 0 })
   }
 
-  // only GET allowed
   if (req.method !== 'GET') {
-    return res
-      .status(405)
-      .json({ success: false, added: 0, skipped: 0, error: 'Only GET allowed' })
+    return res.status(405).json({ success: false, added: 0, skipped: 0 })
   }
 
   try {
-    // 2) Fetch & parse XML
     const CAL_URL = 'https://nfs.faireconomy.media/ff_calendar_thisweek.xml'
     const { data: xml } = await axios.get<string>(CAL_URL)
     const parsed = await parseStringPromise(xml, {
       explicitArray: false,
-      trim:          true,
+      trim: true,
     })
 
-    // normalize into an array
     const raw = parsed?.weeklyevents?.event
-    const events: any[] = raw
-      ? Array.isArray(raw)
-        ? raw
-        : [raw]
-      : []
+    const events: any[] = raw ? (Array.isArray(raw) ? raw : [raw]) : []
 
     let added = 0
     let skipped = 0
     const now = Date.now()
 
     for (const ev of events) {
-      // skip non‐high impact
       if (ev.impact?.trim().toLowerCase() !== 'high') {
         skipped++
         continue
       }
 
-      // parse date/time
-      const dateStr = ev.date?.trim()    // e.g. "07-31-2025"
-      const t = ev.time?.trim().toLowerCase() // e.g. "12:30pm"
+      const dateStr = ev.date?.trim()
+      const t = ev.time?.trim().toLowerCase()
       if (!dateStr || !t) { skipped++; continue }
       const m = t.match(/^(\d{1,2}):(\d{2})(am|pm)$/)
       if (!m) { skipped++; continue }
@@ -86,19 +77,18 @@ export default async function handler(
         continue
       }
 
-      // extract forecast
       const rawForecast = ev.forecast?.trim()
       const forecastVal =
         rawForecast && !isNaN(Number(rawForecast))
           ? parseFloat(rawForecast)
           : null
 
-      // build an external ID
       const externalId =
-        ev.url?.trim() ||
-        `ff-${ev.title}-${mm}${dd}-${hour}${minute}`
+        ev.url?.trim() || `ff-${ev.title}-${mm}${dd}-${hour}${minute}`
 
-      // 3) Upsert market, including forecast
+      const originalTitle = ev.title?.trim() || ''
+      const naturalQuestion = generateQuestion(originalTitle)
+
       await prisma.market.upsert({
         where: { externalId },
         update: {
@@ -106,13 +96,13 @@ export default async function handler(
         },
         create: {
           externalId,
-          question:  ev.title.trim(),
-          status:    'open',
+          question: naturalQuestion,
+          status: 'open',
           eventTime,
-          poolYes:   0,
-          poolNo:    0,
-          notified:  false,
-          resolved:  false,
+          poolYes: 1,
+          poolNo: 1,
+          notified: false,
+          resolved: false,
           ...(forecastVal != null ? { forecast: forecastVal } : {}),
         },
       })
@@ -124,8 +114,6 @@ export default async function handler(
   } catch (err: any) {
     console.error('import-markets error:', err)
     await sendAdminAlert(`import-markets failed: ${err.message}`)
-    return res
-      .status(500)
-      .json({ success: false, added: 0, skipped: 0, error: err.message })
+    return res.status(500).json({ success: false, added: 0, skipped: 0, error: err.message })
   }
 }
