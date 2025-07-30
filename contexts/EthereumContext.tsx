@@ -21,11 +21,9 @@ const EthereumContext = createContext<EthereumContextType>({
 export function EthereumProvider({ children }: { children: ReactNode }) {
   const [isMounted, setIsMounted] = useState(false)
   
-  const { address, isConnected } = useAccount()
-  const { connectAsync } = useConnect({
-    connector: injected({ target: 'metaMask' })
-  })
+  const { connectors, connectAsync } = useConnect()
   const { disconnectAsync } = useDisconnect()
+  const { address, isConnected } = useAccount()
 
   useEffect(() => {
     setIsMounted(true)
@@ -34,8 +32,16 @@ export function EthereumProvider({ children }: { children: ReactNode }) {
 
   const connect = async () => {
     if (!isMounted) return
+    
     try {
-      await connectAsync()
+      // Find the injected connector (MetaMask)
+      const injectedConnector = connectors.find((c) => c.id === 'injected')
+      
+      if (!injectedConnector) {
+        throw new Error('MetaMask connector not found')
+      }
+
+      await connectAsync({ connector: injectedConnector })
     } catch (error) {
       console.error('Connection error:', error)
       throw error
