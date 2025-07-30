@@ -62,31 +62,32 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
   }
 
   return (
-    <div className="min-h-screen bg-white text-black font-[Montserrat]">
-      {/* Top nav */}
-      <div className="flex items-center justify-between px-4 py-4">
-        <Image src="/logo.png" alt="Tovo" width={60} height={24} />
+    <div className="trade-wrapper min-h-screen bg-white text-black font-[Montserrat]">
+      {/* Header */}
+      <header className="trade-header flex items-center justify-between px-4 py-4">
+        <Image src="/logo.png" alt="Tovo" width={60} height={20} />
         <button
           onClick={() => setDrawerOpen(true)}
-          className="text-sm underline"
+          className="connect-wallet-link text-[13px] underline"
         >
           Connect Wallet
         </button>
-      </div>
+      </header>
 
-      <main className="px-4 py-4 max-w-md mx-auto">
-        {/* Title block */}
-        <div className="text-center mb-6">
-          <h1 className="uppercase text-[#00B89F] text-sm font-semibold tracking-wide">
+      {/* Main content */}
+      <main className="trade-main px-4 py-4 max-w-md mx-auto">
+        {/* Title */}
+        <div className="trade-heading text-center mb-6">
+          <h1 className="text-[#00B89F] uppercase text-sm font-semibold tracking-wide">
             Prediction Markets Today
           </h1>
         </div>
 
         {/* Card */}
-        <div className="bg-[#003E37] text-white rounded-xl px-6 py-8 space-y-5 shadow-md">
-          <h2 className="text-2xl font-semibold">{market.question}</h2>
-          <p className="text-sm text-white/70 italic">
-            Ends On {new Date(market.eventTime).toLocaleString('en-US', {
+        <div className="trade-card bg-[#003E37] rounded-xl px-6 py-8 text-center space-y-4 text-white">
+          <h2 className="trade-question text-xl font-semibold">{market.question}</h2>
+          <p className="trade-timer text-sm text-gray-300">
+            Ends on {new Date(market.eventTime).toLocaleString('en-US', {
               month: 'numeric',
               day: 'numeric',
               year: 'numeric',
@@ -94,57 +95,60 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
               minute: '2-digit',
             })}
           </p>
-          <p className="text-sm font-medium">
+          <p className="trade-percentages text-sm font-medium text-gray-200">
             {yesPct.toFixed(1)}% Yes — <strong>{noPct.toFixed(1)}% No</strong>
           </p>
 
-          {/* Progress Bar */}
-          <div className="h-2 w-full bg-[#E5E5E5] rounded-full overflow-hidden">
+          {/* Progress bar */}
+          <div className="trade-progress h-2 w-full bg-[#E5E5E5] rounded-full overflow-hidden">
             <div
-              className="h-full bg-[#00B89F]"
+              className="trade-progress-fill h-full bg-[#00B89F]"
               style={{ width: `${yesPct}%` }}
             />
           </div>
 
           {/* Buttons */}
-          <div className="flex justify-center gap-4">
+          <div className="trade-buttons flex justify-center gap-4 mt-4">
             <button
               onClick={() => setAmount('1.0')}
-              className="w-24 py-2 border border-white text-white rounded-full hover:bg-white hover:text-[#003E37] transition"
+              className="btn btn-yes w-24 py-2 border border-white rounded-full font-medium hover:bg-white hover:text-black"
             >
               Yes
             </button>
             <button
               onClick={() => setAmount('1.0')}
-              className="w-24 py-2 border border-white text-white rounded-full hover:bg-white hover:text-[#003E37] transition"
+              className="btn btn-no w-24 py-2 border border-white rounded-full font-medium hover:bg-white hover:text-black"
             >
               No
             </button>
           </div>
 
-          {/* Input & Confirm */}
+          {/* Trade input */}
           <input
             type="number"
             step="0.01"
             min="0"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            className="w-full mt-2 p-2 rounded-md border border-gray-300 text-sm text-black"
+            className="trade-input w-full mt-4 p-2 rounded-md border border-gray-300 text-sm text-black"
             placeholder="Enter amount"
           />
+
+          {/* Confirm button */}
           <button
             onClick={handleTrade}
             disabled={loading}
-            className="w-full bg-[#00B89F] text-white font-semibold py-2 rounded-md hover:opacity-90 transition"
+            className="trade-confirm-btn w-full bg-[#00B89F] text-white font-semibold py-2 rounded-md"
           >
             {loading ? 'Placing bet...' : 'Confirm Bet'}
           </button>
 
-          {message && <div className="text-sm mt-2">{message}</div>}
+          {/* Message */}
+          {message && <div className="trade-message text-sm mt-2">{message}</div>}
         </div>
       </main>
 
-      {/* Drawer */}
+      {/* Wallet Drawer */}
       <WalletDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
     </div>
   )
