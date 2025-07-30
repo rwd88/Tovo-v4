@@ -396,6 +396,7 @@ button.wallet-toggle-btn img {
     width: 123px;
 }
 
+
 @keyframes slideDown {
   0% {
     transform: translateY(-100%);
@@ -409,11 +410,11 @@ button.wallet-toggle-btn img {
 
 @keyframes slideUp {
   0% {
-    transform: translateY(0);
+    transform: translateX(0);
     opacity: 1;
   }
   100% {
-    transform: translateY(-100%);
+    transform: translateX(-100%);
     opacity: 0;
   }
 }
@@ -424,4 +425,69 @@ button.wallet-toggle-btn img {
 
 .drawer-close {
   animation: slideUp 0.3s ease-in forwards;
+}
+
+.fixed.inset-0.z-50.flex.items-start.justify-center.bg-black.bg-opacity-60 {
+    top: 0;
+    position: absolute;
+    height: 100vh;
+    width: 90%;
+    background: #15463d;
+    right: 0;
+    padding: 20px;
+}
+button#wallet-drawer-close {
+    right: 0;
+    position: absolute;
+    background: transparent;
+    border: 0px;
+    font-size: 40px !important;
+    color: #d5d5d5;
+}
+.flex.items-center.gap-3.mb-6 img {
+    width: 30%;
+    object-fit: contain;
+    height: 10%;
+}
+h3.text-lg.font-semibold {
+    margin-top: 50px;
+    display: grid;
+    justify-content: center;
+    color: #fff;
+    font-family: 'Montserrat';
+    font-size: 25px;
+}
+.flex.flex-col.items-center.gap-4 {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    row-gap: 30px;
+    margin-top: 50px;
+}
+button.bg-blue-600.hover\:bg-blue-700.text-white.font-semibold.px-5.py-2.rounded.transition.duration-200 {
+    height: 35px;
+    border-radius: 100px;
+    width: 100%;
+}
+div#ton-connect-button {
+    height: 35px;
+    border-radius: 100px;
+    width: 100% !important;
+}
+button.go3974562317.go54158285 {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+}
+.wallet-adapter-dropdown {
+    display: flex;
+    height: 35px;
+    border-radius: 100px;
+    width: 100% !important;
+    flex-direction: column;
+}
+button.wallet-adapter-button.wallet-adapter-button-trigger {
+    display: flex
+;
+    justify-content: center;
 }
