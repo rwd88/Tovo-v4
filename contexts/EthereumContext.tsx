@@ -1,7 +1,13 @@
 'use client'
 
 import { useAccount, useConnect, useDisconnect } from 'wagmi'
-import { useEffect, useState, createContext, useContext, ReactNode } from 'react'
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+} from 'react'
 
 interface EthereumContextType {
   address: string | null
@@ -18,20 +24,16 @@ const EthereumContext = createContext<EthereumContextType>({
 })
 
 export function EthereumProvider({ children }: { children: ReactNode }) {
-  const [isMounted, setIsMounted] = useState(false)
-
   const { address, isConnected } = useAccount()
   const { connectAsync, connectors } = useConnect()
   const { disconnectAsync } = useDisconnect()
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    setIsMounted(true)
-    return () => setIsMounted(false)
+    setMounted(true)
   }, [])
 
   const connect = async () => {
-    if (!isMounted) return
-
     try {
       const injectedConnector = connectors.find((c) => c.id === 'injected')
       if (!injectedConnector) throw new Error('MetaMask connector not found')
@@ -43,7 +45,6 @@ export function EthereumProvider({ children }: { children: ReactNode }) {
   }
 
   const disconnect = async () => {
-    if (!isMounted) return
     try {
       await disconnectAsync()
     } catch (error) {
@@ -54,8 +55,8 @@ export function EthereumProvider({ children }: { children: ReactNode }) {
   return (
     <EthereumContext.Provider
       value={{
-        address: isMounted ? address : null,
-        isConnected: isMounted ? isConnected : false,
+        address: mounted ? address ?? null : null,
+        isConnected: mounted ? isConnected : false,
         connect,
         disconnect,
       }}
