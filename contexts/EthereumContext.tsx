@@ -24,9 +24,6 @@ const EthereumContext = createContext<EthereumContextType>({
 })
 
 export function EthereumProvider({ children }: { children: ReactNode }) {
-  const { address, isConnected } = useAccount()
-  const { connectAsync, connectors } = useConnect()
-  const { disconnectAsync } = useDisconnect()
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -35,11 +32,16 @@ export function EthereumProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // ✅ Only use wagmi hooks *after* mounted
+  const { address, isConnected } = mounted ? useAccount() : { address: null, isConnected: false }
+  const { connectAsync, connectors } = mounted ? useConnect() : { connectAsync: async () => {}, connectors: [] }
+  const { disconnectAsync } = mounted ? useDisconnect() : { disconnectAsync: async () => {} }
+
   const connect = async () => {
+    if (!mounted) return
     try {
       const injectedConnector = connectors.find((c) => c.id === 'injected')
       if (!injectedConnector) throw new Error('MetaMask connector not found')
-
       await connectAsync({ connector: injectedConnector })
     } catch (error) {
       console.error('Connection error:', error)
@@ -47,6 +49,7 @@ export function EthereumProvider({ children }: { children: ReactNode }) {
   }
 
   const disconnect = async () => {
+    if (!mounted) return
     try {
       await disconnectAsync()
     } catch (error) {
@@ -57,8 +60,8 @@ export function EthereumProvider({ children }: { children: ReactNode }) {
   return (
     <EthereumContext.Provider
       value={{
-        address: mounted ? address ?? null : null,
-        isConnected: mounted ? isConnected : false,
+        address,
+        isConnected,
         connect,
         disconnect,
       }}
@@ -66,12 +69,4 @@ export function EthereumProvider({ children }: { children: ReactNode }) {
       {children}
     </EthereumContext.Provider>
   )
-}
-
-export const useEthereum = () => {
-  const context = useContext(EthereumContext)
-  if (!context) {
-    throw new Error('useEthereum must be used within an EthereumProvider')
-  }
-  return context
 }
