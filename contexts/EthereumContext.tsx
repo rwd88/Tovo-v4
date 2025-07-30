@@ -1,6 +1,11 @@
+// ✅ Update your context export in /contexts/EthereumContext.tsx
 'use client'
 
-import { useAccount, useConnect, useDisconnect } from 'wagmi'
+import {
+  useAccount,
+  useConnect,
+  useDisconnect,
+} from 'wagmi'
 import {
   createContext,
   useContext,
@@ -16,52 +21,41 @@ interface EthereumContextType {
   disconnect: () => Promise<void>
 }
 
-const EthereumContext = createContext<EthereumContextType>({
-  address: null,
-  isConnected: false,
-  connect: async () => {},
-  disconnect: async () => {},
-})
+const EthereumContext = createContext<EthereumContextType | undefined>(undefined)
 
 export function EthereumProvider({ children }: { children: ReactNode }) {
+  const { address, isConnected } = useAccount()
+  const { connectAsync, connectors } = useConnect()
+  const { disconnectAsync } = useDisconnect()
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setMounted(true)
-    }
+    setMounted(true)
   }, [])
 
-  // ✅ Only use wagmi hooks *after* mounted
-  const { address, isConnected } = mounted ? useAccount() : { address: null, isConnected: false }
-  const { connectAsync, connectors } = mounted ? useConnect() : { connectAsync: async () => {}, connectors: [] }
-  const { disconnectAsync } = mounted ? useDisconnect() : { disconnectAsync: async () => {} }
-
   const connect = async () => {
-    if (!mounted) return
     try {
-      const injectedConnector = connectors.find((c) => c.id === 'injected')
-      if (!injectedConnector) throw new Error('MetaMask connector not found')
-      await connectAsync({ connector: injectedConnector })
-    } catch (error) {
-      console.error('Connection error:', error)
+      const injected = connectors.find((c) => c.id === 'injected')
+      if (!injected) throw new Error('MetaMask connector not found')
+      await connectAsync({ connector: injected })
+    } catch (err) {
+      console.error('Connect error:', err)
     }
   }
 
   const disconnect = async () => {
-    if (!mounted) return
     try {
       await disconnectAsync()
-    } catch (error) {
-      console.error('Disconnection error:', error)
+    } catch (err) {
+      console.error('Disconnect error:', err)
     }
   }
 
   return (
     <EthereumContext.Provider
       value={{
-        address,
-        isConnected,
+        address: mounted ? address ?? null : null,
+        isConnected: mounted ? isConnected : false,
         connect,
         disconnect,
       }}
@@ -69,4 +63,10 @@ export function EthereumProvider({ children }: { children: ReactNode }) {
       {children}
     </EthereumContext.Provider>
   )
+}
+
+export function useEthereum(): EthereumContextType {
+  const ctx = useContext(EthereumContext)
+  if (!ctx) throw new Error('useEthereum must be used within EthereumProvider')
+  return ctx
 }
