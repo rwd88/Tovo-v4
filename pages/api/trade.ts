@@ -1,4 +1,3 @@
-// src/pages/api/trade.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { verifyMessage } from 'ethers'
 import { prisma } from '../../lib/prisma'
@@ -65,6 +64,21 @@ export default async function handler(
         balance: 0,
       },
       update: {},
+    })
+
+    // fetch user to check balance
+    const user = await prisma.user.findUnique({ where: { id: walletAddress } })
+    if (!user || user.balance < amount) {
+      return res.status(400).json({
+        success: false,
+        error: 'Insufficient balance to place this bet.',
+      })
+    }
+
+    // deduct balance BEFORE creating trade
+    await prisma.user.update({
+      where: { id: walletAddress },
+      data: { balance: { decrement: amount } },
     })
 
     const fee    = parseFloat((amount * 0.01).toFixed(6))
