@@ -29,11 +29,11 @@ export default function WalletDrawer({ open, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black bg-opacity-60">
-      <div
-        className={`bg-[#003E37] text-white w-[90%] h-full max-w-md p-6 rounded-b-2xl shadow-xl relative overflow-y-auto ${
-          animatingOut ? 'drawer-close' : 'drawer-open'
-        }`}
-      >
+        <div
+  className={`bg-[#003E37] text-white w-[90%] h-full max-w-[400px] p-6 shadow-xl relative overflow-y-auto rounded-l-2xl ${
+    animatingOut ? 'drawer-close' : 'drawer-open'
+  }`}
+>
         {/* Close Button */}
         <button
           id="wallet-drawer-close"
