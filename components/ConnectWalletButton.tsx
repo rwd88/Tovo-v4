@@ -3,6 +3,7 @@
 import { useEthereum } from '../contexts/EthereumContext'
 import dynamic from 'next/dynamic'
 import { TonConnectButton } from '@tonconnect/ui-react'
+import { useRouter } from 'next/router'
 
 const SolanaWalletMultiButton = dynamic(
   async () =>
@@ -18,19 +19,21 @@ function isMobileDevice() {
 
 export default function ConnectWalletButton() {
   const { connect, disconnect, address } = useEthereum()
+  const router = useRouter()
 
   const handleClick = async () => {
     try {
-      // If user already connected, disconnect
+      const currentPath = window.location.pathname + window.location.search
+
       if (address) {
         await disconnect()
         return
       }
 
-      // If no Ethereum provider (on mobile), redirect to MetaMask app
       if (typeof window.ethereum === 'undefined') {
         if (isMobileDevice()) {
-          const deepLink = `https://metamask.app.link/dapp/${YOUR_DAPP_URL}`
+          localStorage.setItem('postConnectRedirect', currentPath)
+          const deepLink = `https://metamask.app.link/dapp/${YOUR_DAPP_URL}${currentPath}`
           window.location.href = deepLink
         } else {
           alert('MetaMask not detected. Please install MetaMask extension.')
@@ -38,7 +41,7 @@ export default function ConnectWalletButton() {
         return
       }
 
-      // Connect normally on desktop
+      localStorage.setItem('postConnectRedirect', currentPath)
       await connect()
     } catch (error) {
       console.error('Wallet action failed:', error)

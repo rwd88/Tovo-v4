@@ -53,6 +53,16 @@ export function EthereumProvider({ children }: { children: React.ReactNode }) {
     setAddress(null)
   }
 
+  useEffect(() => {
+    if (address) {
+      const redirect = localStorage.getItem('postConnectRedirect')
+      if (redirect) {
+        window.location.href = redirect
+        localStorage.removeItem('postConnectRedirect')
+      }
+    }
+  }, [address])
+
   return (
     <EthereumContext.Provider value={{ connect, disconnect, address, provider }}>
       {children}
