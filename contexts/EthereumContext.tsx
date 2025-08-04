@@ -5,7 +5,7 @@ import WalletConnectProvider from '@walletconnect/web3-provider'
 import { ethers } from 'ethers'
 
 interface EthereumContextType {
-  connect: () => Promise<void>
+  connect: (wallet?: 'metamask' | 'trust') => Promise<void>
   disconnect: () => Promise<void>
   address: string | null
   provider: ethers.providers.Web3Provider | null
@@ -22,16 +22,20 @@ export function EthereumProvider({ children }: { children: React.ReactNode }) {
   const [address, setAddress] = useState<string | null>(null)
   const [provider, setProvider] = useState<ethers.providers.Web3Provider | null>(null)
 
-  const connect = async () => {
+  const connect = async (wallet: 'metamask' | 'trust' = 'metamask') => {
     const wcProvider = new WalletConnectProvider({
       rpc: {
         1: 'https://mainnet.infura.io/v3/YOUR_INFURA_ID',
         11155111: 'https://sepolia.infura.io/v3/YOUR_INFURA_ID',
       },
       chainId: 11155111,
+      qrcodeModalOptions: {
+        mobileLinks: ['metamask', 'trust'], // 👈 supported wallets
+      },
     })
 
     await wcProvider.enable()
+
     const web3 = new ethers.providers.Web3Provider(wcProvider)
     const signer = web3.getSigner()
     const userAddress = await signer.getAddress()
@@ -52,16 +56,6 @@ export function EthereumProvider({ children }: { children: React.ReactNode }) {
     setProvider(null)
     setAddress(null)
   }
-
-  useEffect(() => {
-    if (address) {
-      const redirect = localStorage.getItem('postConnectRedirect')
-      if (redirect) {
-        window.location.href = redirect
-        localStorage.removeItem('postConnectRedirect')
-      }
-    }
-  }, [address])
 
   return (
     <EthereumContext.Provider value={{ connect, disconnect, address, provider }}>

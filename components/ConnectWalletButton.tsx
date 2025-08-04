@@ -3,7 +3,6 @@
 import { useEthereum } from '../contexts/EthereumContext'
 import dynamic from 'next/dynamic'
 import { TonConnectButton } from '@tonconnect/ui-react'
-import { useRouter } from 'next/router'
 
 const SolanaWalletMultiButton = dynamic(
   async () =>
@@ -11,53 +10,48 @@ const SolanaWalletMultiButton = dynamic(
   { ssr: false }
 )
 
-const YOUR_DAPP_URL = 'tovo-v4.vercel.app'
-
-function isMobileDevice() {
-  return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
-}
-
 export default function ConnectWalletButton() {
   const { connect, disconnect, address } = useEthereum()
-  const router = useRouter()
 
-  const handleClick = async () => {
+  const handleClick = async (wallet: 'metamask' | 'trust') => {
     try {
-      const currentPath = window.location.pathname + window.location.search
-
       if (address) {
         await disconnect()
         return
       }
 
-      if (typeof window.ethereum === 'undefined') {
-        if (isMobileDevice()) {
-          localStorage.setItem('postConnectRedirect', currentPath)
-          const deepLink = `https://metamask.app.link/dapp/${YOUR_DAPP_URL}${currentPath}`
-          window.location.href = deepLink
-        } else {
-          alert('MetaMask not detected. Please install MetaMask extension.')
-        }
-        return
-      }
-
-      localStorage.setItem('postConnectRedirect', currentPath)
-      await connect()
+      await connect(wallet)
     } catch (error) {
-      console.error('Wallet action failed:', error)
+      console.error('Wallet connection failed:', error)
     }
   }
 
   return (
     <div className="flex flex-col items-center gap-4">
-      <button
-        onClick={handleClick}
-        className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2 rounded transition duration-200"
-      >
-        {address
-          ? `Disconnect: ${address.slice(0, 6)}...${address.slice(-4)}`
-          : 'Connect MetaMask'}
-      </button>
+      {address ? (
+        <button
+          onClick={() => disconnect()}
+          className="bg-red-500 hover:bg-red-600 text-white font-semibold px-5 py-2 rounded"
+        >
+          Disconnect: {address.slice(0, 6)}...{address.slice(-4)}
+        </button>
+      ) : (
+        <>
+          <button
+            onClick={() => handleClick('metamask')}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2 rounded w-full"
+          >
+            Connect MetaMask
+          </button>
+          <button
+            onClick={() => handleClick('trust')}
+            className="bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-2 rounded w-full"
+          >
+            Connect Trust Wallet
+          </button>
+        </>
+      )}
+
       <TonConnectButton />
       <SolanaWalletMultiButton />
     </div>
