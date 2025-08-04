@@ -8,7 +8,9 @@ import {
 import {
   InjectedConnector,
   MetaMaskConnector,
-} from 'wagmi/connectors/injected'
+  WalletConnectConnector,
+} from '@wagmi/connectors'
+
 import {
   createContext,
   useContext,
@@ -40,9 +42,11 @@ export function EthereumProvider({ children }: { children: ReactNode }) {
     try {
       const connector =
         connectors.find((c) => c.id === 'metaMask') ||
+        connectors.find((c) => c.id === 'walletConnect') ||
         connectors.find((c) => c.id === 'injected')
 
-      if (!connector) throw new Error('No compatible wallet found (MetaMask or TrustWallet)')
+      if (!connector) throw new Error('No supported wallet found.')
+
       await connectAsync({ connector })
     } catch (err) {
       console.error('Connect error:', err)
