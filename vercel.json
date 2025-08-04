@@ -2,15 +2,15 @@
   "crons": [
     {
       "path": "/api/cron/import-markets?secret=12345A",
-      "schedule": "0 0 * * *"
+      "schedule": "0 0 * * *"            // every day at 00:00
     },
     {
       "path": "/api/cron/settle-markets?secret=12345A",
-      "schedule": "*/59 * * * *"
+      "schedule": "*/59 * * * *"        // every 59 minutes
     },
     {
       "path": "/api/cron/publish-markets?secret=12345A",
-      "schedule": "*/15 * * * *"
+      "schedule": "1 0 * * *"           // every day at 00:01
     }
   ]
 }
