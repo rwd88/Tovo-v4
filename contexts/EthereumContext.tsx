@@ -1,14 +1,14 @@
 'use client'
 
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useState, useEffect } from 'react'
 import WalletConnectProvider from '@walletconnect/web3-provider'
-import { BrowserProvider } from 'ethers'
+import { ethers } from 'ethers'
 
 interface EthereumContextType {
-  connect: (wallet?: 'metamask' | 'trust') => Promise<void>
+  connect: () => Promise<void>
   disconnect: () => Promise<void>
   address: string | null
-  provider: BrowserProvider | null
+  provider: ethers.BrowserProvider | null
 }
 
 const EthereumContext = createContext<EthereumContextType>({
@@ -20,38 +20,36 @@ const EthereumContext = createContext<EthereumContextType>({
 
 export function EthereumProvider({ children }: { children: React.ReactNode }) {
   const [address, setAddress] = useState<string | null>(null)
-  const [provider, setProvider] = useState<BrowserProvider | null>(null)
+  const [provider, setProvider] = useState<ethers.BrowserProvider | null>(null)
 
-  const connect = async (wallet: 'metamask' | 'trust' = 'metamask') => {
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+  const connect = async () => {
+    if (typeof window !== 'undefined' && typeof window.ethereum !== 'undefined') {
+      // ✅ Use MetaMask directly on desktop or mobile with extension
+      const web3 = new ethers.BrowserProvider(window.ethereum)
+      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' })
+      const userAddress = accounts[0]
 
+      setProvider(web3)
+      setAddress(userAddress)
+
+      window.ethereum.on('accountsChanged', (accounts: string[]) => {
+        setAddress(accounts[0] || null)
+      })
+
+      return
+    }
+
+    // ❌ Fallback to WalletConnect (iOS / no extension)
     const wcProvider = new WalletConnectProvider({
       rpc: {
         1: 'https://mainnet.infura.io/v3/YOUR_INFURA_ID',
         11155111: 'https://sepolia.infura.io/v3/YOUR_INFURA_ID',
       },
       chainId: 11155111,
-      qrcodeModalOptions: {
-        mobileLinks: ['metamask', 'trust'],
-      },
     })
 
-    if (isMobile) {
-      const dappUrl = 'tovo-v4.vercel.app' // without https
-      let link = ''
-
-      if (wallet === 'metamask') {
-        link = `https://metamask.app.link/dapp/${dappUrl}`
-      } else {
-        link = `https://link.trustwallet.com/open_url?coin_id=60&url=https://${dappUrl}`
-      }
-
-      window.location.href = link
-      return
-    }
-
     await wcProvider.enable()
-    const web3 = new BrowserProvider(wcProvider as any)
+    const web3 = new ethers.BrowserProvider(wcProvider)
     const signer = await web3.getSigner()
     const userAddress = await signer.getAddress()
 
@@ -65,7 +63,7 @@ export function EthereumProvider({ children }: { children: React.ReactNode }) {
   }
 
   const disconnect = async () => {
-    if (provider?.provider?.disconnect) {
+    if ((provider?.provider as any)?.disconnect) {
       await (provider.provider as any).disconnect()
     }
     setProvider(null)
