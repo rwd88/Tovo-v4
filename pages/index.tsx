@@ -48,20 +48,21 @@ export default function Home() {
 
   if (!isClient) return null
 
-  // Build tag list
-  const tags = Array.from(new Set(markets.map((m) => m.tag || 'General'))).sort()
+  const tags = Array.from(
+    new Set(markets.map((m) => m.tag || 'General'))
+  ).sort()
   tags.unshift('All')
   const filtered =
     activeFilter === 'All'
       ? markets
       : markets.filter((m) => (m.tag || 'General') === activeFilter)
 
-  function formatQuestion(q: string) {
+  const formatQuestion = (q: string) => {
     const t = q.trim()
     return /^Will\s/i.test(t) ? t : `Will ${t.replace(/\?$/, '')}?`
   }
 
-  function yesPct(m: Market) {
+  const yesPct = (m: Market) => {
     const yes = m.poolYes || 0
     const no = m.poolNo || 0
     const total = yes + no
@@ -76,7 +77,6 @@ export default function Home() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
 
-      {/* Drawer */}
       <WalletDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
 
       <div className={`${styles.page} ${geistSans.variable} ${geistMono.variable}`}>
@@ -105,12 +105,12 @@ export default function Home() {
         </header>
 
         {/* Main */}
-        <main className="px-4 py-4 max-w-md mx-auto mt-20">
-        <div className="text-center mb-6">
-          <h1 className="text-[#00B89F] uppercase text-sm font-semibold tracking-wide">
-            Prediction Markets Today
-          </h1>
-        </div>
+        <main className={`${styles.main} mt-20 px-4 w-full`}>
+          <div className="text-center mb-6">
+            <h1 className="text-[#00B89F] uppercase text-sm font-semibold tracking-wide">
+              Prediction Markets Today
+            </h1>
+          </div>
 
           {/* Filters */}
           <div className="filters">

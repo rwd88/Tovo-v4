@@ -155,7 +155,7 @@ input, button {
 }
 
 h1.text-\[\#00B89F\].uppercase.text-sm.font-semibold.tracking-wide {
-    padding: 0px 20px;
+    padding: 0px 40px;
     font-size: 31px !important;
     margin-top: 150px;
   text-align: center;
@@ -164,7 +164,7 @@ h1.text-\[\#00B89F\].uppercase.text-sm.font-semibold.tracking-wide {
 
 }
 h1.text-2xl.font-bold.text-center.mb-4.text-\[\#43E1C8\]{
-    padding: 0 20px;
+    padding: 0 40px;
     font-size: 31px !important;
     text-align: center;
     color: #43E1C8;
@@ -494,8 +494,7 @@ button.wallet-adapter-button.wallet-adapter-button-trigger {
 
 /* HEADER */
 header.flex.items-center.justify-between.px-4.py-4 {
-    height: 25px;
-    object-fit: contain;
+  height: auto !important;
   position: fixed;
   top: 0;
   left: 0;
