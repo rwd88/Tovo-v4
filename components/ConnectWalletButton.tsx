@@ -10,43 +10,47 @@ const SolanaWalletMultiButton = dynamic(
   { ssr: false }
 )
 
+function isMobileDevice() {
+  return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+}
+
 export default function ConnectWalletButton() {
   const { connect, disconnect, address } = useEthereum()
 
-  const handleDisconnect = async () => {
+  const handleClick = async () => {
     try {
-      await disconnect()
-    } catch (err) {
-      console.error('Failed to disconnect:', err)
+      if (address) {
+        await disconnect()
+        return
+      }
+
+      if (typeof window.ethereum === 'undefined') {
+        if (isMobileDevice()) {
+          const currentUrl = encodeURIComponent(window.location.href)
+          const deepLink = `https://metamask.app.link/dapp/${currentUrl}`
+          window.location.href = deepLink
+        } else {
+          alert('MetaMask or Trust Wallet not detected. Please install one.')
+        }
+        return
+      }
+
+      await connect()
+    } catch (error) {
+      console.error('Wallet action failed:', error)
     }
   }
 
   return (
     <div className="flex flex-col items-center gap-4">
-      {address ? (
-        <button
-          onClick={handleDisconnect}
-          className="bg-gray-700 hover:bg-gray-800 text-white font-semibold px-5 py-2 rounded"
-        >
-          Disconnect: {address.slice(0, 6)}...{address.slice(-4)}
-        </button>
-      ) : (
-        <>
-          <button
-            onClick={() => connect('metamask')}
-            className="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-5 py-2 rounded"
-          >
-            Connect MetaMask
-          </button>
-          <button
-            onClick={() => connect('trust')}
-            className="bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-2 rounded"
-          >
-            Connect Trust Wallet
-          </button>
-        </>
-      )}
-
+      <button
+        onClick={handleClick}
+        className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2 rounded transition duration-200"
+      >
+        {address
+          ? `Disconnect: ${address.slice(0, 6)}...${address.slice(-4)}`
+          : 'Connect Wallet'}
+      </button>
       <TonConnectButton />
       <SolanaWalletMultiButton />
     </div>
