@@ -1,4 +1,3 @@
-// ✅ Update your context export in /contexts/EthereumContext.tsx
 'use client'
 
 import {
@@ -6,6 +5,10 @@ import {
   useConnect,
   useDisconnect,
 } from 'wagmi'
+import {
+  InjectedConnector,
+  MetaMaskConnector,
+} from 'wagmi/connectors/injected'
 import {
   createContext,
   useContext,
@@ -35,9 +38,12 @@ export function EthereumProvider({ children }: { children: ReactNode }) {
 
   const connect = async () => {
     try {
-      const injected = connectors.find((c) => c.id === 'injected')
-      if (!injected) throw new Error('MetaMask connector not found')
-      await connectAsync({ connector: injected })
+      const connector =
+        connectors.find((c) => c.id === 'metaMask') ||
+        connectors.find((c) => c.id === 'injected')
+
+      if (!connector) throw new Error('No compatible wallet found (MetaMask or TrustWallet)')
+      await connectAsync({ connector })
     } catch (err) {
       console.error('Connect error:', err)
     }
