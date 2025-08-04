@@ -74,6 +74,7 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
 
+      {/* Drawer */}
       <WalletDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
 
       {/* Header */}
@@ -124,15 +125,15 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
 
           {market.forecast != null && (
             <p className="text-sm text-gray-300">
-              Forecast: {market.forecast.toFixed(1)}%
+              Forecast: {(market.forecast).toFixed(1)}%
             </p>
           )}
 
           <p className="text-sm font-medium text-gray-200">
             {market.forecast != null ? (
               <>
-                {yesPct.toFixed(1)}% say it will be above {market.forecast.toFixed(1)}% —{' '}
-                {noPct.toFixed(1)}% say it will be below
+                {yesPct.toFixed(1)}% say it will be above{' '}
+                {market.forecast.toFixed(1)}% — {noPct.toFixed(1)}% say it will be below
               </>
             ) : (
               <>
@@ -141,6 +142,7 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
             )}
           </p>
 
+          {/* Progress bar */}
           <div className="h-2 w-full bg-[#E5E5E5] rounded-full overflow-hidden">
             <div
               className="h-full bg-[#00B89F]"
@@ -148,6 +150,7 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
             />
           </div>
 
+          {/* Yes / No Buttons */}
           <div className="flex justify-center gap-4 mt-4">
             <button
               onClick={() => {
@@ -177,6 +180,7 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
             </button>
           </div>
 
+          {/* Trade form */}
           <div className="mt-4 space-y-2">
             <input
               type="number"

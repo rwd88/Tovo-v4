@@ -155,16 +155,21 @@ input, button {
 }
 
 h1.text-\[\#00B89F\].uppercase.text-sm.font-semibold.tracking-wide {
-    padding: 0px 40px;
+    padding: 0px 40px !important;
     font-size: 31px !important;
-    margin-top: 150px;
   text-align: center;
   color: #43E1C8;
     text-transform: uppercase;
-
+    line-height: 34px;
+    font-family: 'Montserrat';
+    font-weight: bold;
 }
 h1.text-2xl.font-bold.text-center.mb-4.text-\[\#43E1C8\]{
-    padding: 0 40px;
+
+    line-height: 34px;
+    font-family: 'Montserrat';
+    font-weight: bold; 
+   padding: 0 40px;
     font-size: 31px !important;
     text-align: center;
     color: #43E1C8;
@@ -505,6 +510,9 @@ header.flex.items-center.justify-between.px-4.py-4 {
 /* OFFSET main below header */
 .main {
   margin-top: 80px; /* adjust if your header height differs */
+    position: absolute;
+    row-gap: 20px !important;
+    display: grid;
 }
 
 /* FILTERS */
