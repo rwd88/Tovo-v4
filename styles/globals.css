@@ -492,3 +492,111 @@ button.wallet-adapter-button.wallet-adapter-button-trigger {
     display: flex;
     justify-content: center;
 }
+/* —— homepage specific —— */
+
+/* HEADER */
+header.flex.items-center.justify-between.px-4.py-4 {
+  background: var(--background);
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 50;
+}
+
+/* OFFSET main below header */
+.main {
+  margin-top: 80px; /* adjust if your header height differs */
+}
+
+/* FILTERS */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+.filter-button {
+  background: #f0f0f0;
+  border: none;
+  border-radius: 9999px;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.filter-button:hover {
+  background: #e0e0e0;
+}
+.filter-button.active {
+  background: #43E1C8;
+  color: #ffffff;
+}
+
+/* MARKET LIST GRID */
+.market-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+@media (min-width: 768px) {
+  .market-list {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* CARD */
+.market-card {
+  background: #00423b;
+  color: #ffffff;
+  border-radius: 1rem;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.market-title {
+  font-size: 1rem;
+  font-weight: 600;
+}
+.market-time {
+  font-size: 0.875rem;
+  opacity: 0.8;
+}
+
+/* PROGRESS BAR */
+.progress-bar {
+  width: 100%;
+  height: 4px;
+  background: #00352f;
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 0.75rem;
+}
+.progress-fill {
+  height: 100%;
+  background: #43E1C8;
+  transition: width 0.3s ease;
+}
+
+/* YES/NO BUTTONS */
+.button-group {
+  display: flex;
+  gap: 0.5rem;
+}
+.yes-button,
+.no-button {
+  flex: 1;
+  background: transparent;
+  border: 1px solid #ffffff;
+  border-radius: 9999px;
+  padding: 0.5rem 0;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.yes-button:hover,
+.no-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
