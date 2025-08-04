@@ -1,11 +1,18 @@
+'use client'
+
+import Head from 'next/head'
 import Image from 'next/image'
+import Link from 'next/link'
 import { useState } from 'react'
 import type { GetServerSideProps } from 'next'
 import type { Market } from '@prisma/client'
 import { useEthereum } from '../../contexts/EthereumContext'
 import dynamic from 'next/dynamic'
 
-const WalletDrawer = dynamic(() => import('../../components/WalletDrawer'), { ssr: false })
+const WalletDrawer = dynamic(
+  () => import('../../components/WalletDrawer'),
+  { ssr: false }
+)
 
 type Props = {
   market: Omit<Market, 'eventTime'> & { eventTime: string }
@@ -34,7 +41,6 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
 
     setLoading(true)
     setMessage(null)
-
     try {
       const res = await fetch('/api/trade', {
         method: 'POST',
@@ -46,7 +52,6 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
           side,
         }),
       })
-
       const json = await res.json()
       if (json.success) {
         setMessage('✅ Trade submitted successfully.')
@@ -64,31 +69,52 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
 
   return (
     <div className="trade-wrapper min-h-screen bg-white text-black font-[Montserrat] relative">
+      <Head>
+        <title>Market {market.id} | Tovo</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+      </Head>
+
+      {/* Drawer */}
+      <WalletDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+
       {/* Header */}
-      <header className="flex items-center justify-between px-4 py-4">
-        <Image src="/logo.png" alt="Tovo" width={60} height={20} />
+      <header className="flex items-center justify-between px-4 py-4 fixed top-0 w-full bg-white dark:bg-[#0a0a0a] z-20">
+        <Link href="/">
+          <Image
+            src="/logo.png"
+            alt="Tovo"
+            width={120}
+            height={24}
+            style={{ objectFit: 'contain' }}
+          />
+        </Link>
         <button
-          onClick={() => setDrawerOpen(!drawerOpen)}
+          onClick={() => setDrawerOpen((v) => !v)}
           className="wallet-toggle-btn"
         >
-          <Image src="/connect wallet.svg" alt="Connect Wallet" width={32} height={32} />
+          <Image
+            src="/connect wallet.svg"
+            alt="Connect Wallet"
+            width={120}
+            height={24}
+          />
         </button>
       </header>
 
-      {/* Main content */}
-      <main className="px-4 py-4 max-w-md mx-auto">
+      {/* Main */}
+      <main className="px-4 py-4 max-w-md mx-auto mt-20">
         <div className="text-center mb-6">
           <h1 className="text-[#00B89F] uppercase text-sm font-semibold tracking-wide">
             Prediction Markets Today
           </h1>
         </div>
 
-        {/* Card */}
         <div className="bg-[#003E37] rounded-xl px-6 py-8 text-center space-y-4 text-white">
           <h2 className="text-xl font-semibold">{market.question}</h2>
 
           <p className="text-sm text-gray-300">
-            Ends on {new Date(market.eventTime).toLocaleString('en-US', {
+            Ends on{' '}
+            {new Date(market.eventTime).toLocaleString('en-US', {
               month: 'numeric',
               day: 'numeric',
               year: 'numeric',
@@ -106,8 +132,8 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
           <p className="text-sm font-medium text-gray-200">
             {market.forecast != null ? (
               <>
-                {yesPct.toFixed(1)}% say it will be above {(market.forecast).toFixed(1)}% —{' '}
-                {noPct.toFixed(1)}% say it will be below
+                {yesPct.toFixed(1)}% say it will be above{' '}
+                {market.forecast.toFixed(1)}% — {noPct.toFixed(1)}% say it will be below
               </>
             ) : (
               <>
@@ -174,13 +200,9 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
             </button>
           </div>
 
-          {/* Message */}
           {message && <div className="text-sm mt-2">{message}</div>}
         </div>
       </main>
-
-      {/* Wallet Drawer */}
-      <WalletDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
     </div>
   )
 }

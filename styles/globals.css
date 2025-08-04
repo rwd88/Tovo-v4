@@ -1,3 +1,8 @@
+header img {
+  object-fit: contain;
+  width: auto;
+  height: 24px; /* or whatever fixed height you prefer */
+}
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -395,37 +400,25 @@ button.wallet-toggle-btn img {
 
 
 @keyframes slideInRight {
-  0% {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  100% {
-    transform: translateX(0%);
-    opacity: 1;
-  }
+  0%   { transform: translateX(100%); opacity: 0; }
+  100% { transform: translateX(0);    opacity: 1; }
 }
 
-@keyframes slideOutLeft {
-  0% {
-    transform: translateX(0%);
-    opacity: 1;
-  }
-  100% {
-    transform: translateX(-100%);
-    opacity: 0;
-  }
+@keyframes slideOutRight {
+  0%   { transform: translateX(0);    opacity: 1; }
+  100% { transform: translateX(100%); opacity: 0; }
 }
 
 .drawer-open {
   animation: slideInRight 0.3s ease-out forwards;
 }
-
 .drawer-close {
-  animation: slideOutLeft 0.3s ease-in forwards;
+  animation: slideOutRight 0.3s ease-in forwards;
 }
 
 
 .fixed.inset-0.z-50.flex.items-start.justify-center.bg-black.bg-opacity-60 {
+    z-index: 1000;
     top: 0;
     position: absolute;
     height: 100vh;
