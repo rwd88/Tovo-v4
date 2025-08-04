@@ -382,10 +382,6 @@ button.w-full.bg-\[\#00B89F\].text-white.font-semibold.py-2.rounded-md {
     border-radius: 20px 20px 0px 0px;
     padding: 20px;
 }
-header.flex.items-center.justify-between.px-4.py-4 img {
-    height: 25px;
-    object-fit: contain;
-}
 .flex.justify-between.items-center.mb-6 {
     display: flex;
 }
@@ -496,7 +492,8 @@ button.wallet-adapter-button.wallet-adapter-button-trigger {
 
 /* HEADER */
 header.flex.items-center.justify-between.px-4.py-4 {
-  background: var(--background);
+    height: 25px;
+    object-fit: contain;
   position: fixed;
   top: 0;
   left: 0;
@@ -548,6 +545,7 @@ header.flex.items-center.justify-between.px-4.py-4 {
 
 /* CARD */
 .market-card {
+  cursor: pointer;        /* <— makes it obvious it’s clickable */
   background: #00423b;
   color: #ffffff;
   border-radius: 1rem;
@@ -555,6 +553,15 @@ header.flex.items-center.justify-between.px-4.py-4 {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+}
+.market-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Remove pointer events on inner buttons if you still want them clickable */
+.market-card .button-group button {
+  cursor: auto;
 }
 .market-title {
   font-size: 1rem;

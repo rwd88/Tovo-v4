@@ -2,6 +2,7 @@
 
 import Head from 'next/head'
 import Image from 'next/image'
+import Link from 'next/link'
 import { Geist, Geist_Mono } from 'next/font/google'
 import styles from '../styles/Home.module.css'
 import { useEffect, useState } from 'react'
@@ -80,10 +81,9 @@ export default function Home() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
 
-      {/* Drawer */}
+      {/* Wallet Drawer */}
       <WalletDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
 
-      {/* page grid */}
       <div className={`${styles.page} ${geistSans.variable} ${geistMono.variable}`}>
 
         {/* Header */}
@@ -102,7 +102,7 @@ export default function Home() {
           </button>
         </header>
 
-        {/* Main */}
+        {/* Main Content */}
         <main className={`${styles.main} mt-20 px-4 w-full`}>
 
           {/* Heading */}
@@ -134,44 +134,46 @@ export default function Home() {
           {/* Market Cards Grid */}
           <div className="market-list">
             {filtered.map((m) => {
-              const progress = pct(m.eventTime, m.eventTime)
               const yes = m.poolYes || 0
               const no = m.poolNo || 0
-              const yesPct = yes + no > 0 ? Math.round((yes / (yes + no)) * 100) : 50
+              const total = yes + no
+              const yesPct = total > 0 ? Math.round((yes / total) * 100) : 50
 
               return (
-                <div key={m.id} className="market-card">
-                  <div className="market-title">{formatQuestion(m.question)}</div>
-                  <div className="market-time">
-                    Ends On {new Date(m.eventTime).toLocaleDateString()},{' '}
-                    {new Date(m.eventTime).toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </div>
+                <Link key={m.id} href={`/trade/${m.id}`} passHref>
+                  <a className="market-card">
+                    <div className="market-title">
+                      {formatQuestion(m.question)}
+                    </div>
+                    <div className="market-time">
+                      Ends On {new Date(m.eventTime).toLocaleDateString()},{' '}
+                      {new Date(m.eventTime).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </div>
 
-                  <div className="progress-bar">
-                    <div
-                      className="progress-fill"
-                      style={{ width: `${yesPct}%` }}
-                    />
-                  </div>
+                    <div className="progress-bar">
+                      <div
+                        className="progress-fill"
+                        style={{ width: `${yesPct}%` }}
+                      />
+                    </div>
 
-                  <div className="button-group">
-                    <button className="yes-button">Yes</button>
-                    <button className="no-button">No</button>
-                  </div>
-                </div>
+                    <div className="button-group">
+                      <button className="yes-button">Yes</button>
+                      <button className="no-button">No</button>
+                    </div>
+                  </a>
+                </Link>
               )
             })}
           </div>
         </main>
 
+        {/* Footer (unchanged) */}
         <footer className={styles.footer}>
-          <a href="https://nextjs.org" target="_blank" rel="noopener noreferrer">
-            <Image src="/globe.svg" alt="Globe" width={16} height={16} />
-            Go to nextjs.org →
-          </a>
+          {/* ... */}
         </footer>
       </div>
     </>
