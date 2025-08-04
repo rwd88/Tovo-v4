@@ -157,9 +157,16 @@ input, button {
 h1.text-\[\#00B89F\].uppercase.text-sm.font-semibold.tracking-wide {
     padding: 0px 20px;
     font-size: 31px !important;
-    margin-top: 50px;
+    margin-top: 150px;
   text-align: center;
   color: #43E1C8;
+}
+h1.text-2xl.font-bold.text-center.mb-4.text-\[\#43E1C8\]{
+    padding: 0 20px;
+    font-size: 31px !important;
+    margin-top: 100px;
+    text-align: center;
+    color: #43E1C8;
 }
 
 .bg-\[\#003E37\].rounded-xl.px-6.py-8.text-center.space-y-4.text-white{
@@ -183,6 +190,7 @@ p.text-sm.text-gray-300 {
   color: #fff;
   font-style: italic;
   font-family: 'Montserrat';
+    justify-self: anchor-center;
 }
 
 p.text-sm.font-medium.text-gray-200 {
@@ -587,6 +595,7 @@ header.flex.items-center.justify-between.px-4.py-4 {
 }
 .yes-button,
 .no-button {
+    color: white;
   flex: 1;
   background: transparent;
   border: 1px solid #ffffff;
@@ -599,4 +608,9 @@ header.flex.items-center.justify-between.px-4.py-4 {
 .yes-button:hover,
 .no-button:hover {
   background: rgba(255, 255, 255, 0.1);
+}
+/* Phantom button */
+.wallet-adapter-button-trigger {
+    border-radius: 200px;
+    background-color: #512da8;
 }
