@@ -26,6 +26,7 @@
     "@tonconnect/ui-react": "^2.2.0",
     "@wagmi/connectors": "^5.9.0",
     "@walletconnect/ethereum-provider": "^2.21.5",
+    "@walletconnect/web3-provider": "^1.8.0",
     "@web3modal/ethereum": "^2.7.1",
     "@web3modal/html": "^2.7.1",
     "cheerio": "^1.0.0",

@@ -1,72 +1,65 @@
-// ✅ Update your context export in /contexts/EthereumContext.tsx
 'use client'
 
-import {
-  useAccount,
-  useConnect,
-  useDisconnect,
-} from 'wagmi'
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  ReactNode,
-} from 'react'
+import { createContext, useContext, useState, useEffect } from 'react'
+import WalletConnectProvider from '@walletconnect/web3-provider'
+import { ethers } from 'ethers'
 
 interface EthereumContextType {
-  address: string | null
-  isConnected: boolean
   connect: () => Promise<void>
   disconnect: () => Promise<void>
+  address: string | null
+  provider: ethers.providers.Web3Provider | null
 }
 
-const EthereumContext = createContext<EthereumContextType | undefined>(undefined)
+const EthereumContext = createContext<EthereumContextType>({
+  connect: async () => {},
+  disconnect: async () => {},
+  address: null,
+  provider: null,
+})
 
-export function EthereumProvider({ children }: { children: ReactNode }) {
-  const { address, isConnected } = useAccount()
-  const { connectAsync, connectors } = useConnect()
-  const { disconnectAsync } = useDisconnect()
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+export function EthereumProvider({ children }: { children: React.ReactNode }) {
+  const [address, setAddress] = useState<string | null>(null)
+  const [provider, setProvider] = useState<ethers.providers.Web3Provider | null>(null)
 
   const connect = async () => {
-    try {
-      const injected = connectors.find((c) => c.id === 'injected')
-      if (!injected) throw new Error('MetaMask connector not found')
-      await connectAsync({ connector: injected })
-    } catch (err) {
-      console.error('Connect error:', err)
-    }
+    const wcProvider = new WalletConnectProvider({
+      rpc: {
+        1: 'https://mainnet.infura.io/v3/YOUR_INFURA_ID',
+        11155111: 'https://sepolia.infura.io/v3/YOUR_INFURA_ID',
+      },
+      chainId: 11155111,
+    })
+
+    await wcProvider.enable()
+    const web3 = new ethers.providers.Web3Provider(wcProvider)
+    const signer = web3.getSigner()
+    const userAddress = await signer.getAddress()
+
+    setProvider(web3)
+    setAddress(userAddress)
+
+    wcProvider.on('disconnect', () => {
+      setProvider(null)
+      setAddress(null)
+    })
   }
 
   const disconnect = async () => {
-    try {
-      await disconnectAsync()
-    } catch (err) {
-      console.error('Disconnect error:', err)
+    if (provider?.provider?.disconnect) {
+      await (provider.provider as any).disconnect()
     }
+    setProvider(null)
+    setAddress(null)
   }
 
   return (
-    <EthereumContext.Provider
-      value={{
-        address: mounted ? address ?? null : null,
-        isConnected: mounted ? isConnected : false,
-        connect,
-        disconnect,
-      }}
-    >
+    <EthereumContext.Provider value={{ connect, disconnect, address, provider }}>
       {children}
     </EthereumContext.Provider>
   )
 }
 
-export function useEthereum(): EthereumContextType {
-  const ctx = useContext(EthereumContext)
-  if (!ctx) throw new Error('useEthereum must be used within EthereumProvider')
-  return ctx
+export function useEthereum() {
+  return useContext(EthereumContext)
 }
