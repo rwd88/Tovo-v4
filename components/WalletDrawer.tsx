@@ -1,9 +1,6 @@
-// components/WalletDrawer.tsx
-'use client'
-
 import { useEffect, useState } from 'react'
-import Image from 'next/image'
 import ConnectWalletButton from './ConnectWalletButton'
+import Image from 'next/image'
 
 type Props = {
   open: boolean
@@ -11,58 +8,52 @@ type Props = {
 }
 
 export default function WalletDrawer({ open, onClose }: Props) {
-  const [visible, setVisible] = useState(open)
+  const [visible, setVisible] = useState(false)
+  const [animatingOut, setAnimatingOut] = useState(false)
 
-  // keep mounted for animation
   useEffect(() => {
-    if (open) setVisible(true)
-    else {
-      // after animation, unmount
-      const t = setTimeout(() => setVisible(false), 300)
-      return () => clearTimeout(t)
+    if (open) {
+      setVisible(true)
+      setAnimatingOut(false)
+    } else {
+      setAnimatingOut(true)
+      const timeout = setTimeout(() => {
+        setVisible(false)
+        setAnimatingOut(false)
+      }, 300) // match animation duration
+      return () => clearTimeout(timeout)
     }
   }, [open])
 
   if (!visible) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex">
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black bg-opacity-60"
-        onClick={onClose}
-      />
-
-      {/* Drawer Panel */}
-      <div
-        className={`fixed top-0 right-0 h-full w-[90%] max-w-[400px] 
-                    bg-[#003E37] text-white p-6 overflow-y-auto 
-                    transform transition-transform duration-300`}
-        style={{
-          transform: open
-            ? 'translateX(0)'     // slide in
-            : 'translateX(100%)', // slide out to the right
-          zIndex: 51,
-        }}
-      >
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black bg-opacity-60">
+        <div
+  className={`bg-[#003E37] text-white w-[90%] h-full max-w-[400px] p-6 shadow-xl relative overflow-y-auto rounded-l-2xl ${
+    animatingOut ? 'drawer-close' : 'drawer-open'
+  }`}
+>
+        {/* Close Button */}
         <button
+          id="wallet-drawer-close"
           onClick={onClose}
-          className="absolute top-4 right-4 text-white text-3xl"
+          className="absolute top-4 right-4 text-white text-2xl font-bold"
         >
           ×
         </button>
 
-        {/* Logo + title */}
+        {/* Logo */}
         <div className="flex items-center gap-3 mb-6">
-          <Image src="/logo.png" alt="Logo" width={50} height={30} style={{ objectFit: 'contain' }} />
+          <Image src="/logo.png" alt="Logo" width={50} height={30} />
           <div>
             <h3 className="text-lg font-semibold">Connect Wallet</h3>
             <p className="text-sm text-gray-300">Choose your network</p>
           </div>
-        </div>  
+        </div>
 
-        {/* Wallet buttons */}
-        <div className="space-y-4">
+        {/* Wallet Buttons */}
+        <div className="space-y-4 mt-6">
           <ConnectWalletButton />
         </div>
       </div>
