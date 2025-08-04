@@ -160,11 +160,12 @@ h1.text-\[\#00B89F\].uppercase.text-sm.font-semibold.tracking-wide {
     margin-top: 150px;
   text-align: center;
   color: #43E1C8;
+    text-transform: uppercase;
+
 }
 h1.text-2xl.font-bold.text-center.mb-4.text-\[\#43E1C8\]{
     padding: 0 20px;
     font-size: 31px !important;
-    margin-top: 100px;
     text-align: center;
     color: #43E1C8;
 }

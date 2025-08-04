@@ -105,10 +105,12 @@ export default function Home() {
         </header>
 
         {/* Main */}
-        <main className={`${styles.main} mt-20 px-4 w-full`}>
-          <h1 className="text-2xl font-bold text-center mb-4 text-[#43E1C8]">
-            PREDICTION MARKETS TODAY
+        <main className="px-4 py-4 max-w-md mx-auto mt-20">
+        <div className="text-center mb-6">
+          <h1 className="text-[#00B89F] uppercase text-sm font-semibold tracking-wide">
+            Prediction Markets Today
           </h1>
+        </div>
 
           {/* Filters */}
           <div className="filters">

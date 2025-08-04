@@ -59,7 +59,7 @@ export default function WalletDrawer({ open, onClose }: Props) {
             <h3 className="text-lg font-semibold">Connect Wallet</h3>
             <p className="text-sm text-gray-300">Choose your network</p>
           </div>
-        </div>
+        </div>  
 
         {/* Wallet buttons */}
         <div className="space-y-4">
