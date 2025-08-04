@@ -13,16 +13,11 @@ const SolanaWalletMultiButton = dynamic(
 export default function ConnectWalletButton() {
   const { connect, disconnect, address } = useEthereum()
 
-  const handleClick = async (wallet: 'metamask' | 'trust') => {
+  const handleDisconnect = async () => {
     try {
-      if (address) {
-        await disconnect()
-        return
-      }
-
-      await connect(wallet)
-    } catch (error) {
-      console.error('Wallet connection failed:', error)
+      await disconnect()
+    } catch (err) {
+      console.error('Failed to disconnect:', err)
     }
   }
 
@@ -30,22 +25,22 @@ export default function ConnectWalletButton() {
     <div className="flex flex-col items-center gap-4">
       {address ? (
         <button
-          onClick={() => disconnect()}
-          className="bg-red-500 hover:bg-red-600 text-white font-semibold px-5 py-2 rounded"
+          onClick={handleDisconnect}
+          className="bg-gray-700 hover:bg-gray-800 text-white font-semibold px-5 py-2 rounded"
         >
           Disconnect: {address.slice(0, 6)}...{address.slice(-4)}
         </button>
       ) : (
         <>
           <button
-            onClick={() => handleClick('metamask')}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2 rounded w-full"
+            onClick={() => connect('metamask')}
+            className="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-5 py-2 rounded"
           >
             Connect MetaMask
           </button>
           <button
-            onClick={() => handleClick('trust')}
-            className="bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-2 rounded w-full"
+            onClick={() => connect('trust')}
+            className="bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-2 rounded"
           >
             Connect Trust Wallet
           </button>

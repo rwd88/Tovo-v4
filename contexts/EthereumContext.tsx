@@ -1,14 +1,14 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState } from 'react'
 import WalletConnectProvider from '@walletconnect/web3-provider'
-import { ethers } from 'ethers'
+import { BrowserProvider } from 'ethers'
 
 interface EthereumContextType {
   connect: (wallet?: 'metamask' | 'trust') => Promise<void>
   disconnect: () => Promise<void>
   address: string | null
-  provider: ethers.providers.Web3Provider | null
+  provider: BrowserProvider | null
 }
 
 const EthereumContext = createContext<EthereumContextType>({
@@ -20,9 +20,11 @@ const EthereumContext = createContext<EthereumContextType>({
 
 export function EthereumProvider({ children }: { children: React.ReactNode }) {
   const [address, setAddress] = useState<string | null>(null)
-  const [provider, setProvider] = useState<ethers.providers.Web3Provider | null>(null)
+  const [provider, setProvider] = useState<BrowserProvider | null>(null)
 
   const connect = async (wallet: 'metamask' | 'trust' = 'metamask') => {
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+
     const wcProvider = new WalletConnectProvider({
       rpc: {
         1: 'https://mainnet.infura.io/v3/YOUR_INFURA_ID',
@@ -30,14 +32,27 @@ export function EthereumProvider({ children }: { children: React.ReactNode }) {
       },
       chainId: 11155111,
       qrcodeModalOptions: {
-        mobileLinks: ['metamask', 'trust'], // 👈 supported wallets
+        mobileLinks: ['metamask', 'trust'],
       },
     })
 
-    await wcProvider.enable()
+    if (isMobile) {
+      const dappUrl = 'tovo-v4.vercel.app' // without https
+      let link = ''
 
-    const web3 = new ethers.providers.Web3Provider(wcProvider)
-    const signer = web3.getSigner()
+      if (wallet === 'metamask') {
+        link = `https://metamask.app.link/dapp/${dappUrl}`
+      } else {
+        link = `https://link.trustwallet.com/open_url?coin_id=60&url=https://${dappUrl}`
+      }
+
+      window.location.href = link
+      return
+    }
+
+    await wcProvider.enable()
+    const web3 = new BrowserProvider(wcProvider as any)
+    const signer = await web3.getSigner()
     const userAddress = await signer.getAddress()
 
     setProvider(web3)
