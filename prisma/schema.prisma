@@ -25,20 +25,21 @@ model Market {
   externalId      String    @unique
   question        String
   eventTime       DateTime
+  forecast        Float?
   poolYes         Float
   poolNo          Float
   status          String    @default("open")
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
   feeCollected    Float     @default(0)
+  createdAt       DateTime  @default(now())
+  notified        Boolean   @default(false)
   settledAt       DateTime?
   expiresAt       DateTime?
-  notified        Boolean   @default(false)
-  resolved        Boolean   @default(false)
-  resolvedOutcome String?
-  forecast        Float?
   houseProfit     Float?
   tag             String?
+  updatedAt       DateTime  @updatedAt
+  resolved        Boolean   @default(false)
+  resolvedOutcome String?
+  description     String?
   outcomes        Outcome[]
   trades          Trade[]
 
@@ -48,29 +49,29 @@ model Market {
 model Outcome {
   id       String  @id @default(cuid())
   marketId String
+  name     String
   market   Market  @relation(fields: [marketId], references: [id])
   trades   Trade[] @relation("OutcomeTrades")
-  name     String
 
   @@map("outcomes")
 }
 
 model Trade {
-  id         String   @id @default(cuid())
-  marketId   String
-  market     Market   @relation(fields: [marketId], references: [id])
-  userId     String
-  user       User     @relation(fields: [userId], references: [id])
-  outcomeId  String?
-  outcome    Outcome? @relation("OutcomeTrades", fields: [outcomeId], references: [id])
-  type       String
-  amount     Float
-  fee        Float
-  payout     Float
-  shares     Float
-  settled    Boolean  @default(false)
-  won        Boolean?
-  createdAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  marketId  String
+  userId    String
+  type      String
+  amount    Float
+  fee       Float
+  payout    Float
+  shares    Float
+  settled   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  outcomeId String?
+  won       Boolean?
+  market    Market   @relation(fields: [marketId], references: [id])
+  outcome   Outcome? @relation("OutcomeTrades", fields: [outcomeId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
 
   @@index([marketId])
   @@index([userId])
@@ -78,13 +79,13 @@ model Trade {
 }
 
 model Deposit {
-  id          Int      @id @default(autoincrement())
-  chainId     Int
+  txHash      String
+  createdAt   DateTime @default(now())
   address     String
   amount      String
-  txHash      String
   blockNumber Int
-  createdAt   DateTime @default(now())
+  chainId     Int
+  id          Int      @id @default(autoincrement())
 
   @@map("deposits")
 }
@@ -97,9 +98,9 @@ model Withdrawal {
   nonce     String   @unique
   expiresAt DateTime
   status    String
-  txHash    String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  txHash    String?
 
   @@index([userId])
   @@map("withdrawals")
@@ -116,23 +117,19 @@ model DepositAddress {
 }
 
 model OnChainDeposit {
-  id             Int              @id @default(autoincrement())
+  id             Int            @id @default(autoincrement())
   chainId        Int
   address        String
   amount         String
-  txHash         String           @unique
+  txHash         String         @unique
   blockNumber    Int
+  createdAt      DateTime       @default(now())
   status         String
-  createdAt      DateTime         @default(now())
-  depositAddress DepositAddress?  @relation("AddressDeposits", fields: [address], references: [address])
+  depositAddress DepositAddress @relation("AddressDeposits", fields: [address], references: [address])
 
   @@map("onchain_deposits")
 }
-model WalletNonce {
-  address   String   @id
-  nonce     String
-  updatedAt DateTime @updatedAt
-}
+
 model Subscriber {
   id         String   @id @default(cuid())
   chatId     String   @unique
