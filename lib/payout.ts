@@ -7,18 +7,17 @@ const ERC20_ABI = [
 ]
 
 // —— Load environment ——
-const RPC_URL        = process.env.EVM_RPC_URL!          // already set in Vercel
-const ADMIN_PRIV_KEY = process.env.EVM_PRIVATE_KEY!      // already set in Vercel
-const TOKEN_ADDRESS  = process.env.USDC_MAINNET!         // already set in Vercel
-const ADMIN_ADDRESS  = process.env.FEE_WALLET_ADDRESS!   // **NEW**: add this in Vercel
+const RPC_URL        = process.env.EVM_RPC_URL!          // e.g. https://mainnet.infura.io/v3/...
+const ADMIN_PRIV_KEY = process.env.EVM_PRIVATE_KEY!      // your house/admin private key
+const TOKEN_ADDRESS  = process.env.USDC_MAINNET!         // USDC contract address
+const ADMIN_ADDRESS  = process.env.FEE_WALLET_ADDRESS!   // house wallet address
 
-const DECIMALS       = 6  // USDC has 6 decimals
+const DECIMALS       = 6  // USDC uses 6 decimals
 
 if (!RPC_URL || !ADMIN_PRIV_KEY || !TOKEN_ADDRESS || !ADMIN_ADDRESS) {
   throw new Error("Missing payout configuration in env")
 }
 
-// —— Setup provider & wallet ——
 const provider      = new ethers.providers.JsonRpcProvider(RPC_URL)
 const adminWallet   = new ethers.Wallet(ADMIN_PRIV_KEY, provider)
 const tokenContract = new ethers.Contract(TOKEN_ADDRESS, ERC20_ABI, adminWallet)
