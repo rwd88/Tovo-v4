@@ -1,4 +1,4 @@
-// lib/payout.ts
+// src/lib/payout.ts
 import { ethers } from 'ethers'
 
 // —— Minimal ERC-20 ABI for `transfer` ——
@@ -7,20 +7,20 @@ const ERC20_ABI = [
 ]
 
 // —— Load environment ——
-// Your RPC endpoint for Ethereum (or BSC, etc)
-const RPC_URL        = process.env.NEXT_PUBLIC_ETH_RPC_URL!
-const ADMIN_PRIV_KEY = process.env.ADMIN_PRIVATE_KEY!
-const TOKEN_ADDRESS  = process.env.USDC_MAINNET!      // e.g. USDC contract
-const DECIMALS       = 6                              // USDC decimal places
-const ADMIN_ADDRESS  = process.env.ADMIN_WALLET_ADDRESS!
+const RPC_URL        = process.env.EVM_RPC_URL!          // already set in Vercel
+const ADMIN_PRIV_KEY = process.env.EVM_PRIVATE_KEY!      // already set in Vercel
+const TOKEN_ADDRESS  = process.env.USDC_MAINNET!         // already set in Vercel
+const ADMIN_ADDRESS  = process.env.FEE_WALLET_ADDRESS!   // **NEW**: add this in Vercel
+
+const DECIMALS       = 6  // USDC has 6 decimals
 
 if (!RPC_URL || !ADMIN_PRIV_KEY || !TOKEN_ADDRESS || !ADMIN_ADDRESS) {
   throw new Error("Missing payout configuration in env")
 }
 
-// —— Setup provider & wallet ——  
-const provider     = new ethers.providers.JsonRpcProvider(RPC_URL)
-const adminWallet  = new ethers.Wallet(ADMIN_PRIV_KEY, provider)
+// —— Setup provider & wallet ——
+const provider      = new ethers.providers.JsonRpcProvider(RPC_URL)
+const adminWallet   = new ethers.Wallet(ADMIN_PRIV_KEY, provider)
 const tokenContract = new ethers.Contract(TOKEN_ADDRESS, ERC20_ABI, adminWallet)
 
 /**
@@ -29,7 +29,7 @@ const tokenContract = new ethers.Contract(TOKEN_ADDRESS, ERC20_ABI, adminWallet)
  */
 export async function payToken(toAddress: string, amount: number): Promise<string> {
   const units = ethers.utils.parseUnits(amount.toString(), DECIMALS)
-  const tx = await tokenContract.transfer(toAddress, units)
+  const tx    = await tokenContract.transfer(toAddress, units)
   await tx.wait()
   return tx.hash
 }
