@@ -503,6 +503,7 @@ button.wallet-adapter-button.wallet-adapter-button-trigger {
 
 /* HEADER */
 header.flex.items-center.justify-between.px-4.py-4 {
+    background: white;
   height: auto !important;
   position: fixed;
   top: 0;
