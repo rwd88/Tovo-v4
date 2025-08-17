@@ -6,12 +6,16 @@
       "schedule": "0 0 * * *"
     },
     {
-      "path": "/api/cron/settle-markets?secret=12345A",
-      "schedule": "*/59 * * * *"
-    },
-    {
       "path": "/api/cron/publish-markets?secret=12345A",
       "schedule": "1 0 * * *"
+    },
+    {
+      "path": "/api/cron/archive-old-markets?secret=12345A",
+      "schedule": "2 0 * * *"
+    },
+    {
+      "path": "/api/cron/settle-markets?secret=12345A",
+      "schedule": "*/59 * * * *"
     }
   ]
 }
