@@ -6,7 +6,7 @@ import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { Geist, Geist_Mono } from 'next/font/google'
 import styles from '../styles/Home.module.css'
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useEthereum } from '../contexts/EthereumContext'
 import { useSolana } from '../contexts/SolanaContext'
 import { useTon } from '../contexts/TonContext'
@@ -33,31 +33,33 @@ export default function Home() {
 
   const [isClient, setIsClient] = useState(false)
   const [markets, setMarkets] = useState<Market[]>([])
+  const [fetchError, setFetchError] = useState<string | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [activeFilter, setActiveFilter] = useState('All')
 
   useEffect(() => {
     setIsClient(true)
-    // ✅ Correct endpoint
-    fetch('/api/markets', { cache: 'no-store' })
-      .then(async (res) => {
+    ;(async () => {
+      try {
+        const res = await fetch('/api/markets', { cache: 'no-store' })
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        return res.json()
-      })
-      .then((data: Market[]) => setMarkets(Array.isArray(data) ? data : []))
-      .catch((err) => console.error('Fetch markets failed:', err))
+        const data = (await res.json()) as Market[]
+        setMarkets(Array.isArray(data) ? data : [])
+      } catch (err: any) {
+        console.error('Fetch markets failed:', err)
+        setFetchError('Could not load markets. Please try again shortly.')
+      }
+    })()
   }, [])
 
   if (!isClient) return null
 
-  // Final safety net: filter on client too (guards against any cache/SSR drift)
   const nowTs = Date.now()
   const safeMarkets = useMemo(() => {
     return (markets || [])
       .filter((m) => {
         const t = new Date(m.eventTime).getTime()
         return (
-          !!m &&
           (!m.status || m.status.toLowerCase() === 'open') &&
           !Number.isNaN(t) &&
           t > nowTs
@@ -118,48 +120,65 @@ export default function Home() {
             </h1>
           </div>
 
+          {/* Error / Empty states */}
+          {fetchError && (
+            <div className="rounded-md bg-red-50 p-3 text-red-800 mb-6">
+              {fetchError}
+            </div>
+          )}
+
           {/* Filters */}
-          <div className="filters">
-            {tags.map((tag) => {
-              const count =
-                tag === 'All'
-                  ? safeMarkets.length
-                  : safeMarkets.filter((m) => (m.tag || 'General') === tag).length
-              return (
-                <button
-                  key={tag}
-                  className={`filter-button ${activeFilter === tag ? 'active' : ''}`}
-                  onClick={() => setActiveFilter(tag)}
-                >
-                  {tag} {count}
-                </button>
-              )
-            })}
-          </div>
+          {!fetchError && (
+            <div className="filters">
+              {tags.map((tag) => {
+                const count =
+                  tag === 'All'
+                    ? safeMarkets.length
+                    : safeMarkets.filter((m) => (m.tag || 'General') === tag).length
+                return (
+                  <button
+                    key={tag}
+                    className={`filter-button ${activeFilter === tag ? 'active' : ''}`}
+                    onClick={() => setActiveFilter(tag)}
+                  >
+                    {tag} {count}
+                  </button>
+                )
+              })}
+            </div>
+          )}
 
           {/* Market Cards */}
-          <div className="market-list">
-            {filtered.map((m) => (
-              <Link key={m.id} href={`/trade/${m.id}`} passHref>
-                <a className="market-card">
-                  <div className="market-title">{formatQuestion(m.question)}</div>
-                  <div className="market-time">
-                    Ends On {new Date(m.eventTime).toLocaleDateString()},{' '}
-                    {new Date(m.eventTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </div>
+          {!fetchError && (
+            <div className="market-list">
+              {filtered.length === 0 ? (
+                <div className="text-center opacity-75 py-6">
+                  No active markets right now.
+                </div>
+              ) : (
+                filtered.map((m) => (
+                  <Link key={m.id} href={`/trade/${m.id}`} passHref>
+                    <a className="market-card">
+                      <div className="market-title">{formatQuestion(m.question)}</div>
+                      <div className="market-time">
+                        Ends On {new Date(m.eventTime).toLocaleDateString()},{' '}
+                        {new Date(m.eventTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
 
-                  <div className="progress-bar">
-                    <div className="progress-fill" style={{ width: `${yesPct(m)}%` }} />
-                  </div>
+                      <div className="progress-bar">
+                        <div className="progress-fill" style={{ width: `${yesPct(m)}%` }} />
+                      </div>
 
-                  <div className="button-group">
-                    <button className="yes-button">Yes</button>
-                    <button className="no-button">No</button>
-                  </div>
-                </a>
-              </Link>
-            ))}
-          </div>
+                      <div className="button-group">
+                        <button className="yes-button">Yes</button>
+                        <button className="no-button">No</button>
+                      </div>
+                    </a>
+                  </Link>
+                ))
+              )}
+            </div>
+          )}
         </main>
       </div>
     </>
