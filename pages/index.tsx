@@ -6,12 +6,15 @@ import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { Geist, Geist_Mono } from 'next/font/google'
 import styles from '../styles/Home.module.css'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useEthereum } from '../contexts/EthereumContext'
 import { useSolana } from '../contexts/SolanaContext'
 import { useTon } from '../contexts/TonContext'
 
-const WalletDrawer = dynamic(() => import('../components/WalletDrawer'), { ssr: false })
+const WalletDrawer = dynamic(
+  () => import('../components/WalletDrawer'),
+  { ssr: false }
+)
 
 type Market = {
   id: string
@@ -20,7 +23,6 @@ type Market = {
   poolYes: number
   poolNo: number
   tag: string | null
-  status?: string | null
 }
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
@@ -33,51 +35,27 @@ export default function Home() {
 
   const [isClient, setIsClient] = useState(false)
   const [markets, setMarkets] = useState<Market[]>([])
-  const [fetchError, setFetchError] = useState<string | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [activeFilter, setActiveFilter] = useState('All')
 
   useEffect(() => {
     setIsClient(true)
-    ;(async () => {
-      try {
-        const res = await fetch('/api/markets', { cache: 'no-store' })
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const data = (await res.json()) as Market[]
-        setMarkets(Array.isArray(data) ? data : [])
-      } catch (err: any) {
-        console.error('Fetch markets failed:', err)
-        setFetchError('Could not load markets. Please try again shortly.')
-      }
-    })()
+    fetch('/api/markets/active')
+      .then((res) => res.json())
+      .then((data: Market[]) => setMarkets(data))
+      .catch(console.error)
   }, [])
 
   if (!isClient) return null
 
-  const nowTs = Date.now()
-  const safeMarkets = useMemo(() => {
-    return (markets || [])
-      .filter((m) => {
-        const t = new Date(m.eventTime).getTime()
-        return (
-          (!m.status || m.status.toLowerCase() === 'open') &&
-          !Number.isNaN(t) &&
-          t > nowTs
-        )
-      })
-      .sort((a, b) => new Date(a.eventTime).getTime() - new Date(b.eventTime).getTime())
-  }, [markets, nowTs])
-
-  const tags = useMemo(() => {
-    const set = new Set<string>()
-    for (const m of safeMarkets) set.add(m.tag || 'General')
-    return ['All', ...Array.from(set).sort()]
-  }, [safeMarkets])
-
+  const tags = Array.from(
+    new Set(markets.map((m) => m.tag || 'General'))
+  ).sort()
+  tags.unshift('All')
   const filtered =
     activeFilter === 'All'
-      ? safeMarkets
-      : safeMarkets.filter((m) => (m.tag || 'General') === activeFilter)
+      ? markets
+      : markets.filter((m) => (m.tag || 'General') === activeFilter)
 
   const formatQuestion = (q: string) => {
     const t = q.trim()
@@ -105,10 +83,24 @@ export default function Home() {
         {/* Header */}
         <header className="flex items-center justify-between px-4 py-4 fixed top-0 w-full bg-white dark:bg-[#0a0a0a] z-20">
           <Link href="/">
-            <Image src="/logo.png" alt="Tovo" width={120} height={24} style={{ objectFit: 'contain' }} />
+            <Image
+              src="/logo.png"
+              alt="Tovo"
+              width={120}
+              height={24}
+              style={{ objectFit: 'contain' }}
+            />
           </Link>
-          <button className="wallet-toggle-btn" onClick={() => setDrawerOpen((v) => !v)}>
-            <Image src="/connect wallet.svg" alt="Connect Wallet" width={120} height={24} />
+          <button
+            className="wallet-toggle-btn"
+            onClick={() => setDrawerOpen((v) => !v)}
+          >
+            <Image
+              src="/connect wallet.svg"
+              alt="Connect Wallet"
+              width={120}
+              height={24}
+            />
           </button>
         </header>
 
@@ -120,65 +112,56 @@ export default function Home() {
             </h1>
           </div>
 
-          {/* Error / Empty states */}
-          {fetchError && (
-            <div className="rounded-md bg-red-50 p-3 text-red-800 mb-6">
-              {fetchError}
-            </div>
-          )}
-
           {/* Filters */}
-          {!fetchError && (
-            <div className="filters">
-              {tags.map((tag) => {
-                const count =
-                  tag === 'All'
-                    ? safeMarkets.length
-                    : safeMarkets.filter((m) => (m.tag || 'General') === tag).length
-                return (
-                  <button
-                    key={tag}
-                    className={`filter-button ${activeFilter === tag ? 'active' : ''}`}
-                    onClick={() => setActiveFilter(tag)}
-                  >
-                    {tag} {count}
-                  </button>
-                )
-              })}
-            </div>
-          )}
+          <div className="filters">
+            {tags.map((tag) => {
+              const count =
+                tag === 'All'
+                  ? markets.length
+                  : markets.filter((m) => (m.tag || 'General') === tag).length
+              return (
+                <button
+                  key={tag}
+                  className={`filter-button ${
+                    activeFilter === tag ? 'active' : ''
+                  }`}
+                  onClick={() => setActiveFilter(tag)}
+                >
+                  {tag} {count}
+                </button>
+              )
+            })}
+          </div>
 
           {/* Market Cards */}
-          {!fetchError && (
-            <div className="market-list">
-              {filtered.length === 0 ? (
-                <div className="text-center opacity-75 py-6">
-                  No active markets right now.
-                </div>
-              ) : (
-                filtered.map((m) => (
-                  <Link key={m.id} href={`/trade/${m.id}`} passHref>
-                    <a className="market-card">
-                      <div className="market-title">{formatQuestion(m.question)}</div>
-                      <div className="market-time">
-                        Ends On {new Date(m.eventTime).toLocaleDateString()},{' '}
-                        {new Date(m.eventTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </div>
+          <div className="market-list">
+            {filtered.map((m) => (
+              <Link key={m.id} href={`/trade/${m.id}`} passHref>
+                <a className="market-card">
+                  <div className="market-title">{formatQuestion(m.question)}</div>
+                  <div className="market-time">
+                    Ends On {new Date(m.eventTime).toLocaleDateString()},{' '}
+                    {new Date(m.eventTime).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </div>
 
-                      <div className="progress-bar">
-                        <div className="progress-fill" style={{ width: `${yesPct(m)}%` }} />
-                      </div>
+                  <div className="progress-bar">
+                    <div
+                      className="progress-fill"
+                      style={{ width: `${yesPct(m)}%` }}
+                    />
+                  </div>
 
-                      <div className="button-group">
-                        <button className="yes-button">Yes</button>
-                        <button className="no-button">No</button>
-                      </div>
-                    </a>
-                  </Link>
-                ))
-              )}
-            </div>
-          )}
+                  <div className="button-group">
+                    <button className="yes-button">Yes</button>
+                    <button className="no-button">No</button>
+                  </div>
+                </a>
+              </Link>
+            ))}
+          </div>
         </main>
       </div>
     </>
