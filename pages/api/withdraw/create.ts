@@ -1,101 +1,79 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import type { NextApiRequest, NextApiResponse } from 'next';
-import { prisma } from '../../../lib/prisma';
-import { z } from 'zod';
-import { v4 as uuidv4 } from 'uuid';
-import { buildTypedData } from '../../../lib/eip712';
+// pages/api/withdraw/create.ts
+import type { NextApiRequest, NextApiResponse } from 'next'
+import { prisma } from '../../../lib/prisma'
+import { sendAdminAlert } from '../../../lib/telegram'
+import { randomBytes } from 'crypto'
 
-const WithdrawSchema = z.object({
-  userId: z.string(),
-  chain:  z.enum(['solana', 'bsc', 'erc20', 'trc20']),
-  amount: z.number().gt(0),
-});
+type Resp =
+  | { success: true; id: string; nonce: string; amount: number; feeBps: number; expiresAt: string }
+  | { success: false; error: string }
 
-interface ErrorResponse {
-  error: string;
-  details?: any;
-}
-
-interface SuccessResponse {
-  success:   true;
-  nonce:     string;
-  typedData: any;
-  expiresAt: string;
-}
-
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse<SuccessResponse | ErrorResponse>
-) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse<Resp>) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Only POST allowed' });
+    res.setHeader('Allow', ['POST'])
+    return res.status(405).json({ success: false, error: 'Method not allowed' })
   }
 
-  const parsed = WithdrawSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res
-      .status(400)
-      .json({ error: 'Invalid request', details: parsed.error.issues });
+  try {
+    const { walletAddress, amount, chain = 'EVM' } = req.body || {}
+    const addr = String(walletAddress || '').toLowerCase()
+    const amt = Number(amount)
+
+    if (!/^0x[a-f0-9]{40}$/.test(addr)) {
+      return res.status(400).json({ success: false, error: 'Invalid walletAddress' })
+    }
+    if (!Number.isFinite(amt) || amt <= 0) {
+      return res.status(400).json({ success: false, error: 'Invalid amount' })
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { walletAddress: addr },
+      select: { id: true, balance: true },
+    })
+    if (!user) return res.status(404).json({ success: false, error: 'User not found' })
+    if (user.balance < amt) {
+      return res.status(400).json({ success: false, error: 'Insufficient balance' })
+    }
+
+    const WITHDRAW_FEE_BPS = Number(process.env.WITHDRAW_FEE_BPS ?? 100) // 1%
+    const expiresAt = new Date(Date.now() + 15 * 60_000) // 15 minutes
+    const nonce = randomBytes(16).toString('hex')
+
+    const w = await prisma.withdrawal.create({
+      data: {
+        userId: user.id,
+        chain,
+        amount: amt,
+        nonce,
+        expiresAt,
+        status: 'pending',
+      },
+      select: { id: true, nonce: true, amount: true, expiresAt: true },
+    })
+
+    try {
+      await sendAdminAlert?.(
+        [
+          '🟡 Withdrawal request created',
+          `• Wallet: ${addr.slice(0, 6)}…${addr.slice(-4)}`,
+          `• Amount: ${amt}`,
+          `• Fee: ${WITHDRAW_FEE_BPS / 100}%`,
+          `• Expires: ${w.expiresAt.toISOString()}`,
+          `• Nonce: ${w.nonce}`,
+        ].join('\n')
+      )
+    } catch {}
+
+    return res.status(200).json({
+      success: true,
+      id: w.id,
+      nonce: w.nonce,
+      amount: amt,
+      feeBps: WITHDRAW_FEE_BPS,
+      expiresAt: w.expiresAt.toISOString(),
+    })
+  } catch (err: any) {
+    console.error('[/api/withdraw/create] error', err)
+    return res.status(500).json({ success: false, error: err?.message || 'Server error' })
   }
-  const { userId, chain, amount } = parsed.data;
-
-  // 1️⃣ Check user balance
-  const user = await prisma.user.findUnique({
-    where: { telegramId: userId },
-  });
-  if (!user || user.balance < amount) {
-    return res.status(400).json({ error: 'Insufficient balance' });
-  }
-
-  // 2️⃣ Daily cap check (max 1000 units/day)
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const agg = await prisma.withdrawal.aggregate({
-    _sum: { amount: true },
-    where: {
-      userId,
-      createdAt: { gte: todayStart },
-      status:   { in: ['signed', 'completed'] },
-    },
-  });
-  const used = agg._sum.amount ?? 0;
-  if (used + amount > 1000) {
-    return res.status(400).json({ error: 'Daily withdrawal cap exceeded' });
-  }
-
-  // 3️⃣ Create pending withdrawal
-  const nonce     = uuidv4();
-  const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15m TTL
-  await prisma.withdrawal.create({
-    data: {
-      userId,
-      chain,
-      amount,
-      nonce,
-      expiresAt,
-      status: 'pending',
-    },
-  });
-
-  // 4️⃣ Build EIP-712 typed data
-  const typedData = buildTypedData({
-    domain: { name: 'Tovo', version: '1' },
-    types: {
-      Withdrawal: [
-        { name: 'userId', type: 'string' },
-        { name: 'chain',  type: 'string' },
-        { name: 'amount', type: 'uint256' },
-        { name: 'nonce',  type: 'string' },
-      ],
-    },
-    primaryType: 'Withdrawal',
-    message:     { userId, chain, amount, nonce },
-  });
-
-  return res.status(200).json({
-    success:   true,
-    nonce,
-    typedData,
-    expiresAt: expiresAt.toISOString(),
-  });
 }

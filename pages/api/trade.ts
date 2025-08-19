@@ -2,6 +2,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { prisma } from '../../lib/prisma'
 import { sendAdminAlert } from '../../lib/telegram'
+import { ethers } from 'ethers'
 
 type TradeSide = 'YES' | 'NO'
 
@@ -9,14 +10,16 @@ interface TradeResponse {
   success: boolean
   newPoolYes?: number
   newPoolNo?: number
-  userBalance?: number
   error?: string
 }
+
+const ERC20_IFACE = new ethers.utils.Interface([
+  "event Transfer(address indexed from, address indexed to, uint256 value)"
+])
 
 function bad(res: NextApiResponse<TradeResponse>, msg: string, code = 400) {
   return res.status(code).json({ success: false, error: msg })
 }
-const mask = (addr = '') => (addr.length > 10 ? `${addr.slice(0, 6)}…${addr.slice(-4)}` : addr)
 
 export default async function handler(
   req: NextApiRequest,
@@ -30,20 +33,18 @@ export default async function handler(
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body
     const marketId = String(body?.marketId || '').trim()
-    const walletAddressRaw = String(body?.walletAddress || '').trim()
+    const walletAddress = String(body?.walletAddress || '').trim().toLowerCase()
     const side = String(body?.side || '').toUpperCase() as TradeSide
     const amount = Number(body?.amount)
+    const clientFeeBps = Number(body?.clientFeeBps ?? 100)
+    const txHash = String(body?.txHash || '').trim()
 
     if (!marketId) return bad(res, 'Missing marketId')
-    if (!walletAddressRaw) return bad(res, 'Missing walletAddress')
-    const walletAddress = walletAddressRaw.toLowerCase()
-    if (!/^0x[a-f0-9]{40}$/.test(walletAddress)) {
-      return bad(res, 'Invalid walletAddress format')
-    }
+    if (!/^0x[a-f0-9]{40}$/.test(walletAddress)) return bad(res, 'Invalid walletAddress')
     if (side !== 'YES' && side !== 'NO') return bad(res, 'Side must be YES or NO')
     if (!Number.isFinite(amount) || amount <= 0) return bad(res, 'Amount must be a positive number')
+    if (!/^0x([A-Fa-f0-9]{64})$/.test(txHash)) return bad(res, 'Missing or invalid txHash')
 
-    // Validate market
     const market = await prisma.market.findUnique({
       where: { id: marketId },
       select: { id: true, question: true, status: true, eventTime: true, resolvedOutcome: true },
@@ -53,26 +54,46 @@ export default async function handler(
     if (market.resolvedOutcome) return bad(res, 'Market already resolved')
     if (new Date(market.eventTime).getTime() <= Date.now()) return bad(res, 'Market already closed')
 
-    // Fee config
-    const FEE_BPS = Number(process.env.FEE_BPS ?? 100) // 1% default
-    const fee = Math.max(0, (amount * FEE_BPS) / 10_000)
-    const totalDebit = amount + fee
+    // --- verify on-chain payment ---
+    const provider = new ethers.providers.JsonRpcProvider(process.env.EVM_RPC_URL!)
+    const receipt = await provider.getTransactionReceipt(txHash)
+    if (!receipt || receipt.status !== 1) return bad(res, 'Payment tx not found or failed', 402)
 
-    // Atomic: ensure user by walletAddress, debit, update pools, create trade
+    const TOKEN = (process.env.USDC_MAINNET || '').toLowerCase()
+    const HOUSE = (process.env.HOUSE_WALLET_ADDRESS || '').toLowerCase()
+    if (!TOKEN || !HOUSE) return bad(res, 'Server token/house not configured', 500)
+
+    const tokenLogs = receipt.logs.filter(l => l.address.toLowerCase() === TOKEN)
+    let paid = ethers.BigNumber.from(0)
+    for (const log of tokenLogs) {
+      try {
+        const parsed = ERC20_IFACE.parseLog(log)
+        if (parsed.name === 'Transfer') {
+          const from = parsed.args.from.toLowerCase()
+          const to = parsed.args.to.toLowerCase()
+          if (from === walletAddress && to === HOUSE) {
+            paid = paid.add(parsed.args.value)
+          }
+        }
+      } catch {}
+    }
+    if (paid.isZero()) return bad(res, 'No valid USDC transfer to house found in tx', 402)
+
+    // decimals assumed 6 for USDC/USDT
+    const decimals = 6
+    const paidHuman = Number(ethers.utils.formatUnits(paid, decimals))
+    const fee = (amount * clientFeeBps) / 10_000
+    const total = amount + fee
+    if (paidHuman + 1e-9 < total) return bad(res, 'Paid amount is less than required', 402)
+
+    // --- record trade & update pools atomically ---
     const result = await prisma.$transaction(async (tx) => {
+      // Ensure user exists (no balance check anymore)
       const user = await tx.user.upsert({
         where: { walletAddress },
         update: {},
         create: { walletAddress, balance: 0 },
-        select: { id: true, balance: true },
-      })
-
-      if (user.balance < totalDebit) throw new Error('Insufficient balance')
-
-      const updatedUser = await tx.user.update({
-        where: { id: user.id },
-        data: { balance: { decrement: totalDebit } },
-        select: { balance: true },
+        select: { id: true },
       })
 
       const updatedMarket = await tx.market.update({
@@ -92,50 +113,34 @@ export default async function handler(
           amount,
           fee,
           settled: false,
+          // you can add tx hash column later if desired
         },
       })
 
       return {
         newPoolYes: updatedMarket.poolYes,
         newPoolNo:  updatedMarket.poolNo,
-        userBalance: updatedUser.balance,
-        fee,
-        totalDebit,
       }
     })
 
-    // Admin bot (non‑blocking)
+    // admin alert (non-blocking)
     try {
       await sendAdminAlert?.(
         [
-          '🟢 New Trade',
+          '🟢 New Trade (on-chain paid)',
           `• Market: ${market.id}`,
           market.question ? `• Q: ${market.question}` : null,
-          `• Wallet: ${mask(walletAddress)}`,
+          `• Wallet: ${walletAddress.slice(0,6)}…${walletAddress.slice(-4)}`,
           `• Side: ${side}`,
-          `• Amount: ${amount.toFixed(2)}`,
-          `• Fee: ${result.fee.toFixed(2)} (${Number(process.env.FEE_BPS ?? 100)} bps)`,
-          `• Total debited: ${result.totalDebit.toFixed(2)}`,
-          `• Pools → Yes: ${result.newPoolYes?.toFixed(2)} | No: ${result.newPoolNo?.toFixed(2)}`,
-          `• When: ${new Date().toISOString()}`,
-        ]
-          .filter(Boolean)
-          .join('\n')
+          `• Amount: ${amount.toFixed(2)}  Fee: ${fee.toFixed(2)}  Total: ${total.toFixed(2)}`,
+          `• Tx: ${txHash}`,
+        ].filter(Boolean).join('\n')
       )
     } catch {}
 
-    return res.status(200).json({
-      success: true,
-      newPoolYes: result.newPoolYes,
-      newPoolNo: result.newPoolNo,
-      userBalance: result.userBalance,
-    })
+    return res.status(200).json({ success: true, ...result })
   } catch (err: any) {
-    const msg = err?.message || 'Server error'
-    if (msg.includes('Insufficient balance') || msg.startsWith('Invalid walletAddress')) {
-      return bad(res, msg, 400)
-    }
     console.error('[/api/trade] failed:', err)
-    return bad(res, msg, 500)
+    return bad(res, err?.message || 'Server error', 500)
   }
 }
