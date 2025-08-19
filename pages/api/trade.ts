@@ -1,4 +1,3 @@
-// pages/api/trade.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { prisma } from '../../lib/prisma'
 
@@ -8,6 +7,7 @@ interface TradeResponse {
   success: boolean
   newPoolYes?: number
   newPoolNo?: number
+  userBalance?: number
   error?: string
 }
 
@@ -26,15 +26,18 @@ export default async function handler(
 
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body
+
     const marketId = String(body?.marketId || '').trim()
+    const walletAddress = String(body?.walletAddress || '').trim()
     const side = String(body?.side || '').toUpperCase() as TradeSide
     const amount = Number(body?.amount)
 
     if (!marketId) return bad(res, 'Missing marketId')
+    if (!walletAddress) return bad(res, 'Missing walletAddress')
     if (side !== 'YES' && side !== 'NO') return bad(res, 'Side must be YES or NO')
     if (!Number.isFinite(amount) || amount <= 0) return bad(res, 'Amount must be a positive number')
 
-    // load market and validate state
+    // Load market
     const market = await prisma.market.findUnique({
       where: { id: marketId },
       select: {
@@ -49,27 +52,92 @@ export default async function handler(
     if (market.resolvedOutcome) return bad(res, 'Market already resolved')
     if (new Date(market.eventTime).getTime() <= Date.now()) return bad(res, 'Market already closed')
 
-    // apply trade atomically
-    const updated = await prisma.market.update({
-      where: { id: market.id },
-      data:
-        side === 'YES'
-          ? { poolYes: { increment: amount } }
-          : { poolNo: { increment: amount } },
-      select: { poolYes: true, poolNo: true },
-    })
+    // Fee in basis points (default 1% = 100 bps)
+    const FEE_BPS = Number(process.env.FEE_BPS ?? 100)
+    const fee = Math.max(0, (amount * FEE_BPS) / 10_000)
+    const totalDebit = amount + fee
 
-    // NOTE: If your payout cron needs per-user trades, add a trade record here.
-    // I’ve left it out because your schema for Trade/User wasn’t shared.
-    // We can wire it up once you confirm required fields.
+    // Atomically:
+    // - find/create user by walletAddress
+    // - ensure balance >= totalDebit
+    // - decrement user.balance
+    // - increment market pool & feeCollected
+    // - create Trade row
+    const result = await prisma.$transaction(async (tx) => {
+      // find/create user
+      let user = await tx.user.findUnique({
+        where: { walletAddress },
+        select: { id: true, balance: true },
+      })
+      if (!user) {
+        user = await tx.user.create({
+          data: { walletAddress, balance: 0 },
+          select: { id: true, balance: true },
+        })
+      }
+
+      if (user.balance < totalDebit) {
+        throw new Error('Insufficient balance')
+      }
+
+      // debit user
+      const updatedUser = await tx.user.update({
+        where: { id: user.id },
+        data: { balance: { decrement: totalDebit } },
+        select: { balance: true },
+      })
+
+      // update pools and accrue fee
+      const updatedMarket = await tx.market.update({
+        where: { id: marketId },
+        data:
+          side === 'YES'
+            ? {
+                poolYes: { increment: amount },
+                feeCollected: { increment: fee },
+              }
+            : {
+                poolNo: { increment: amount },
+                feeCollected: { increment: fee },
+              },
+        select: { poolYes: true, poolNo: true },
+      })
+
+      // record trade
+      await tx.trade.create({
+        data: {
+          marketId,
+          userId: user.id,
+          type: side,            // 'YES' | 'NO'
+          amount,
+          fee,
+          settled: false,
+        },
+      })
+
+      return {
+        newPoolYes: updatedMarket.poolYes,
+        newPoolNo: updatedMarket.poolNo,
+        userBalance: updatedUser.balance,
+      }
+    })
 
     return res.status(200).json({
       success: true,
-      newPoolYes: updated.poolYes,
-      newPoolNo: updated.poolNo,
+      ...result,
     })
   } catch (err: any) {
+    const msg = err?.message || 'Server error'
+    // Normalize common Prisma/JSON errors into 400s the UI can show
+    if (
+      msg.includes('Insufficient balance') ||
+      msg.includes('Unexpected token') ||
+      msg.includes('JSON') ||
+      msg.includes('Side must be')
+    ) {
+      return bad(res, msg, 400)
+    }
     console.error('[/api/trade] failed:', err)
-    return bad(res, err?.message || 'Server error', 500)
+    return bad(res, msg, 500)
   }
 }
