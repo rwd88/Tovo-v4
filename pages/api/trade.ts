@@ -16,14 +16,7 @@ interface TradeResponse {
 function bad(res: NextApiResponse<TradeResponse>, msg: string, code = 400) {
   return res.status(code).json({ success: false, error: msg })
 }
-
-// mask a wallet for logs/alerts
-function mask(addr: string) {
-  if (!addr) return ''
-  const s = addr.trim()
-  if (s.length <= 10) return s
-  return `${s.slice(0, 6)}…${s.slice(-4)}`
-}
+const mask = (addr = '') => (addr.length > 10 ? `${addr.slice(0, 6)}…${addr.slice(-4)}` : addr)
 
 export default async function handler(
   req: NextApiRequest,
@@ -36,64 +29,52 @@ export default async function handler(
 
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body
-
     const marketId = String(body?.marketId || '').trim()
-    const walletAddress = String(body?.walletAddress || '').trim()
+    const walletAddressRaw = String(body?.walletAddress || '').trim()
     const side = String(body?.side || '').toUpperCase() as TradeSide
     const amount = Number(body?.amount)
 
     if (!marketId) return bad(res, 'Missing marketId')
-    if (!walletAddress) return bad(res, 'Missing walletAddress')
+    if (!walletAddressRaw) return bad(res, 'Missing walletAddress')
+    const walletAddress = walletAddressRaw.toLowerCase()
+    if (!/^0x[a-f0-9]{40}$/.test(walletAddress)) {
+      return bad(res, 'Invalid walletAddress format')
+    }
     if (side !== 'YES' && side !== 'NO') return bad(res, 'Side must be YES or NO')
     if (!Number.isFinite(amount) || amount <= 0) return bad(res, 'Amount must be a positive number')
 
-    // Load & validate market state
+    // Validate market
     const market = await prisma.market.findUnique({
       where: { id: marketId },
-      select: {
-        id: true,
-        question: true,
-        status: true,
-        eventTime: true,
-        resolvedOutcome: true,
-      },
+      select: { id: true, question: true, status: true, eventTime: true, resolvedOutcome: true },
     })
     if (!market) return bad(res, 'Market not found', 404)
     if (market.status.toLowerCase() !== 'open') return bad(res, 'Market is not open')
     if (market.resolvedOutcome) return bad(res, 'Market already resolved')
     if (new Date(market.eventTime).getTime() <= Date.now()) return bad(res, 'Market already closed')
 
-    // Fee in basis points; default 1% (100 bps)
-    const FEE_BPS = Number(process.env.FEE_BPS ?? 100)
+    // Fee config
+    const FEE_BPS = Number(process.env.FEE_BPS ?? 100) // 1% default
     const fee = Math.max(0, (amount * FEE_BPS) / 10_000)
     const totalDebit = amount + fee
 
-    // Atomically: ensure user, debit balance, update pools/fees, create trade
+    // Atomic: ensure user by walletAddress, debit, update pools, create trade
     const result = await prisma.$transaction(async (tx) => {
-      // find/create user
-      let user = await tx.user.findUnique({
+      const user = await tx.user.upsert({
         where: { walletAddress },
+        update: {},
+        create: { walletAddress, balance: 0 },
         select: { id: true, balance: true },
       })
-      if (!user) {
-        user = await tx.user.create({
-          data: { walletAddress, balance: 0 },
-          select: { id: true, balance: true },
-        })
-      }
 
-      if (user.balance < totalDebit) {
-        throw new Error('Insufficient balance')
-      }
+      if (user.balance < totalDebit) throw new Error('Insufficient balance')
 
-      // debit user balance
       const updatedUser = await tx.user.update({
         where: { id: user.id },
         data: { balance: { decrement: totalDebit } },
         select: { balance: true },
       })
 
-      // update pools & accrue fee
       const updatedMarket = await tx.market.update({
         where: { id: marketId },
         data:
@@ -103,12 +84,11 @@ export default async function handler(
         select: { poolYes: true, poolNo: true },
       })
 
-      // record trade for settlement
       await tx.trade.create({
         data: {
           marketId,
           userId: user.id,
-          type: side,         // 'YES' | 'NO'
+          type: side,
           amount,
           fee,
           settled: false,
@@ -119,11 +99,12 @@ export default async function handler(
         newPoolYes: updatedMarket.poolYes,
         newPoolNo:  updatedMarket.poolNo,
         userBalance: updatedUser.balance,
-        fee, totalDebit,
+        fee,
+        totalDebit,
       }
     })
 
-    // 🔔 Admin bot: real-time trade notification (non-blocking)
+    // Admin bot (non‑blocking)
     try {
       await sendAdminAlert?.(
         [
@@ -137,11 +118,11 @@ export default async function handler(
           `• Total debited: ${result.totalDebit.toFixed(2)}`,
           `• Pools → Yes: ${result.newPoolYes?.toFixed(2)} | No: ${result.newPoolNo?.toFixed(2)}`,
           `• When: ${new Date().toISOString()}`,
-        ].filter(Boolean).join('\n')
+        ]
+          .filter(Boolean)
+          .join('\n')
       )
-    } catch {
-      // do not block response if Telegram fails
-    }
+    } catch {}
 
     return res.status(200).json({
       success: true,
@@ -151,13 +132,7 @@ export default async function handler(
     })
   } catch (err: any) {
     const msg = err?.message || 'Server error'
-    // Common user-facing errors kept as 400
-    if (
-      msg.includes('Insufficient balance') ||
-      msg.includes('Missing') ||
-      msg.includes('Side must be') ||
-      msg.includes('closed')
-    ) {
+    if (msg.includes('Insufficient balance') || msg.startsWith('Invalid walletAddress')) {
       return bad(res, msg, 400)
     }
     console.error('[/api/trade] failed:', err)

@@ -8,14 +8,15 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  telegramId   String   @unique
-  username     String?
-  balance      Float    @default(0)
-  createdAt    DateTime @default(now())
-  solanaWallet String?
-  bscWallet    String?
-  trades       Trade[]
+  id            String   @id @default(cuid())
+  telegramId    String   @unique
+  walletAddress String   @unique
+  username      String?
+  balance       Float    @default(0)
+  createdAt     DateTime @default(now())
+  solanaWallet  String?
+  bscWallet     String?
+  trades        Trade[]  @relation("UserTrades")
 
   @@map("users")
 }
@@ -71,7 +72,7 @@ model Trade {
   won       Boolean?
   market    Market   @relation(fields: [marketId], references: [id])
   outcome   Outcome? @relation("OutcomeTrades", fields: [outcomeId], references: [id])
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation("UserTrades", fields: [userId], references: [id])
 
   @@index([marketId])
   @@index([userId])
