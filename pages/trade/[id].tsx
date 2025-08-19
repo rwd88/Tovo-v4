@@ -9,10 +9,7 @@ import type { Market } from '@prisma/client'
 import { useEthereum } from '../../contexts/EthereumContext'
 import dynamic from 'next/dynamic'
 
-const WalletDrawer = dynamic(
-  () => import('../../components/WalletDrawer'),
-  { ssr: false }
-)
+const WalletDrawer = dynamic(() => import('../../components/WalletDrawer'), { ssr: false })
 
 type Props = {
   market: Omit<Market, 'eventTime'> & { eventTime: string }
@@ -31,37 +28,52 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
   const total = market.poolYes + market.poolNo
   const yesPct = total > 0 ? (market.poolYes / total) * 100 : 0
   const noPct = 100 - yesPct
-  const side = selectedSide === 'yes' ? 'UP' : 'DOWN'
+
+  // ✅ map UI to API: YES / NO
+  const apiSide: 'YES' | 'NO' | null =
+    selectedSide === 'yes' ? 'YES' : selectedSide === 'no' ? 'NO' : null
 
   const handleTrade = async () => {
-    if (!address) return setMessage('❌ Connect your wallet first.')
-    const amt = parseFloat(amount)
-    if (isNaN(amt) || amt <= 0) return setMessage('❌ Invalid amount.')
-    if (!selectedSide) return setMessage('❌ Choose Yes or No.')
-
-    setLoading(true)
     setMessage(null)
+
+    if (!address) return setMessage('❌ Connect your wallet first.')
+    if (!apiSide) return setMessage('❌ Choose Yes or No.')
+
+    const amt = Number(amount)
+    if (!Number.isFinite(amt) || amt <= 0) return setMessage('❌ Enter a positive amount.')
+
+    // optional client guard: prevent trading after close
+    if (new Date(market.eventTime).getTime() <= Date.now()) {
+      return setMessage('❌ Market already closed.')
+    }
+
     try {
+      setLoading(true)
       const res = await fetch('/api/trade', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           marketId: market.id,
-          walletAddress: address,
+          walletAddress: address, // kept if your API uses it
           amount: amt,
-          side,
+          side: apiSide,          // ✅ send YES / NO
         }),
       })
       const json = await res.json()
-      if (json.success) {
-        setMessage('✅ Trade submitted successfully.')
-        if (json.market) setMarket(json.market)
-      } else {
-        setMessage(`❌ ${json.error}`)
+
+      if (!res.ok || !json.success) {
+        throw new Error(json?.error || `HTTP ${res.status}`)
       }
-    } catch (err) {
+
+      setMessage('✅ Trade submitted successfully.')
+      if (json.market) setMarket(json.market)               // if API returns full market
+      else if (json.newPoolYes != null && json.newPoolNo != null) {
+        // or update locally from returned pools
+        setMarket((m) => ({ ...m, poolYes: json.newPoolYes, poolNo: json.newPoolNo }))
+      }
+    } catch (err: any) {
       console.error(err)
-      setMessage('❌ Server error.')
+      setMessage(`❌ ${err?.message || 'Server error'}`)
     } finally {
       setLoading(false)
     }
@@ -80,24 +92,10 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-4 fixed top-0 w-full bg-white dark:bg-[#0a0a0a] z-20">
         <Link href="/">
-          <Image
-            src="/logo.png"
-            alt="Tovo"
-            width={120}
-            height={24}
-            style={{ objectFit: 'contain' }}
-          />
+          <Image src="/logo.png" alt="Tovo" width={120} height={24} style={{ objectFit: 'contain' }} />
         </Link>
-        <button
-          onClick={() => setDrawerOpen((v) => !v)}
-          className="wallet-toggle-btn"
-        >
-          <Image
-            src="/connect wallet.svg"
-            alt="Connect Wallet"
-            width={120}
-            height={24}
-          />
+        <button onClick={() => setDrawerOpen((v) => !v)} className="wallet-toggle-btn">
+          <Image src="/connect wallet.svg" alt="Connect Wallet" width={120} height={24} />
         </button>
       </header>
 
@@ -124,16 +122,14 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
           </p>
 
           {market.forecast != null && (
-            <p className="text-sm text-gray-300">
-              Forecast: {(market.forecast).toFixed(1)}%
-            </p>
+            <p className="text-sm text-gray-300">Forecast: {market.forecast.toFixed(1)}%</p>
           )}
 
           <p className="text-sm font-medium text-gray-200">
             {market.forecast != null ? (
               <>
-                {yesPct.toFixed(1)}% say it will be above{' '}
-                {market.forecast.toFixed(1)}% — {noPct.toFixed(1)}% say it will be below
+                {yesPct.toFixed(1)}% say it will be above {market.forecast.toFixed(1)}% —{' '}
+                {noPct.toFixed(1)}% say it will be below
               </>
             ) : (
               <>
@@ -144,13 +140,10 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
 
           {/* Progress bar */}
           <div className="h-2 w-full bg-[#E5E5E5] rounded-full overflow-hidden">
-            <div
-              className="h-full bg-[#00B89F]"
-              style={{ width: `${yesPct}%` }}
-            />
+            <div className="h-full bg-[#00B89F]" style={{ width: `${yesPct}%` }} />
           </div>
 
-          {/* Yes / No Buttons */}
+          {/* Yes / No */}
           <div className="flex justify-center gap-4 mt-4">
             <button
               onClick={() => {
