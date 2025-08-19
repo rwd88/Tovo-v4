@@ -15,25 +15,7 @@ interface SettlementResult {
   settledCount?: number
   totalFeesSent?: number
   houseProfit?: number
-  payoutEnabled?: boolean
   error?: string
-}
-
-/**
- * Best-effort detection of payout env config.
- * Adjust names if your lib/payout uses different ones.
- */
-function getPayoutConfig() {
-  const cfg = {
-    EVM_RPC_URL: process.env.EVM_RPC_URL || process.env.NEXT_PUBLIC_EVM_RPC_URL,
-    EVM_PRIVATE_KEY: process.env.EVM_PRIVATE_KEY,
-    HOUSE_WALLET: process.env.HOUSE_WALLET || process.env.NEXT_PUBLIC_HOUSE_WALLET,
-    TOKEN_ADDRESS: process.env.TOKEN_ADDRESS || process.env.NEXT_PUBLIC_TOKEN_ADDRESS, // USDT/USDC
-  }
-  const missing = Object.entries(cfg)
-    .filter(([, v]) => !v)
-    .map(([k]) => k)
-  return { cfg, missing, ok: missing.length === 0 }
 }
 
 export default async function handler(
@@ -49,14 +31,6 @@ export default async function handler(
     return res.status(403).json({ success: false, error: 'Invalid credentials' })
   }
 
-  const { ok: payoutEnabled, missing } = getPayoutConfig()
-  if (!payoutEnabled) {
-    // Warn once per run (don’t crash the job)
-    await sendAdminAlert?.(
-      `⚠️ settle-markets: payout disabled — missing envs: ${missing.join(', ')}`
-    ).catch(() => {})
-  }
-
   try {
     const BATCH_SIZE = 25
     let totalSettled = 0
@@ -68,8 +42,8 @@ export default async function handler(
       const markets = await prisma.market.findMany({
         where: {
           status: 'open',
-          eventTime: { lt: new Date() },   // in the past
-          resolvedOutcome: { not: null },  // result already decided
+          eventTime: { lt: new Date() },
+          resolvedOutcome: { not: null },
         },
         include: {
           trades: {
@@ -88,35 +62,32 @@ export default async function handler(
 
       for (const m of markets) {
         try {
-          // 1) DB transaction: compute winners, credit balances, mark settled
           const { payouts, tradingFee, houseCut } = await prisma.$transaction(async (tx) => {
             const outcome = determineMarketResult(m)
             if (!outcome) {
               await tx.market.update({
                 where: { id: m.id },
-                data: { status: 'settled', settledAt: new Date(), houseProfit: 0 },
+                data: { status: 'settled' },
               })
               return { payouts: [], tradingFee: 0, houseCut: 0 }
             }
 
             const totalPool = m.poolYes + m.poolNo
-            const tradingFee = totalPool * 0.01 * 2   // your current fee logic
+            const tradingFee = totalPool * 0.01 * 2
             const houseCut = totalPool * 0.10
             const winningPool = outcome === 'YES' ? m.poolYes : m.poolNo
-            const distributable = Math.max(totalPool - tradingFee - houseCut, 0)
-            const factor = winningPool > 0 ? distributable / winningPool : 0
+            const payoutFactor =
+              winningPool > 0 ? (totalPool - tradingFee - houseCut) / winningPool : 0
 
             const payouts: { userId: string; amount: number }[] = []
             for (const t of m.trades) {
               if (t.type.toUpperCase() === outcome) {
-                const userProfit = t.amount * factor - (t.fee || 0)
-                if (userProfit > 0) {
-                  await tx.user.update({
-                    where: { id: t.userId },
-                    data: { balance: { increment: userProfit } },
-                  })
-                }
-                payouts.push({ userId: t.userId, amount: Math.max(userProfit, 0) })
+                const userProfit = t.amount * payoutFactor - (t.fee || 0)
+                await tx.user.update({
+                  where: { id: t.userId },
+                  data: { balance: { increment: userProfit } },
+                })
+                payouts.push({ userId: t.userId, amount: userProfit })
               }
             }
 
@@ -124,7 +95,6 @@ export default async function handler(
               where: { marketId: m.id },
               data: { settled: true },
             })
-
             await tx.market.update({
               where: { id: m.id },
               data: {
@@ -137,84 +107,65 @@ export default async function handler(
             return { payouts, tradingFee, houseCut }
           })
 
-          // 2) Optional on‑chain payouts (skip if env missing)
-          if (payoutEnabled) {
-            // Winners
-            for (const { userId, amount } of payouts) {
-              if (amount <= 0) continue
-              const user = await prisma.user.findUnique({
-                where: { id: userId },
-                select: { walletAddress: true },
-              })
-              if (!user?.walletAddress) {
-                await sendAdminAlert?.(`No wallet address for user ${userId}`).catch(() => {})
-                continue
-              }
-              try {
-                await payToken(user.walletAddress, amount)
-              } catch (err: any) {
-                console.error(`❌ Payout to ${userId} failed:`, err)
-                await sendAdminAlert?.(
-                  `Payout to ${userId} failed: ${err?.message || err}`
-                ).catch(() => {})
-              }
+          // on-chain payouts (same as before)
+          for (const { userId, amount } of payouts) {
+            const user = await prisma.user.findUnique({
+              where: { id: userId },
+              select: { walletAddress: true },
+            })
+            if (!user?.walletAddress) continue
+            try {
+              await payToken(user.walletAddress, amount)
+            } catch (err) {
+              console.error(`❌ Payout to ${userId} failed:`, err)
             }
-
-            // Trading fees to house
-            if (tradingFee > 0) {
-              try {
-                await payHouse(tradingFee)
-                totalFeesSent += tradingFee
-              } catch (err: any) {
-                console.error('❌ Trading fee transfer failed:', err)
-                await sendAdminAlert?.(
-                  `Trading fee transfer failed: ${err?.message || err}`
-                ).catch(() => {})
-              }
+          }
+          if (tradingFee > 0) {
+            try {
+              await payHouse(tradingFee)
+              totalFeesSent += tradingFee
+            } catch (err) {
+              console.error('❌ Trading fee transfer failed:', err)
             }
-
-            // House cut
-            if (houseCut > 0) {
-              try {
-                await payHouse(houseCut)
-                totalProfit += houseCut
-              } catch (err: any) {
-                console.error('❌ House fee transfer failed:', err)
-                await sendAdminAlert?.(
-                  `House fee transfer failed: ${err?.message || err}`
-                ).catch(() => {})
-              }
+          }
+          if (houseCut > 0) {
+            try {
+              await payHouse(houseCut)
+              totalProfit += houseCut
+            } catch (err) {
+              console.error('❌ House fee transfer failed:', err)
             }
           }
 
           totalSettled++
-        } catch (innerErr: any) {
+
+          // ✅ NEW: notify admin bot for each market
+          const totalPool = m.poolYes + m.poolNo
+          const feesToHouse = tradingFee + houseCut
+          await sendAdminAlert(
+            `✅ Market settled\n• Market ID: ${m.id}\n• Total pool: ${totalPool.toFixed(
+              2
+            )}\n• Fees sent to admin: ${feesToHouse.toFixed(2)}`
+          )
+        } catch (innerErr) {
           console.error('❌ Settlement error on market', m.id, innerErr)
-          await sendAdminAlert?.(
-            `Failed to settle market ${m.id}: ${innerErr?.message || innerErr}`
-          ).catch(() => {})
         }
       }
     }
 
-    const summary = `Settled ${totalSettled} markets • Fees sent ${totalFeesSent.toFixed(
-      2
-    )} • House profit ${totalProfit.toFixed(2)} • Payouts ${
-      payoutEnabled ? 'ON' : 'OFF (env missing)'
-    }`
-
-    await sendCronSummary?.(summary).catch(() => {})
-
+    await sendCronSummary(
+      `Settled ${totalSettled} markets • Sent fees ${totalFeesSent.toFixed(
+        2
+      )} • House profit ${totalProfit.toFixed(2)}`
+    )
     return res.status(200).json({
       success: true,
       settledCount: totalSettled,
       totalFeesSent,
       houseProfit: totalProfit,
-      payoutEnabled,
     })
   } catch (err: any) {
     console.error('🔥 settle-markets crashed:', err)
-    await sendAdminAlert?.(`settle-markets crashed: ${err?.message || err}`).catch(() => {})
-    return res.status(500).json({ success: false, error: err?.message || 'Unknown error' })
+    return res.status(500).json({ success: false, error: err.message })
   }
 }

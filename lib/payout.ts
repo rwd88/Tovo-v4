@@ -1,41 +1,58 @@
 // src/lib/payout.ts
 import { ethers } from 'ethers'
 
-// —— Minimal ERC-20 ABI for `transfer` ——
-const ERC20_ABI = [
-  "function transfer(address to, uint256 amount) public returns (bool)"
-]
+// ---- Minimal ERC20 ABI ----
+const ERC20_ABI = ['function transfer(address to, uint256 amount) public returns (bool)']
 
-// —— Load environment ——
-const RPC_URL        = process.env.EVM_RPC_URL!          // e.g. https://mainnet.infura.io/v3/...
-const ADMIN_PRIV_KEY = process.env.EVM_PRIVATE_KEY!      // your house/admin private key
-const TOKEN_ADDRESS  = process.env.USDC_MAINNET!         // USDC contract address
-const ADMIN_ADDRESS  = process.env.FEE_WALLET_ADDRESS!   // house wallet address
+// ---- Env (read but do not throw here) ----
+const RPC_URL         = process.env.EVM_RPC_URL || ''
+const ADMIN_PRIV_KEY  = process.env.EVM_PRIVATE_KEY || ''
+const TOKEN_ADDRESS   = process.env.USDC_MAINNET || ''
+// support both names for the admin house wallet address
+const ADMIN_ADDRESS   =
+  process.env.HOUSE_WALLET_ADDRESS ||
+  process.env.FEE_WALLET_ADDRESS ||
+  ''
 
-const DECIMALS       = 6  // USDC uses 6 decimals
+// allow override; default USDC/USDT decimals = 6
+const TOKEN_DECIMALS  = Number(process.env.TOKEN_DECIMALS ?? 6)
 
-if (!RPC_URL || !ADMIN_PRIV_KEY || !TOKEN_ADDRESS || !ADMIN_ADDRESS) {
-  throw new Error("Missing payout configuration in env")
+let provider: ethers.providers.JsonRpcProvider | null = null
+let signer: ethers.Wallet | null = null
+let token: ethers.Contract | null = null
+
+/** Return whether payouts are fully configured + which vars are missing. */
+export function isPayoutEnabled() {
+  const missing: string[] = []
+  if (!RPC_URL)        missing.push('EVM_RPC_URL')
+  if (!ADMIN_PRIV_KEY) missing.push('EVM_PRIVATE_KEY')
+  if (!TOKEN_ADDRESS)  missing.push('USDC_MAINNET')
+  if (!ADMIN_ADDRESS)  missing.push('HOUSE_WALLET_ADDRESS (or FEE_WALLET_ADDRESS)')
+  return { ok: missing.length === 0, missing }
 }
 
-const provider      = new ethers.providers.JsonRpcProvider(RPC_URL)
-const adminWallet   = new ethers.Wallet(ADMIN_PRIV_KEY, provider)
-const tokenContract = new ethers.Contract(TOKEN_ADDRESS, ERC20_ABI, adminWallet)
+function ensureInited() {
+  if (provider && signer && token) return
+  const { ok, missing } = isPayoutEnabled()
+  if (!ok) {
+    const why = `payout disabled; missing env: ${missing.join(', ')}`
+    throw new Error(why)
+  }
+  provider = new ethers.providers.JsonRpcProvider(RPC_URL)
+  signer   = new ethers.Wallet(ADMIN_PRIV_KEY!, provider)
+  token    = new ethers.Contract(TOKEN_ADDRESS!, ERC20_ABI, signer)
+}
 
-/**
- * Transfer `amount` tokens (human units, e.g. 1.23) to `toAddress`.
- * Returns the transaction hash.
- */
+/** Pay `amount` tokens (human units, e.g. 1.23) to `toAddress`. Returns tx hash. */
 export async function payToken(toAddress: string, amount: number): Promise<string> {
-  const units = ethers.utils.parseUnits(amount.toString(), DECIMALS)
-  const tx    = await tokenContract.transfer(toAddress, units)
+  ensureInited()
+  const units = ethers.utils.parseUnits(amount.toString(), TOKEN_DECIMALS)
+  const tx    = await token!.transfer(toAddress, units)
   await tx.wait()
   return tx.hash
 }
 
-/**
- * Convenience: pay the house/admin fee to the configured ADMIN_ADDRESS
- */
+/** Convenience: send `amount` to the admin/house wallet. */
 export async function payHouse(amount: number): Promise<string> {
-  return payToken(ADMIN_ADDRESS, amount)
+  return payToken(ADMIN_ADDRESS!, amount)
 }
