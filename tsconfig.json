@@ -1,14 +1,29 @@
-/* Based on https://github.com/tsconfig/bases/blob/501da2bcd640cf95c95805783e1012b992338f28/bases/node22.json */
 {
   "compilerOptions": {
-    "lib": ["es2023"],
-    "module": "node16",
-    "target": "es2022",
-    "strict": true,
-    "esModuleInterop": true,
+    "target": "ES2020",
+    "lib": ["dom", "dom.iterable", "es2020"],
+    "allowJs": true,
     "skipLibCheck": true,
-    "moduleResolution": "node16",
-    "outDir": "dist"
-"exclude": ["contracts", "artifacts", "cache", "ignition"]
-  }
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "types": ["node", "@types/react", "@types/react-dom"]
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
+  "exclude": [
+    "node_modules",
+    // hardhat/solidity outputs – keep them out of the app TS program
+    "contracts",
+    "artifacts",
+    "cache",
+    "ignition",
+    "contracts-out",
+    "contracts/node_modules"
+  ]
 }
