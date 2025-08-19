@@ -8,15 +8,29 @@ import type { GetServerSideProps } from 'next'
 import type { Market } from '@prisma/client'
 import { useEthereum } from '../../contexts/EthereumContext'
 import dynamic from 'next/dynamic'
+import { BrowserProvider, Contract, parseUnits } from 'ethers'
 
-const WalletDrawer = dynamic(() => import('../../components/WalletDrawer'), {
-  ssr: false,
-})
+const WalletDrawer = dynamic(() => import('../../components/WalletDrawer'), { ssr: false })
 
 type Props = {
   market: Omit<Market, 'eventTime'> & { eventTime: string }
   initialSide: 'yes' | 'no'
 }
+
+const ERC20_ABI = [
+  'function allowance(address owner, address spender) view returns (uint256)',
+  'function approve(address spender, uint256 amount) returns (bool)',
+  'function decimals() view returns (uint8)',
+]
+const MARKET_ABI = [
+  // common variants – we’ll try in order
+  'function bet(uint256 marketId, uint8 side, uint256 amount) external',
+  'function placeBet(uint256 marketId, bool side, uint256 amount) external',
+]
+
+const USDC = process.env.NEXT_PUBLIC_USDC_ADDRESS || ''
+const MARKET_ADDR = process.env.NEXT_PUBLIC_MARKET_ADDRESS || ''
+const FEE_BPS = Number(process.env.NEXT_PUBLIC_TRADE_FEE_BPS ?? 100) // 1%
 
 export default function TradePage({ market: initialMarket, initialSide }: Props) {
   const { address } = useEthereum()
@@ -31,45 +45,78 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
   const yesPct = total > 0 ? (market.poolYes / total) * 100 : 0
   const noPct = 100 - yesPct
 
-  // map UI → API
   const apiSide: 'YES' | 'NO' | null =
     selectedSide === 'yes' ? 'YES' : selectedSide === 'no' ? 'NO' : null
+
+  async function ensureApprove(signer: any, owner: string, spender: string, unitsNeeded: bigint) {
+    const usdc = new Contract(USDC, ERC20_ABI, signer)
+    // USDC is 6 decimals; parseUnits already used with 6
+    const allowance: bigint = await usdc.allowance(owner, spender)
+    if (allowance >= unitsNeeded) return
+    const tx = await usdc.approve(spender, unitsNeeded)
+    await tx.wait()
+  }
 
   const handleTrade = async () => {
     setMessage(null)
 
     if (!address) return setMessage('❌ Connect your wallet first.')
     if (!apiSide) return setMessage('❌ Choose Yes or No.')
-
+    if (!USDC || !MARKET_ADDR) return setMessage('❌ Missing token/market config.')
     const amt = Number(amount)
     if (!Number.isFinite(amt) || amt <= 0) return setMessage('❌ Enter a positive amount.')
-
     if (new Date(market.eventTime).getTime() <= Date.now()) {
       return setMessage('❌ Market already closed.')
     }
 
     try {
       setLoading(true)
-      const res = await fetch('/api/trade', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          marketId: market.id,
-          walletAddress: address,
-          amount: amt,
-          side: apiSide,
-        }),
-      })
 
-      const json = await res.json()
-      if (!res.ok || !json.success) throw new Error(json?.error || `HTTP ${res.status}`)
+      // 1) Connect wallet
+      if (!(globalThis as any).ethereum) throw new Error('No wallet detected')
+      const provider = new BrowserProvider((globalThis as any).ethereum)
+      const signer = await provider.getSigner()
+      const from = await signer.getAddress()
 
-      setMessage('✅ Trade submitted successfully.')
-      if (json.market) {
-        setMarket(json.market)
-      } else if (json.newPoolYes != null && json.newPoolNo != null) {
-        setMarket((m) => ({ ...m, poolYes: json.newPoolYes, poolNo: json.newPoolNo }))
+      // 2) Compute trade + fee and approve token
+      const fee = (amt * FEE_BPS) / 10_000
+      const totalDebit = +(amt + fee).toFixed(6)
+      const units = parseUnits(totalDebit.toString(), 6) // USDC 6 decimals
+      await ensureApprove(signer, from, MARKET_ADDR, units)
+
+      // 3) Call market contract (try both bet() and placeBet())
+      const marketContract = new Contract(MARKET_ADDR, MARKET_ABI, signer)
+      const marketId = market.id
+      const sideYesBool = apiSide === 'YES'
+      const sideYesUint = sideYesBool ? 1 : 2 // assuming 1=Yes, 2=No for bet(uint8)
+
+      let tx
+      try {
+        // try bet(uint256,uint8,uint256)
+        tx = await marketContract.bet(marketId, sideYesUint, parseUnits(amt.toString(), 6))
+      } catch {
+        // fallback to placeBet(uint256,bool,uint256)
+        tx = await marketContract.placeBet(marketId, sideYesBool, parseUnits(amt.toString(), 6))
       }
+      const receipt = await tx.wait()
+      if (!receipt || receipt.status !== 1) throw new Error('Transaction failed')
+
+      // 4) Optional: tell backend to log (non-blocking)
+      try {
+        await fetch('/api/trade', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            marketId,
+            walletAddress: from,
+            amount: amt,
+            side: apiSide,
+            txHash: tx.hash,
+          }),
+        })
+      } catch {}
+
+      setMessage('✅ Trade submitted on-chain!')
     } catch (err: any) {
       console.error(err)
       setMessage(`❌ ${err?.message || 'Server error'}`)
@@ -147,10 +194,7 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
           {/* Yes / No buttons */}
           <div id="trade-buttons" className="flex justify-center gap-4 mt-4">
             <button
-              onClick={() => {
-                setAmount('1.0')
-                setSelectedSide('yes')
-              }}
+              onClick={() => { setAmount('1.0'); setSelectedSide('yes') }}
               className={`w-24 py-2 border rounded-full font-medium transition ${
                 selectedSide === 'yes'
                   ? 'bg-white text-black border-white'
@@ -160,10 +204,7 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
               Yes
             </button>
             <button
-              onClick={() => {
-                setAmount('1.0')
-                setSelectedSide('no')
-              }}
+              onClick={() => { setAmount('1.0'); setSelectedSide('no') }}
               className={`w-24 py-2 border rounded-full font-medium transition ${
                 selectedSide === 'no'
                   ? 'bg-white text-black border-white'
