@@ -1,0 +1,1 @@
+"use strict";exports.id=5363,exports.ids=[5363],exports.modules={5363:(a,b,c)=>{c.d(b,{prisma:()=>e});var d=c(6330);let e=global.prisma||new d.PrismaClient({log:["warn","error"]});e.$use(async(a,b)=>{let c=Date.now(),d=await b(a),e=Date.now();return console.log(`🔍 prisma: ${a.model}.${a.action} took ${e-c}ms`),d})}};

@@ -1,35 +1,13 @@
-// tsconfig.json
+/* Based on https://github.com/tsconfig/bases/blob/501da2bcd640cf95c95805783e1012b992338f28/bases/node22.json */
 {
   "compilerOptions": {
-    "target": "es2015",
-    "lib": ["dom", "dom.iterable", "esnext"],
-    "module": "esnext",
-    "baseUrl": ".",
-    "paths": {
-      "@/lib/*": ["lib/*"],
-      "@prisma/client": ["node_modules/@prisma/client"]
-    },
+    "lib": ["es2023"],
+    "module": "node16",
+    "target": "es2022",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "downlevelIteration": true,
-    "allowJs": true,
-    "noEmit": true,
-    "incremental": true,
-    "moduleResolution": "node",
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "jsx": "preserve",
-   // Look first in our top-level types/ folder, then any @types packages
-   "typeRoots": ["types", "node_modules/@types"]
-  },
-  "include": [
-    "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    // your own additional declarations, if any
-    "src/types/**/*.d.ts"
-  ],
-  "exclude": ["node_modules"]
+    "moduleResolution": "node16",
+    "outDir": "dist"
+  }
 }
