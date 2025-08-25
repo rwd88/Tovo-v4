@@ -1,27 +1,35 @@
-// pages/api/chain/health.ts
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getPublicProvider } from "../../../src/lib/provider";
-import { CONTRACT_ADDRESS } from "../../../src/lib/contracts";
 import { ethers } from "ethers";
+import { CONTRACT_ADDRESS, CONTRACT_ABI } from "../../../src/lib/contracts";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    const provider = getPublicProvider();
-    const [network, block, code] = await Promise.all([
-      provider.getNetwork(),
-      provider.getBlockNumber(),
-      provider.getCode(CONTRACT_ADDRESS),
-    ]);
+    const rpcUrl = process.env.EVM_RPC_URL!;
+    const provider = new ethers.JsonRpcProvider(rpcUrl);
 
-    res.status(200).json({
+    const network = await provider.getNetwork();
+    const blockNumber = await provider.getBlockNumber();
+
+    let codeSize = 0;
+    let contractDeployed = false;
+    try {
+      const code = await provider.getCode(CONTRACT_ADDRESS);
+      codeSize = code.length;
+      contractDeployed = codeSize > 2;
+    } catch (e) {
+      console.error("getCode failed", e);
+    }
+
+    return res.status(200).json({
       network: network.name,
       chainId: Number(network.chainId),
-      blockNumber: block,
-      contractDeployed: code && code !== "0x",
+      blockNumber,
       contractAddress: CONTRACT_ADDRESS,
-      codeSize: code?.length ?? 0
+      contractDeployed,
+      codeSize,
     });
-  } catch (e: any) {
-    res.status(500).json({ error: e.message || "unknown error" });
+  } catch (err: any) {
+    console.error("❌ health.ts failed", err);
+    return res.status(500).json({ error: err.message || "Server error" });
   }
 }
