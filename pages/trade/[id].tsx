@@ -244,7 +244,7 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
 
 export const getServerSideProps: GetServerSideProps<Props> = async (ctx) => {
   const { id, side } = ctx.query
-  const { prisma } = await import('../../lib/prisma')
+const prisma = (await import('../../lib/prisma')).default 
   const m = await prisma.market.findUnique({ where: { id: String(id) } })
   if (!m) return { notFound: true }
 
