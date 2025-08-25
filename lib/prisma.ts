@@ -1,31 +1,28 @@
 // lib/prisma.ts
 import { PrismaClient } from '@prisma/client'
 
-/**
- * Prisma must NOT be used in the Edge runtime.
- * Ensure any route using this runs on Node.js runtime.
- */
+/** Block Edge runtime (Prisma needs Node.js) */
 if (typeof (globalThis as any).EdgeRuntime !== 'undefined') {
   throw new Error('Prisma is not supported in the Edge runtime. Use runtime: "nodejs".')
 }
 
-// Keep one instance during hot-reload in dev
+/** Reuse a single client in dev */
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient }
 const isDev = process.env.NODE_ENV !== 'production'
 
-const prisma =
+const prisma: PrismaClient =
   globalForPrisma.prisma ??
   new PrismaClient({
     log: isDev ? ['query', 'info', 'warn', 'error'] : ['warn', 'error'],
   })
 
+/** Attach middleware only if the client actually has `$use` */
+const hasUse = typeof (prisma as any)?.$use === 'function'
+const MW_KEY = Symbol.for('prisma.middleware.attached')
 
-const MW_KEY = Symbol.for('prisma.timingMw.attached')
-const g: any = globalThis
-if (!g[MW_KEY]) {
-  g[MW_KEY] = true
-
-  prisma.$use(async (params, next) => {
+if (hasUse && !(globalThis as any)[MW_KEY]) {
+  ;(globalThis as any)[MW_KEY] = true
+  ;(prisma as any).$use(async (params: any, next: any) => {
     const start = isDev ? Date.now() : 0
     try {
       const result = await next(params)
@@ -55,26 +52,15 @@ if (!g[MW_KEY]) {
       throw err
     }
   })
+} else if (!hasUse) {
+  // Last‑ditch safety: don't throw — just warn and keep exporting the client
+  if (isDev) console.warn('⚠️ prisma.$use is not a function; exporting client without middleware.')
 }
 
-// expose single instance in dev
 if (isDev) globalForPrisma.prisma = prisma
 
-// optional: graceful disconnect (handy for local scripts)
 process.on('beforeExit', async () => {
-  try {
-    await prisma.$disconnect()
-  } catch {
-    /* ignore */
-  }
+  try { await prisma.$disconnect() } catch {}
 })
 
-/** ESM + CJS + named compatibility */
-export { prisma }                           // supports: import { prisma } from '.../lib/prisma'
-export default prisma                       // supports: import prisma from '.../lib/prisma'
-// Support require()/transpile edge cases
-// @ts-ignore
-if (typeof module !== 'undefined' && module.exports) {
-  ;(module as any).exports = prisma
-  ;(module as any).exports.default = prisma
-}
+export default prisma
