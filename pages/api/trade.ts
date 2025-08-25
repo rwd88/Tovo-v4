@@ -1,6 +1,6 @@
 // pages/api/trade.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { prisma } from '../../lib/prisma'
+import prisma from '../../lib/prisma'
 import { sendAdminAlert } from '../../lib/telegram'
 
 type TradeSide = 'YES' | 'NO'

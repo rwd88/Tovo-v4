@@ -1,6 +1,6 @@
 // pages/api/settle-markets.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { prisma } from '../../lib/prisma'
+import prisma from '../../lib/prisma'
 
 interface SettlementResult {
   success: boolean

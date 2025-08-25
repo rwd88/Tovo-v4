@@ -1,6 +1,6 @@
 // pages/api/nonce.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { prisma } from '../../lib/prisma'
+import prisma from '../../lib/prisma'
 import { v4 as uuid } from 'uuid'
 import { rateLimiter } from '../../lib/rateLimiter'
 

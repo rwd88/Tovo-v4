@@ -1,7 +1,7 @@
 // src/bot/bot.ts
 import { Telegraf, session, Markup } from 'telegraf'
 import type { Context, Message } from 'telegraf'
-import { prisma } from '../../lib/prisma'
+import prisma from '../../lib/prisma'
 import { sendAdminAlert } from '../../lib/telegram'
 import { formatMarketHtml, escapeHtml } from '../../lib/market-utils'
 

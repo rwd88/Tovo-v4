@@ -1,6 +1,6 @@
 // pages/api/trade/Create.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { prisma } from '../../../lib/prisma';
+import prisma from '../../../lib/prisma'
 import { sendTelegramMessage } from '../../../lib/telegram';
 
 type TradeType = 'YES' | 'NO';

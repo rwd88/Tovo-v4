@@ -2,7 +2,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { JsonRpcProvider }             from 'ethers'
-import { prisma }                      from '../../../lib/prisma'
+import prisma from '../../../lib/prisma'
 
 // Make sure you set an EVM_CHAIN_ID env var (e.g. "1" for mainnet)
 const EVM_CHAIN_ID = parseInt(process.env.EVM_CHAIN_ID || '', 10)
