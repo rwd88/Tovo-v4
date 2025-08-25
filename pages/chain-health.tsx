@@ -1,7 +1,7 @@
 // pages/chain-health.tsx
 import { useEffect, useState } from "react";
-import { getReadContract, getWriteContract } from "@/lib/contract-instance";
-import { CONTRACT_ADDRESS } from "@/lib/contracts";
+import { getReadContract, getWriteContract } from "../src/lib/contract-instance";
+import { CONTRACT_ADDRESS } from "../src/lib/contracts";
 
 type Health = {
   network: string;
