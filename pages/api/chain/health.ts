@@ -1,7 +1,7 @@
 // pages/api/chain/health.ts
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getPublicProvider } from "@/lib/provider";
-import { CONTRACT_ADDRESS } from "@/lib/contracts";
+import { getPublicProvider } from "../../../src/lib/provider";
+import { CONTRACT_ADDRESS } from "../../../src/lib/contracts";
 import { ethers } from "ethers";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
