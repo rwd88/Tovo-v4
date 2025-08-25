@@ -1,9 +1,9 @@
 // pages/api/cron/publish-market/[id].ts
 
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { prisma } from '@/lib/prisma'
-import { sendTelegramMessage, sendAdminAlert } from '@/lib/telegram'
-import { formatMarketHtml } from '@/lib/market-utils'
+import { prisma } from '../../../../lib/prisma'
+import { sendTelegramMessage, sendAdminAlert } from '../../../../lib/telegram'
+import { formatMarketHtml } from '../../../../lib/market-utils'
 
 export default async function handler(
   req: NextApiRequest,
