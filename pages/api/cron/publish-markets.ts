@@ -2,7 +2,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { prisma } from '../../../lib/prisma'
 import { sendTelegramMessage, sendAdminAlert } from '../../../lib/telegram'
-import { escapeHtml, formatMarketHtml } from '../../lib/market-utils'
+import { escapeHtml, formatMarketHtml } from '../../../lib/market-utils'
 
 interface PublishResponse {
   success:   boolean

@@ -1,6 +1,6 @@
 // pages/api/cron/archive-old-markets.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { prisma } from '@/lib/prisma'
+import { prisma } from '../../../lib/prisma'
 
 export const config = {
   api: { bodyParser: false },

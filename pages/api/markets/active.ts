@@ -1,6 +1,6 @@
 // pages/api/markets/active.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { prisma } from '@/lib/prisma'
+import { prisma } from '../../../lib/prisma'
 
 export type ActiveMarket = {
   id: string
