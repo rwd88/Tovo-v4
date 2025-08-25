@@ -1,7 +1,7 @@
 'use client';
 
 import { useAccount, useReadContract, useWriteContract } from 'wagmi';
-import { COUNTER_ADDRESS, COUNTER_ABI } from '@/lib/contracts';
+import { COUNTER_ADDRESS, COUNTER_ABI } from '../lib/contracts';
 import { useState } from 'react';
 
 export default function CounterClient() {

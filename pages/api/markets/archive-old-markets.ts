@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { prisma } from "../../../lib/prisma";
+import prisma from "../../../lib/prisma"                 // ✅ default import, correct path
 
 export const config = {
   api: { bodyParser: false },

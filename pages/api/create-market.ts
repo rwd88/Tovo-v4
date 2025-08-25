@@ -1,17 +1,17 @@
 // pages/api/create-market.ts
 import type { NextApiRequest, NextApiResponse } from "next"
-import { prisma } from '../../lib/prisma'
+import prisma from "../../lib/prisma"                 // ✅ default import, correct path
 import { sendMarketToTelegram } from "../../lib/telegram/sendMarket"
 
 interface CreateMarketRequest {
-  externalId:  string
-  question:    string
-  status:      string
-  eventTime:   string | Date
-  forecast?:   number
-  outcome?:    string
-  poolYes:     number
-  poolNo:      number
+  externalId: string
+  question: string
+  status: string
+  eventTime: string | Date
+  forecast?: number
+  outcome?: string
+  poolYes: number
+  poolNo: number
 }
 
 type CreateMarketResponse =
@@ -27,7 +27,7 @@ export default async function handler(
     return res.status(405).json({ success: false, error: "Only POST allowed" })
   }
 
-  // 2) Secret‐check
+  // 2) Secret check
   const secret = req.query.secret as string
   if (secret !== process.env.CRON_SECRET) {
     return res
@@ -53,7 +53,7 @@ export default async function handler(
     !status ||
     !eventTime ||
     typeof poolYes !== "number" ||
-    typeof poolNo  !== "number"
+    typeof poolNo !== "number"
   ) {
     return res
       .status(400)
@@ -70,7 +70,7 @@ export default async function handler(
       poolYes,
       poolNo,
       ...(forecast !== undefined ? { forecast } : {}),
-      ...(outcome  !== undefined ? { resolvedOutcome: outcome } : {}),
+      ...(outcome !== undefined ? { resolvedOutcome: outcome } : {}),
     }
 
     // 5) Create

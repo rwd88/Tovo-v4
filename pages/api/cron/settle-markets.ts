@@ -1,6 +1,6 @@
 // pages/api/cron/settle-markets.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { prisma } from '../../../lib/prisma'
+import  prisma  from '../../../lib/prisma'
 import { determineMarketResult } from '../../../lib/market-utils'
 import { sendCronSummary, sendAdminAlert } from '../../../lib/telegram'
 import { payToken, payHouse } from '../../../lib/payout'

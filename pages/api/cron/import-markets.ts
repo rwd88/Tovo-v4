@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import axios from "axios";
 import { parseStringPromise } from "xml2js";
-import { prisma } from "../../../lib/prisma";
+import  prisma  from '../../../lib/prisma'
 import { sendAdminAlert } from "../../../lib/telegram";
 
 export const config = {
