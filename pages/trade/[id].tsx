@@ -8,7 +8,8 @@ import type { GetServerSideProps } from 'next'
 import type { Market } from '@prisma/client'
 import { useEthereum } from '../../contexts/EthereumContext'
 import dynamic from 'next/dynamic'
-import { BrowserProvider, Contract, parseUnits } from 'ethers'
+import { BrowserProvider, Contract, parseUnits, parseEther } from 'ethers'
+import { RUNTIME } from '../../lib/runtimeConfig' // ✅ NEW
 
 const WalletDrawer = dynamic(() => import('../../components/WalletDrawer'), { ssr: false })
 
@@ -23,14 +24,17 @@ const ERC20_ABI = [
   'function decimals() view returns (uint8)',
 ]
 const MARKET_ABI = [
-  // common variants – we’ll try in order
+  // token-based
   'function bet(uint256 marketId, uint8 side, uint256 amount) external',
   'function placeBet(uint256 marketId, bool side, uint256 amount) external',
+  // ETH (payable) variants
+  'function bet(uint256 marketId, uint8 side) payable',
+  'function placeBet(uint256 marketId, bool side) payable',
 ]
-
-const USDC = process.env.NEXT_PUBLIC_USDC_ADDRESS || ''
-const MARKET_ADDR = process.env.NEXT_PUBLIC_MARKET_ADDRESS || ''
+const USDC = RUNTIME.USDC // undefined in ETH mode
+const MARKET_ADDR = RUNTIME.MARKET
 const FEE_BPS = Number(process.env.NEXT_PUBLIC_TRADE_FEE_BPS ?? 100) // 1%
+
 
 export default function TradePage({ market: initialMarket, initialSide }: Props) {
   const { address } = useEthereum()
