@@ -1,80 +1,73 @@
-import type { NextApiRequest, NextApiResponse } from "next";
-import prisma from "../../../lib/prisma"                 // ✅ default import, correct path
+// pages/api/markets/archive-old-markets.ts
+import type { NextApiRequest, NextApiResponse } from 'next'
+import  prisma  from '../../../lib/prisma'
 
-export const config = {
-  api: { bodyParser: false },
-  maxDuration: 60,
-};
+type Q = {
+  limit?: string
+  cursor?: string // id of the last item from previous page
+  before?: string // ISO date to filter older than; default now
+  status?: 'closed' | 'settled' | 'any'
+}
 
-type Resp = {
-  ok: boolean;
-  archived?: number;
-  deleted?: number;
-  error?: string;
-};
+function serialize(m: any) {
+  return {
+    ...m,
+    onchainId:
+      m.onchainId === null || m.onchainId === undefined
+        ? null
+        : typeof m.onchainId === 'bigint'
+        ? m.onchainId.toString()
+        : `${m.onchainId}`,
+  }
+}
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse<Resp>
-) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
+
+  const { limit = '50', cursor, before, status = 'any' } = (req.query as any) || {}
+  const take = Math.min(Math.max(parseInt(String(limit), 10) || 50, 1), 100)
+
+  const beforeDate = before ? new Date(before) : new Date()
+
+  // status filter
+  const statusFilter =
+    status === 'closed' || status === 'settled'
+      ? { status }
+      : { status: { in: ['closed', 'settled'] as const } }
+
   try {
-    const token =
-      (req.query.secret as string) ||
-      req.headers.authorization?.replace("Bearer ", "") ||
-      (req.headers["x-cron-secret"] as string) ||
-      "";
-
-    if (token !== (process.env.CRON_SECRET || "12345A")) {
-      return res.status(403).json({ ok: false, error: "Unauthorized" });
-    }
-
-    if (req.method !== "GET") {
-      return res.status(405).json({ ok: false, error: "Method not allowed" });
-    }
-
-    const now = new Date();
-
-    // 1️⃣ Archive: past un-resolved events
-    const archiveResult = await prisma.market.updateMany({
+    const rows = await prisma.market.findMany({
       where: {
-        status: { in: ["open", "OPEN"] },
-        resolved: false,
-        resolvedOutcome: null,
-        eventTime: { lt: now },
+        ...statusFilter,
+        // older than a given date (default: now)
+        eventTime: { lt: beforeDate },
       },
-      data: { status: "archived" },
-    });
+      orderBy: { eventTime: 'desc' },
+      take: take + 1,
+      ...(cursor ? { skip: 1, cursor: { id: String(cursor) } } : {}),
+      select: {
+        id: true,
+        onchainId: true, // ✅ include on-chain numeric id
+        question: true,
+        eventTime: true,
+        poolYes: true,
+        poolNo: true,
+        status: true,
+        resolved: true,
+        resolvedOutcome: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    })
 
-    // 2️⃣ Optional hard delete for long-archived
-    const retentionDays = Number(process.env.ARCHIVE_RETENTION_DAYS ?? 30);
-    const cutoff = new Date(now.getTime() - retentionDays * 24 * 60 * 60 * 1000);
+    const hasMore = rows.length > take
+    const items = hasMore ? rows.slice(0, take) : rows
+    const markets = items.map(serialize)
+    const nextCursor = hasMore ? items[items.length - 1].id : null
 
-    const oldArchived = await prisma.market.findMany({
-      where: { status: "archived", eventTime: { lt: cutoff } },
-      select: { id: true },
-      take: 100,
-    });
-
-    let deleted = 0;
-    if (oldArchived.length > 0) {
-      const ids = oldArchived.map((m) => m.id);
-      await prisma.$transaction([
-        prisma.trade.deleteMany({ where: { marketId: { in: ids } } }),
-        prisma.outcome.deleteMany({ where: { marketId: { in: ids } } }),
-        prisma.market.deleteMany({ where: { id: { in: ids } } }),
-      ]);
-      deleted = ids.length;
-    }
-
-    return res.status(200).json({
-      ok: true,
-      archived: archiveResult.count,
-      deleted,
-    });
+    return res.json({ markets, nextCursor })
   } catch (err: any) {
-    console.error("❌ archive-old-markets failed", err);
-    return res
-      .status(500)
-      .json({ ok: false, error: err.message || "Server error" });
+    console.error('archive markets error:', err)
+    return res.status(500).json({ error: 'Failed to load archived markets' })
   }
 }

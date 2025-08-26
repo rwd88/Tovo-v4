@@ -1,72 +1,64 @@
 // pages/api/markets/active.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
-import prisma from '../../../lib/prisma'
+import  prisma  from '../../../lib/prisma'
 
-
-export type ActiveMarket = {
-  id: string
-  question: string
-  eventTime: string   // ISO
-  poolYes: number
-  poolNo: number
-  houseProfit: number | null
-  tag: string | null
+type Q = {
+  limit?: string
+  cursor?: string // id of the last item from previous page
 }
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse<ActiveMarket[] | { error: string }>
-) {
-  if (req.method !== 'GET') {
-    res.setHeader('Allow', ['GET'])
-    return res.status(405).json({ error: `Method ${req.method} Not Allowed` })
+function serialize(m: any) {
+  return {
+    ...m,
+    // Ensure BigInt is JSON-safe and works with /^\d+$/
+    onchainId:
+      m.onchainId === null || m.onchainId === undefined
+        ? null
+        : typeof m.onchainId === 'bigint'
+        ? m.onchainId.toString()
+        : `${m.onchainId}`,
   }
+}
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
+
+  const { limit = '50', cursor }: Q = (req.query as any) || {}
+  const take = Math.min(Math.max(parseInt(String(limit), 10) || 50, 1), 100)
 
   try {
-    // Avoid stale lists
-    res.setHeader('Cache-Control', 'no-store')
+    const where = {
+      status: 'open' as const,
+    }
 
-    const now = new Date() // UTC
-    const skip = Number.parseInt((req.query.skip as string) ?? '0', 10)
-    const take =
-      Number.isFinite(Number(req.query.take)) && Number(req.query.take) > 0
-        ? Math.min(Number(req.query.take), 50)
-        : 20
-
-    const markets = await prisma.market.findMany({
-      where: {
-        status: { in: ['open', 'OPEN'] }, // tolerate case
-        resolved: false,
-        resolvedOutcome: null,
-        eventTime: { gt: now },           // ✅ only future events
-      },
-      orderBy: { eventTime: 'asc' },      // soonest first
-      skip,
-      take,
+    const rows = await prisma.market.findMany({
+      where,
+      orderBy: { eventTime: 'asc' },
+      take: take + 1, // fetch one extra to know if there's a next page
+      ...(cursor ? { skip: 1, cursor: { id: String(cursor) } } : {}),
       select: {
         id: true,
+        onchainId: true, // ✅ include on-chain numeric id
         question: true,
         eventTime: true,
         poolYes: true,
         poolNo: true,
-        houseProfit: true,
-        tag: true,
+        status: true,
+        resolved: true,
+        resolvedOutcome: true,
+        createdAt: true,
+        updatedAt: true,
       },
     })
 
-    const payload: ActiveMarket[] = markets.map((m) => ({
-      id: m.id,
-      question: m.question,
-      eventTime: m.eventTime.toISOString(),
-      poolYes: m.poolYes,
-      poolNo: m.poolNo,
-      houseProfit: m.houseProfit,
-      tag: m.tag,
-    }))
+    const hasMore = rows.length > take
+    const items = hasMore ? rows.slice(0, take) : rows
+    const markets = items.map(serialize)
+    const nextCursor = hasMore ? items[items.length - 1].id : null
 
-    return res.status(200).json(payload)
-  } catch (err) {
-    console.error('[/api/markets/active] Error:', err)
+    return res.json({ markets, nextCursor })
+  } catch (err: any) {
+    console.error('active markets error:', err)
     return res.status(500).json({ error: 'Failed to load active markets' })
   }
 }
