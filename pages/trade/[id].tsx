@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import type { GetServerSideProps, NextPage } from 'next'
 import { BrowserProvider, Contract, parseEther, parseUnits } from 'ethers'
-import { RUNTIME } from '@/lib/runtimeConfig'
+import { RUNTIME } from '../../lib/runtimeConfig'
 
 // --- Types (align with your Prisma model) ---
 type Market = {
