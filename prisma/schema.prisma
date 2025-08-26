@@ -30,6 +30,7 @@ model Market {
   poolYes         Float
   poolNo          Float
   status          String    @default("open")
+  onchainId    BigInt?  //
   feeCollected    Float     @default(0)
   createdAt       DateTime  @default(now())
   notified        Boolean   @default(false)
