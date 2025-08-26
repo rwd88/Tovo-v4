@@ -47,7 +47,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       ...(cursor ? { skip: 1, cursor: { id: String(cursor) } } : {}),
       select: {
         id: true,
-        onchainId: true, // ✅ include on-chain numeric id
+        onchainId: true,
         question: true,
         eventTime: true,
         poolYes: true,
