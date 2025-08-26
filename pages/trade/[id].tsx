@@ -1,60 +1,79 @@
+// /pages/trade/[id].tsx
 'use client'
 
 import Head from 'next/head'
 import Image from 'next/image'
 import Link from 'next/link'
-import { useState } from 'react'
-import type { GetServerSideProps } from 'next'
-import type { Market } from '@prisma/client'
-import { useEthereum } from '../../contexts/EthereumContext'
-import dynamic from 'next/dynamic'
-import { BrowserProvider, Contract, parseUnits, parseEther } from 'ethers'
-import { RUNTIME } from '../../lib/runtimeConfig' // ✅ NEW
+import { useMemo, useState } from 'react'
+import type { GetServerSideProps, NextPage } from 'next'
+import { BrowserProvider, Contract, parseEther, parseUnits } from 'ethers'
+import { RUNTIME } from '@/lib/runtimeConfig'
 
-const WalletDrawer = dynamic(() => import('../../components/WalletDrawer'), { ssr: false })
+// --- Types (align with your Prisma model) ---
+type Market = {
+  id: string
+  question: string
+  eventTime: string // ISO
+  poolYes: number
+  poolNo: number
+  status: 'open' | 'closed' | 'settled'
+  resolved?: boolean | null
+  resolvedOutcome?: 'YES' | 'NO' | null
+}
 
 type Props = {
-  market: Omit<Market, 'eventTime'> & { eventTime: string }
+  market: Market
   initialSide: 'yes' | 'no'
 }
 
+// --- ABIs (token + ETH variants; we'll try/catch to pick the right one) ---
 const ERC20_ABI = [
   'function allowance(address owner, address spender) view returns (uint256)',
   'function approve(address spender, uint256 amount) returns (bool)',
   'function decimals() view returns (uint8)',
 ]
+
 const MARKET_ABI = [
-  // token-based
+  // token variants (no value)
   'function bet(uint256 marketId, uint8 side, uint256 amount) external',
   'function placeBet(uint256 marketId, bool side, uint256 amount) external',
-  // ETH (payable) variants
+  // ETH variants (payable)
   'function bet(uint256 marketId, uint8 side) payable',
   'function placeBet(uint256 marketId, bool side) payable',
 ]
-const USDC = RUNTIME.USDC // undefined in ETH mode
+
+// --- Config from env (via runtimeConfig.ts) ---
 const MARKET_ADDR = RUNTIME.MARKET
+const USDC = RUNTIME.USDC // undefined in ETH mode
+const CHAIN_ID = RUNTIME.CHAIN_ID
 const FEE_BPS = Number(process.env.NEXT_PUBLIC_TRADE_FEE_BPS ?? 100) // 1%
 
-
-export default function TradePage({ market: initialMarket, initialSide }: Props) {
-  const { address } = useEthereum()
-  const [market, setMarket] = useState(initialMarket)
-  const [amount, setAmount] = useState('1.0')
+const TradePage: NextPage<Props> = ({ market, initialSide }) => {
+  const [side, setSide] = useState<'YES' | 'NO'>(initialSide === 'no' ? 'NO' : 'YES')
+  const [amount, setAmount] = useState<string>('0.01')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
-  const [drawerOpen, setDrawerOpen] = useState(false)
-  const [selectedSide, setSelectedSide] = useState<'yes' | 'no' | null>(initialSide)
 
-  const total = market.poolYes + market.poolNo
-  const yesPct = total > 0 ? (market.poolYes / total) * 100 : 0
+  const isClosed = useMemo(() => {
+    try {
+      return new Date(market.eventTime).getTime() <= Date.now()
+    } catch {
+      return false
+    }
+  }, [market.eventTime])
+
+  const yesPct = useMemo(() => {
+    const y = Number(market.poolYes || 0)
+    const n = Number(market.poolNo || 0)
+    const t = y + n
+    return t > 0 ? (y / t) * 100 : 50
+  }, [market.poolYes, market.poolNo])
+
   const noPct = 100 - yesPct
 
-  const apiSide: 'YES' | 'NO' | null =
-    selectedSide === 'yes' ? 'YES' : selectedSide === 'no' ? 'NO' : null
-
   async function ensureApprove(signer: any, owner: string, spender: string, unitsNeeded: bigint) {
+    if (!USDC) return // ETH mode: nothing to approve
     const usdc = new Contract(USDC, ERC20_ABI, signer)
-    // USDC is 6 decimals; parseUnits already used with 6
     const allowance: bigint = await usdc.allowance(owner, spender)
     if (allowance >= unitsNeeded) return
     const tx = await usdc.approve(spender, unitsNeeded)
@@ -64,48 +83,73 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
   const handleTrade = async () => {
     setMessage(null)
 
-    if (!address) return setMessage('❌ Connect your wallet first.')
-    if (!apiSide) return setMessage('❌ Choose Yes or No.')
-    if (!USDC || !MARKET_ADDR) return setMessage('❌ Missing token/market config.')
+    if (!MARKET_ADDR) return setMessage('❌ Missing market config.')
+    if (isClosed) return setMessage('❌ Market already closed.')
     const amt = Number(amount)
     if (!Number.isFinite(amt) || amt <= 0) return setMessage('❌ Enter a positive amount.')
-    if (new Date(market.eventTime).getTime() <= Date.now()) {
-      return setMessage('❌ Market already closed.')
-    }
 
     try {
       setLoading(true)
 
-      // 1) Connect wallet
-      if (!(globalThis as any).ethereum) throw new Error('No wallet detected')
-      const provider = new BrowserProvider((globalThis as any).ethereum)
+      // wallet
+      const eth = (globalThis as any).ethereum
+      if (!eth) throw new Error('No wallet detected')
+
+      const provider = new BrowserProvider(eth)
       const signer = await provider.getSigner()
+
+      // Optional: ensure network
+      const net = await provider.getNetwork()
+      if (Number(net.chainId) !== CHAIN_ID) {
+        // You can programmatically request switch if you want:
+        // await eth.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0xAA36A7' }] })
+        // For now, just show a friendly message:
+        throw new Error(`Wrong network. Please switch to chain ${CHAIN_ID}.`)
+      }
+
       const from = await signer.getAddress()
-
-      // 2) Compute trade + fee and approve token
-      const fee = (amt * FEE_BPS) / 10_000
-      const totalDebit = +(amt + fee).toFixed(6)
-      const units = parseUnits(totalDebit.toString(), 6) // USDC 6 decimals
-      await ensureApprove(signer, from, MARKET_ADDR, units)
-
-      // 3) Call market contract (try both bet() and placeBet())
       const marketContract = new Contract(MARKET_ADDR, MARKET_ABI, signer)
       const marketId = market.id
-      const sideYesBool = apiSide === 'YES'
-      const sideYesUint = sideYesBool ? 1 : 2 // assuming 1=Yes, 2=No for bet(uint8)
+      const sideYesBool = side === 'YES'
+      const sideYesUint = sideYesBool ? 1 : 2
 
       let tx
-      try {
-        // try bet(uint256,uint8,uint256)
-        tx = await marketContract.bet(marketId, sideYesUint, parseUnits(amt.toString(), 6))
-      } catch {
-        // fallback to placeBet(uint256,bool,uint256)
-        tx = await marketContract.placeBet(marketId, sideYesBool, parseUnits(amt.toString(), 6))
+
+      if (!USDC) {
+        // ETH MODE
+        const fee = (amt * FEE_BPS) / 10_000
+        const totalEth = +(amt + fee).toFixed(6)
+
+        try {
+          // try tokenless bet(uint256,uint8) payable
+          tx = await marketContract.bet(marketId, sideYesUint, {
+            value: parseEther(totalEth.toString()),
+          })
+        } catch {
+          // fallback to placeBet(uint256,bool) payable
+          tx = await marketContract.placeBet(marketId, sideYesBool, {
+            value: parseEther(totalEth.toString()),
+          })
+        }
+      } else {
+        // USDC MODE
+        const fee = (amt * FEE_BPS) / 10_000
+        const totalDebit = +(amt + fee).toFixed(6)
+        const units = parseUnits(totalDebit.toString(), 6) // USDC has 6 decimals
+
+        await ensureApprove(signer, from, MARKET_ADDR, units)
+
+        try {
+          tx = await marketContract.bet(marketId, sideYesUint, parseUnits(amt.toString(), 6))
+        } catch {
+          tx = await marketContract.placeBet(marketId, sideYesBool, parseUnits(amt.toString(), 6))
+        }
       }
+
       const receipt = await tx.wait()
       if (!receipt || receipt.status !== 1) throw new Error('Transaction failed')
 
-      // 4) Optional: tell backend to log (non-blocking)
+      // Fire-and-forget server log (optional)
       try {
         await fetch('/api/trade', {
           method: 'POST',
@@ -114,147 +158,163 @@ export default function TradePage({ market: initialMarket, initialSide }: Props)
             marketId,
             walletAddress: from,
             amount: amt,
-            side: apiSide,
+            side,
             txHash: tx.hash,
           }),
         })
       } catch {}
 
-      setMessage('✅ Trade submitted on-chain!')
+      setMessage('✅ Trade submitted!')
     } catch (err: any) {
       console.error(err)
-      setMessage(`❌ ${err?.message || 'Server error'}`)
+      setMessage(`❌ ${err?.message || 'Something went wrong'}`)
     } finally {
       setLoading(false)
     }
   }
 
+  // Temporary probe (you can remove after confirming)
+  if (typeof window !== 'undefined') {
+    // eslint-disable-next-line no-console
+    console.log('CFG', { MARKET_ADDR, USDC, CHAIN_ID })
+  }
+
   return (
-    <div className="trade-wrapper min-h-screen bg-white text-black font-[Montserrat] relative" id="trade-page">
+    <>
       <Head>
         <title>Market {market.id} | Tovo</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="theme-color" content="#ffffff" />
       </Head>
 
-      {/* Wallet Drawer */}
-      <WalletDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      <div className="trade-wrapper min-h-screen bg-white text-black font-[Montserrat] relative" id="trade-page">
+        <header id="trade-header" className="flex items-center justify-between px-4 py-4 fixed top-0 w-full bg-white dark:bg-[#0a0a0a] z-20">
+          <Link href="/">
+            <Image src="/logo.png" width={120} height={24} alt="Tovo" style={{ objectFit: 'contain' }} />
+          </Link>
+          <button className="wallet-toggle-btn">
+            <Image src="/connect wallet.svg" alt="Connect Wallet" width={120} height={24} />
+          </button>
+        </header>
 
-      {/* Header */}
-      <header id="trade-header" className="flex items-center justify-between px-4 py-4 fixed top-0 w-full bg-white dark:bg-[#0a0a0a] z-20">
-        <Link href="/">
-          <Image src="/logo.png" alt="Tovo" width={120} height={24} style={{ objectFit: 'contain' }} />
-        </Link>
-        <button onClick={() => setDrawerOpen((v) => !v)} className="wallet-toggle-btn">
-          <Image src="/connect wallet.svg" alt="Connect Wallet" width={120} height={24} />
-        </button>
-      </header>
+        <main id="trade-main" className="px-4 py-4 max-w-md mx-auto mt-20">
+          <div id="trade-title" className="text-center mb-6">
+            <h1 className="text-[#00B89F] uppercase text-sm font-semibold tracking-wide">Prediction Markets Today</h1>
+          </div>
 
-      {/* Main */}
-      <main id="trade-main" className="px-4 py-4 max-w-md mx-auto mt-20">
-        <div id="trade-title" className="text-center mb-6">
-          <h1 className="text-[#00B89F] uppercase text-sm font-semibold tracking-wide">
-            Prediction Markets Today
-          </h1>
-        </div>
-
-        <div id="trade-box" className="bg-[#003E37] rounded-xl px-6 py-8 text-center space-y-4 text-white">
-          <h2 id="trade-question" className="text-xl font-semibold">{market.question}</h2>
-
-          <p id="trade-endtime" className="text-sm text-gray-300">
-            Ends on{' '}
-            {new Date(market.eventTime).toLocaleString('en-US', {
-              month: 'numeric',
-              day: 'numeric',
-              year: 'numeric',
-              hour: 'numeric',
-              minute: '2-digit',
-            })}
-          </p>
-
-          {market.forecast != null && (
-            <p id="trade-forecast" className="text-sm text-gray-300">
-              Forecast: {market.forecast.toFixed(1)}%
+          <div id="trade-box" className="bg-[#003E37] rounded-xl px-6 py-8 text-center space-y-4 text-white">
+            <h2 id="trade-question" className="text-xl font-semibold">{market.question}</h2>
+            <p id="trade-endtime" className="text-sm text-gray-300">
+              Ends on{' '}
+              {new Date(market.eventTime).toLocaleString(undefined, {
+                hour12: true,
+                month: 'numeric',
+                day: 'numeric',
+                year: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+              })}
             </p>
-          )}
 
-          <p id="trade-pools" className="text-sm font-medium text-gray-200">
-            {market.forecast != null ? (
-              <>
-                {yesPct.toFixed(1)}% say it will be above {market.forecast.toFixed(1)}% —{' '}
-                {noPct.toFixed(1)}% say it will be below
-              </>
-            ) : (
-              <>
-                {yesPct.toFixed(1)}% Yes — {noPct.toFixed(1)}% No
-              </>
-            )}
-          </p>
+            <p id="trade-pools" className="text-sm font-medium text-gray-200">
+              {yesPct.toFixed(1)}% Yes — {noPct.toFixed(1)}% No
+            </p>
 
-          {/* Progress bar */}
-          <div id="trade-progress" className="h-2 w-full bg-[#E5E5E5] rounded-full overflow-hidden">
-            <div className="h-full bg-[#00B89F]" style={{ width: `${yesPct}%` }} />
+            <div id="trade-progress" className="h-2 w-full bg-[#E5E5E5] rounded-full overflow-hidden">
+              <div className="h-full bg-[#00B89F]" style={{ width: `${yesPct}%` }} />
+            </div>
+
+            <div id="trade-buttons" className="flex justify-center gap-4 mt-4">
+              <button
+                className={`w-24 py-2 border rounded-full font-medium transition ${
+                  side === 'YES' ? 'bg-white text-black border-white' : 'border-white text-white hover:bg-white hover:text-black'
+                }`}
+                onClick={() => setSide('YES')}
+              >
+                Yes
+              </button>
+              <button
+                className={`w-24 py-2 border rounded-full font-medium transition ${
+                  side === 'NO' ? 'bg-white text-black border-white' : 'border-white text-white hover:bg-white hover:text-black'
+                }`}
+                onClick={() => setSide('NO')}
+              >
+                No
+              </button>
+            </div>
+
+            <div id="trade-form" className="mt-4 space-y-2">
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                className="w-full p-2 rounded-md border border-gray-300 text-sm text-black"
+                placeholder="Enter amount"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+              />
+
+              {!MARKET_ADDR ? (
+                <p className="text-red-400 text-sm">❌ Missing market config.</p>
+              ) : USDC ? (
+                <p className="text-xs text-gray-300">USDC mode (ERC-20): first trade may ask for Approve, then Trade.</p>
+              ) : (
+                <p className="text-xs text-gray-300">ETH mode: one transaction with value.</p>
+              )}
+
+              <button
+                disabled={loading || !MARKET_ADDR || isClosed}
+                onClick={handleTrade}
+                className="w-full bg-[#00B89F] text-white font-semibold py-2 rounded-md disabled:opacity-60"
+              >
+                {loading ? 'Submitting…' : 'Confirm Bet'}
+              </button>
+
+              {message && <p className="mt-2 text-sm">{message}</p>}
+            </div>
           </div>
-
-          {/* Yes / No buttons */}
-          <div id="trade-buttons" className="flex justify-center gap-4 mt-4">
-            <button
-              onClick={() => { setAmount('1.0'); setSelectedSide('yes') }}
-              className={`w-24 py-2 border rounded-full font-medium transition ${
-                selectedSide === 'yes'
-                  ? 'bg-white text-black border-white'
-                  : 'border-white text-white hover:bg-white hover:text-black'
-              }`}
-            >
-              Yes
-            </button>
-            <button
-              onClick={() => { setAmount('1.0'); setSelectedSide('no') }}
-              className={`w-24 py-2 border rounded-full font-medium transition ${
-                selectedSide === 'no'
-                  ? 'bg-white text-black border-white'
-                  : 'border-white text-white hover:bg-white hover:text-black'
-              }`}
-            >
-              No
-            </button>
-          </div>
-
-          {/* Trade form */}
-          <div id="trade-form" className="mt-4 space-y-2">
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              className="w-full p-2 rounded-md border border-gray-300 text-sm text-black"
-              placeholder="Enter amount"
-            />
-            <button
-              onClick={handleTrade}
-              disabled={loading}
-              className="w-full bg-[#00B89F] text-white font-semibold py-2 rounded-md"
-            >
-              {loading ? 'Placing bet...' : 'Confirm Bet'}
-            </button>
-          </div>
-
-          {message && <div id="trade-message" className="text-sm mt-2">{message}</div>}
-        </div>
-      </main>
-    </div>
+        </main>
+      </div>
+    </>
   )
 }
 
-export const getServerSideProps: GetServerSideProps<Props> = async (ctx) => {
-  const { id, side } = ctx.query
-const prisma = (await import('../../lib/prisma')).default 
-  const m = await prisma.market.findUnique({ where: { id: String(id) } })
-  if (!m) return { notFound: true }
+export default TradePage
 
+// --- Keep your own DB lookup if you already have it ---
+// This generic SSR fallback fetches a market JSON your API must provide.
+// If you already have working getServerSideProps, keep it instead.
+export const getServerSideProps: GetServerSideProps<Props> = async (ctx) => {
+  const id = ctx.params?.id as string
+  const side = (ctx.query.side as string) || 'yes'
+
+  // Try to fetch from your own API route (adjust path if needed)
+  const base = process.env.NEXT_PUBLIC_BASE_URL || `https://${ctx.req.headers.host}`
+  const res = await fetch(`${base}/api/markets/${id}`).catch(() => null)
+
+  if (!res || !res.ok) {
+    // Minimal placeholder so the page still renders
+    const now = new Date(Date.now() + 60 * 60 * 1000).toISOString()
+    return {
+      props: {
+        initialSide: side === 'no' ? 'no' : 'yes',
+        market: {
+          id,
+          question: 'Market',
+          eventTime: now,
+          poolYes: 1,
+          poolNo: 1,
+          status: 'open',
+          resolved: false,
+          resolvedOutcome: null,
+        },
+      },
+    }
+  }
+
+  const market = (await res.json()) as Market
   return {
     props: {
-      market: { ...m, eventTime: m.eventTime.toISOString() },
+      market,
       initialSide: side === 'no' ? 'no' : 'yes',
     },
   }
