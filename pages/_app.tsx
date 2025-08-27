@@ -1,8 +1,7 @@
-// pages/_app.tsx
 import '../styles/globals.css'
 import type { AppProps } from 'next/app'
 import '@fontsource/montserrat'
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ErrorBoundary } from '../components/ErrorBoundary'
 
 // Wagmi
@@ -13,7 +12,10 @@ import { wagmiConfig } from '../lib/wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 // Solana
-import { ConnectionProvider, WalletProvider as SolanaWalletProvider } from '@solana/wallet-adapter-react'
+import {
+  ConnectionProvider,
+  WalletProvider as SolanaWalletProvider,
+} from '@solana/wallet-adapter-react'
 import { PhantomWalletAdapter } from '@solana/wallet-adapter-wallets'
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui'
 import '@solana/wallet-adapter-react-ui/styles.css'
@@ -27,21 +29,33 @@ import { EthereumProvider } from '../contexts/EthereumContext'
 // React Query client
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      retry: 1,
-    },
+    queries: { refetchOnWindowFocus: false, retry: 1 },
   },
 })
 
 export default function MyApp({ Component, pageProps }: AppProps) {
-  const solanaEndpoint = process.env.NEXT_PUBLIC_SOLANA_RPC_URL as string
-  const solanaWallets = useMemo(() => [new PhantomWalletAdapter()], [])
+  const [isClient, setIsClient] = useState(false)
+  useEffect(() => setIsClient(true), [])
+
+  const solanaEndpoint = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || ''
+  const solanaWallets = useMemo(
+    () => (isClient ? [new PhantomWalletAdapter()] : []),
+    [isClient]
+  )
+
+  // Until client is ready, render the page without heavy wallet providers
+  if (!isClient) {
+    return (
+      <ErrorBoundary>
+        <Component {...pageProps} />
+      </ErrorBoundary>
+    )
+  }
 
   return (
     <ErrorBoundary>
       <TonConnectUIProvider
-        manifestUrl={process.env.NEXT_PUBLIC_TON_MANIFEST_URL!}
+        manifestUrl={process.env.NEXT_PUBLIC_TON_MANIFEST_URL || ''}
         walletsListConfiguration={{
           includeWallets: [
             {
@@ -59,7 +73,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
         <ConnectionProvider endpoint={solanaEndpoint}>
           <SolanaWalletProvider wallets={solanaWallets} autoConnect>
             <WalletModalProvider>
-              {/* Wagmi should wrap React Query in v2 */}
+              {/* Wrap app state after wallets are safely client-side */}
               <WagmiProvider config={wagmiConfig}>
                 <QueryClientProvider client={queryClient}>
                   <EthereumProvider>

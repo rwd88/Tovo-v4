@@ -1,14 +1,15 @@
-// next.config.js
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Skip ESLint errors during production builds
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  // Skip TypeScript type‐check errors during production builds
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-};
+  reactStrictMode: true,
+  swcMinify: true,
 
-export default nextConfig;
+  // ✅ lets Chrome DevTools map minified stack traces to your real files/lines in prod
+  productionBrowserSourceMaps: true,
+
+  // (yours) skip lint & TS build errors in prod builds
+  eslint: { ignoreDuringBuilds: true },
+  typescript: { ignoreBuildErrors: true },
+}
+
+// Use CommonJS export for .js files (avoids config import issues)
+module.exports = nextConfig
