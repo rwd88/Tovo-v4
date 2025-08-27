@@ -2,7 +2,8 @@
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
-  // helps debug minified errors in production
+
+  // Helpful for debugging minified prod errors
   productionBrowserSourceMaps: true,
 
   // keep your build skips
@@ -10,4 +11,4 @@ const nextConfig = {
   typescript: { ignoreBuildErrors: true },
 };
 
-export default nextConfig; // ✅ ESM export
+export default nextConfig;

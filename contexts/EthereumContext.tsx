@@ -1,82 +1,78 @@
-'use client'
+// contexts/EthereumContext.tsx
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { BrowserProvider } from 'ethers'
 
-import {
-  useAccount,
-  useConnect,
-  useDisconnect,
-} from 'wagmi'
-import {
-  InjectedConnector,
-  MetaMaskConnector,
-  WalletConnectConnector,
-} from '@wagmi/connectors'
-
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  ReactNode,
-} from 'react'
-
-interface EthereumContextType {
-  address: string | null
-  isConnected: boolean
-  connect: () => Promise<void>
-  disconnect: () => Promise<void>
+type EthereumCtx = {
+  provider: BrowserProvider | null
+  isClient: boolean
+  hasWallet: boolean
+  chainId: number | null
 }
 
-const EthereumContext = createContext<EthereumContextType | undefined>(undefined)
+const defaultCtx: EthereumCtx = {
+  provider: null,
+  isClient: false,
+  hasWallet: false,
+  chainId: null,
+}
 
-export function EthereumProvider({ children }: { children: ReactNode }) {
-  const { address, isConnected } = useAccount()
-  const { connectAsync, connectors } = useConnect()
-  const { disconnectAsync } = useDisconnect()
-  const [mounted, setMounted] = useState(false)
+const Ctx = createContext<EthereumCtx>(defaultCtx)
+
+/**
+ * SSR-safe provider:
+ * - Never accesses window during SSR.
+ * - Initializes provider on client in useEffect.
+ */
+export function EthereumProvider({ children }: { children: React.ReactNode }) {
+  const [state, setState] = useState<EthereumCtx>(defaultCtx)
 
   useEffect(() => {
-    setMounted(true)
+    let mounted = true
+    const eth = (globalThis as any)?.ethereum
+
+    async function init() {
+      if (!mounted) return
+      if (!eth) {
+        setState((s) => ({ ...s, isClient: true, hasWallet: false }))
+        return
+      }
+      try {
+        const provider = new BrowserProvider(eth)
+        const net = await provider.getNetwork().catch(() => null)
+        if (!mounted) return
+        setState({
+          provider,
+          isClient: true,
+          hasWallet: true,
+          chainId: net ? Number(net.chainId) : null,
+        })
+
+        // keep chainId in sync
+        const onChainChanged = (hexId: string) => {
+          if (!mounted) return
+          const id = parseInt(hexId, 16)
+          setState((s) => ({ ...s, chainId: id }))
+        }
+        eth.on?.('chainChanged', onChainChanged)
+        return () => eth.removeListener?.('chainChanged', onChainChanged)
+      } catch {
+        setState((s) => ({ ...s, isClient: true, hasWallet: false }))
+      }
+    }
+
+    init()
+    return () => {
+      mounted = false
+    }
   }, [])
 
-  const connect = async () => {
-    try {
-      const connector =
-        connectors.find((c) => c.id === 'metaMask') ||
-        connectors.find((c) => c.id === 'walletConnect') ||
-        connectors.find((c) => c.id === 'injected')
-
-      if (!connector) throw new Error('No supported wallet found.')
-
-      await connectAsync({ connector })
-    } catch (err) {
-      console.error('Connect error:', err)
-    }
-  }
-
-  const disconnect = async () => {
-    try {
-      await disconnectAsync()
-    } catch (err) {
-      console.error('Disconnect error:', err)
-    }
-  }
-
-  return (
-    <EthereumContext.Provider
-      value={{
-        address: mounted ? address ?? null : null,
-        isConnected: mounted ? isConnected : false,
-        connect,
-        disconnect,
-      }}
-    >
-      {children}
-    </EthereumContext.Provider>
-  )
+  const value = useMemo(() => state, [state.provider, state.isClient, state.hasWallet, state.chainId])
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
 
-export function useEthereum(): EthereumContextType {
-  const ctx = useContext(EthereumContext)
-  if (!ctx) throw new Error('useEthereum must be used within EthereumProvider')
-  return ctx
+/**
+ * Hook never throws; returns safe defaults on SSR.
+ */
+export function useEthereum(): EthereumCtx {
+  return useContext(Ctx)
 }
